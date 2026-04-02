@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #080810; color: #fff; font-family: 'Inter', sans-serif; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #080810; }
+::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 10px; }
+a { text-decoration: none; }
+
+.ark-input {
+  background: #12121f;
+  border: 1px solid rgba(79,142,247,0.18);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: #fff;
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+  font-family: inherit;
+  transition: border 0.2s;
+}
+.ark-input:focus { border-color: #4f8ef7; }
+.ark-input::placeholder { color: #334155; }
+
+.ark-btn {
+  background: linear-gradient(135deg, #4f8ef7, #06b6d4);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: inherit;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.ark-btn:hover { opacity: 0.85; }
+.ark-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ark-btn-ghost {
+  background: transparent;
+  color: #4f8ef7;
+  border: 1px solid rgba(79,142,247,0.25);
+  border-radius: 8px;
+  padding: 9px 20px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.ark-btn-ghost:hover { background: rgba(79,142,247,0.1); }
+
+.ark-card {
+  background: #0a0a14;
+  border: 1px solid rgba(79,142,247,0.12);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.ark-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+}
