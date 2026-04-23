@@ -16,15 +16,25 @@ export function useTenant() {
 
       setUser(u)
 
-      const { data: memberData } = await supabase
+      const { data: memberData, error: memberError } = await supabase
         .from('tenant_members')
         .select('role, tenants(*)')
         .eq('user_id', u.id)
         .order('created_at', { ascending: true })
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (!memberData) { setLoading(false); return }
+      if (memberError) {
+        console.error('[useTenant] member error', memberError)
+        setLoading(false)
+        return
+      }
+
+      if (!memberData) {
+        console.warn('[useTenant] sem tenant vinculado para user', u.id)
+        setLoading(false)
+        return
+      }
 
       setTenant(memberData.tenants)
       setRole(memberData.role)
@@ -32,15 +42,17 @@ export function useTenant() {
       const tenantId = memberData.tenants.id
       const month    = new Date().toISOString().slice(0, 7)
 
-      const [{ data: botData }, { data: usageData }] = await Promise.all([
+      const [{ data: botData, error: botError }, { data: usageData }] = await Promise.all([
         supabase.from('bots').select('*').eq('tenant_id', tenantId).order('created_at'),
-        supabase.from('usage').select('*').eq('tenant_id', tenantId).eq('month', month).single()
+        supabase.from('usage').select('*').eq('tenant_id', tenantId).eq('month', month).maybeSingle()
       ])
+
+      if (botError) console.error('[useTenant] bots error', botError)
 
       setBots(botData || [])
       setUsage(usageData || { messages: 0, conversations: 0 })
     } catch (e) {
-      console.error('[useTenant]', e)
+      console.error('[useTenant] catch', e)
     } finally {
       setLoading(false)
     }
@@ -52,7 +64,6 @@ export function useTenant() {
     return () => subscription.unsubscribe()
   }, [load])
 
-  // Refresh manual de bots (ex: após criar/deletar)
   const refreshBots = useCallback(async (tenantId) => {
     const { data } = await supabase.from('bots').select('*').eq('tenant_id', tenantId).order('created_at')
     setBots(data || [])
