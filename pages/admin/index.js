@@ -22,7 +22,7 @@ export default function AdminDashboard() {
         supabase.from('messages').select('*', { count: 'exact', head: true }).eq('tenant_id', tenant.id),
         supabase.from('conversations').select('*', { count: 'exact', head: true }).eq('tenant_id', tenant.id),
         supabase.from('contacts').select('*', { count: 'exact', head: true }).eq('tenant_id', tenant.id),
-        supabase.from('usage').select('*').eq('tenant_id', tenant.id).eq('month', month).single()
+        supabase.from('usage').select('*').eq('tenant_id', tenant.id).eq('month', month).maybeSingle()
       ])
       setStats({
         messages: msgCount || 0,
@@ -35,7 +35,17 @@ export default function AdminDashboard() {
   }, [tenant])
 
   if (loading) return <div style={{ background: '#080810', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#4f8ef7' }}>Carregando…</div>
-  if (!user || !tenant) return null
+  if (!user) return null
+  if (!tenant) return (
+    <div style={{ background: "#080810", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "#fff", gap: 16 }}>
+      <div style={{ fontSize: 48 }}>⚠️</div>
+      <h2 style={{ color: "#f59e0b", fontWeight: 700 }}>Tenant não encontrado</h2>
+      <p style={{ color: "#475569", fontSize: 14, textAlign: "center", maxWidth: 400 }}>
+        Sua conta não está vinculada a nenhuma empresa. Entre em contato com o suporte.
+      </p>
+      <p style={{ color: "#334155", fontSize: 12 }}>user: {user?.email}</p>
+    </div>
+  )
 
   const plan = PLANS[tenant.plan] || PLANS.free
   const usagePct = Math.min((stats.monthMessages / plan.max_messages_month) * 100, 100)
