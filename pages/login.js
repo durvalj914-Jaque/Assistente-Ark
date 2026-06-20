@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const router = useRouter()
-  const [mode, setMode] = useState('login') // login | register
+  const [mode, setMode] = useState('login')
   const [form, setForm] = useState({ email: '', password: '', company: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -25,23 +25,28 @@ export default function Login() {
         setLoading(false)
         return
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: form.email, password: form.password })
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: form.email,
+          password: form.password
+        })
         if (error) throw error
-        router.push('/admin')
+        if (data?.session) {
+          router.push('/admin')
+        } else {
+          throw new Error('Sessão não iniciada. Tente novamente.')
+        }
       }
     } catch (err) {
-      setError(err.message)
+      setError(err.message || 'Erro ao entrar. Verifique seus dados.')
     }
     setLoading(false)
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#080810', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      {/* Background glow */}
       <div style={{ position: 'fixed', top: '20%', left: '50%', transform: 'translate(-50%,-50%)', width: 600, height: 600, background: 'radial-gradient(circle, rgba(79,142,247,0.06) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
       <div style={{ background: '#0a0a14', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 20, padding: '40px 36px', width: '100%', maxWidth: 400, position: 'relative' }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🤖</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
