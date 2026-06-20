@@ -6,12 +6,13 @@ import { useRouter } from 'next/router'
 export default function App({ Component, pageProps }) {
   const router = useRouter()
 
-  // Scroll to top on route change
   useEffect(() => {
     const handle = () => window.scrollTo(0, 0)
     router.events.on('routeChangeComplete', handle)
     return () => router.events.off('routeChangeComplete', handle)
   }, [router.events])
+
+  const canonicalUrl = 'https://arkiel.com.br' + router.pathname
 
   return (
     <>
@@ -26,7 +27,12 @@ export default function App({ Component, pageProps }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta property="og:title" content="Assistente Ark" />
         <meta property="og:description" content="Automatize seu WhatsApp com inteligência." />
+        <meta property="og:url" content={canonicalUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:image" content="https://arkiel.com.br/og-image.png" />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta name="theme-color" content="#080810" />
+        <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>" />
       </Head>
       <Component {...pageProps} />
