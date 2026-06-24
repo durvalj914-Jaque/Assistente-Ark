@@ -2,9 +2,26 @@ import '../styles/globals.css'
 import Head from 'next/head'
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
+import { supabase } from '../lib/supabase'
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
+
+  useEffect(() => {
+    // Captura o token do OAuth redirect (Google, etc.)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Se estiver na página de login ou na raiz, redireciona para o admin
+        if (router.pathname === '/login' || router.pathname === '/') {
+          router.replace('/admin')
+        }
+      }
+      if (event === 'SIGNED_OUT') {
+        router.replace('/login')
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [router])
 
   useEffect(() => {
     const handle = () => window.scrollTo(0, 0)
