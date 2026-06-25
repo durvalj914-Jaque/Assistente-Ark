@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import Link from 'next/link'
+import Head from 'next/head'
+import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
-export default function Index() {
+export default function Home() {
   const router = useRouter()
   const [checking, setChecking] = useState(true)
 
@@ -14,193 +17,486 @@ export default function Index() {
     })
   }, [])
 
-  if (checking) return <div style={{ background: '#080810', minHeight: '100vh' }} />
+  if (checking) return <div style={{ background: '#000', minHeight: '100vh' }} />
 
   return (
-    <div style={{ background: '#080810', minHeight: '100vh', fontFamily: 'Inter, sans-serif', color: '#fff' }}>
-      {/* Background glows */}
-      <div style={{ position: 'fixed', top: 0, left: '50%', transform: 'translateX(-50%)', width: 900, height: 500, background: 'radial-gradient(ellipse at top, rgba(79,142,247,0.08) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
-      <div style={{ position: 'fixed', bottom: 0, right: 0, width: 600, height: 600, background: 'radial-gradient(circle, rgba(6,182,212,0.05) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
+    <>
+      <Head>
+        <title>Arkiel — Automação Inteligente para WhatsApp Business</title>
+        <meta name="description" content="Plataforma SaaS multi-tenant para automação de WhatsApp com IA. Gerencie chatbots, conversas e atendimentos sem código." />
+      </Head>
 
-      {/* Navbar */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(8,8,16,0.85)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(79,142,247,0.1)', padding: '0 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 64 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
-          <span style={{ fontWeight: 800, fontSize: 16, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Assistente Ark</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Link href="/login" style={{ padding: '8px 18px', border: '1px solid rgba(79,142,247,0.25)', borderRadius: 8, color: '#94a3b8', fontSize: 13, fontWeight: 500, textDecoration: 'none', transition: 'all 0.2s' }}>Entrar</Link>
-          <Link href="/login" style={{ padding: '8px 18px', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}>Começar grátis →</Link>
-        </div>
-      </nav>
+      <style>{`
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #000; color: #fff; font-family: 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
 
-      {/* Hero */}
-      <section style={{ position: 'relative', zIndex: 1, textAlign: 'center', padding: '100px 24px 80px' }}>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(79,142,247,0.1)', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 20, padding: '5px 14px', fontSize: 12, color: '#4f8ef7', fontWeight: 600, marginBottom: 28 }}>
-          ✨ Plataforma SaaS de Chatbot WhatsApp
-        </div>
-        <h1 style={{ fontSize: 'clamp(36px,6vw,68px)', fontWeight: 900, lineHeight: 1.08, maxWidth: 800, margin: '0 auto 22px', letterSpacing: '-1.5px' }}>
-          Automatize seu{' '}
-          <span style={{ background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            WhatsApp
-          </span>
-          <br />com inteligência
-        </h1>
-        <p style={{ fontSize: 18, color: '#64748b', maxWidth: 520, margin: '0 auto 44px', lineHeight: 1.7 }}>
-          Crie bots poderosos, gerencie conversas e escale seu atendimento sem esforço. Multi-tenant, sem código.
-        </p>
-        <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-          <Link href="/login" style={{ padding: '14px 32px', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', borderRadius: 10, color: '#fff', fontSize: 15, fontWeight: 700, textDecoration: 'none', boxShadow: '0 8px 32px rgba(79,142,247,0.3)' }}>
-            Criar conta grátis →
-          </Link>
-          <Link href="/login" style={{ padding: '14px 32px', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: '#94a3b8', fontSize: 15, fontWeight: 600, textDecoration: 'none' }}>
-            Ver demonstração
-          </Link>
-        </div>
+        .home-root { background: #000; }
 
-        {/* Social proof */}
-        <div style={{ marginTop: 52, display: 'flex', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
-          {[['🚀','Deploy instantâneo'],['🔒','Dados seguros'],['📊','Analytics real-time'],['🤖','Multi-bot']].map(([icon, label]) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#475569', fontSize: 13 }}>
-              <span>{icon}</span><span>{label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+        /* Background elements */
+        .bg-grid {
+          position: fixed; inset: 0; z-index: 0; pointer-events: none;
+          background-image:
+            linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+          background-size: 72px 72px;
+        }
+        .bg-glow-top {
+          position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+          width: 1000px; height: 800px; z-index: 0; pointer-events: none;
+          background: radial-gradient(ellipse at top, rgba(79,142,247,0.07) 0%, transparent 60%);
+        }
 
-      {/* Dashboard preview */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '0 24px 100px', maxWidth: 1000, margin: '0 auto' }}>
-        <div style={{ background: '#0a0a14', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 40px 100px rgba(0,0,0,0.5)' }}>
-          {/* Fake browser bar */}
-          <div style={{ background: '#0d0d1a', padding: '12px 20px', borderBottom: '1px solid rgba(79,142,247,0.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', opacity: 0.7 }} />
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#f59e0b', opacity: 0.7 }} />
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#10b981', opacity: 0.7 }} />
-            <div style={{ flex: 1, marginLeft: 10, background: '#12121f', borderRadius: 6, padding: '4px 12px', fontSize: 11, color: '#334155' }}>assistente-ark.vercel.app/admin</div>
+        /* HERO */
+        .hero {
+          position: relative; z-index: 1;
+          padding: 160px 80px 120px;
+          text-align: center;
+          max-width: 1200px; margin: 0 auto;
+        }
+        .hero-badge {
+          display: inline-flex; align-items: center; gap: 8px;
+          border: 1px solid rgba(255,255,255,0.1); border-radius: 100px;
+          padding: 6px 16px; font-size: 12px; font-weight: 500;
+          color: rgba(255,255,255,0.5); margin-bottom: 32px;
+          background: rgba(255,255,255,0.03);
+          letter-spacing: 0.3px;
+        }
+        .hero-badge-dot {
+          width: 6px; height: 6px; border-radius: 50%;
+          background: #22c55e; box-shadow: 0 0 8px #22c55e;
+          animation: blink 2s ease-in-out infinite;
+        }
+        @keyframes blink {
+          0%,100% { opacity: 1; } 50% { opacity: 0.4; }
+        }
+        .hero-title {
+          font-size: clamp(44px, 7vw, 80px);
+          font-weight: 900; line-height: 1.03;
+          letter-spacing: -3px; margin-bottom: 28px; color: #fff;
+        }
+        .hero-title .g {
+          background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.5) 100%);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .hero-title .accent {
+          background: linear-gradient(135deg, #4f8ef7, #06b6d4);
+          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+          background-clip: text;
+        }
+        .hero-sub {
+          font-size: 18px; color: rgba(255,255,255,0.38);
+          max-width: 540px; margin: 0 auto 48px;
+          line-height: 1.75; font-weight: 400;
+        }
+        .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+        .btn-primary {
+          padding: 15px 36px; border-radius: 10px;
+          background: #fff; color: #000;
+          font-size: 15px; font-weight: 700;
+          text-decoration: none; transition: all 0.2s;
+          letter-spacing: -0.3px;
+        }
+        .btn-primary:hover { background: rgba(255,255,255,0.88); transform: translateY(-2px); box-shadow: 0 16px 40px rgba(255,255,255,0.15); }
+        .btn-ghost {
+          padding: 15px 36px; border-radius: 10px;
+          border: 1px solid rgba(255,255,255,0.12);
+          color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500;
+          text-decoration: none; transition: all 0.2s;
+        }
+        .btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+
+        /* HERO STATS */
+        .hero-stats {
+          display: flex; justify-content: center; gap: 0;
+          margin-top: 80px; border: 1px solid rgba(255,255,255,0.06);
+          border-radius: 16px; overflow: hidden; max-width: 700px; margin-left: auto; margin-right: auto;
+          background: rgba(255,255,255,0.02);
+        }
+        .hero-stat {
+          flex: 1; padding: 28px 20px; text-align: center;
+          border-right: 1px solid rgba(255,255,255,0.06);
+        }
+        .hero-stat:last-child { border-right: none; }
+        .hero-stat-num { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+        .hero-stat-lbl { font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 500; margin-top: 4px; letter-spacing: 0.3px; }
+
+        /* SECTION BASE */
+        .section { position: relative; z-index: 1; padding: 100px 80px; max-width: 1200px; margin: 0 auto; }
+        .section-tag {
+          font-size: 11px; font-weight: 700; letter-spacing: 2px;
+          color: #4f8ef7; text-transform: uppercase; margin-bottom: 14px;
+        }
+        .section-title {
+          font-size: clamp(28px, 4vw, 48px); font-weight: 800;
+          letter-spacing: -1.5px; color: #fff; line-height: 1.1;
+          margin-bottom: 18px;
+        }
+        .section-sub {
+          font-size: 16px; color: rgba(255,255,255,0.35);
+          max-width: 520px; line-height: 1.7; margin-bottom: 56px;
+        }
+        .section-divider {
+          height: 1px; background: rgba(255,255,255,0.05);
+          margin: 0 80px; position: relative; z-index: 1;
+        }
+
+        /* PRODUTOS */
+        .products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+        .product-card {
+          border: 1px solid rgba(255,255,255,0.07); border-radius: 20px;
+          padding: 40px 36px; background: rgba(255,255,255,0.02);
+          transition: all 0.25s; cursor: default; position: relative; overflow: hidden;
+        }
+        .product-card::before {
+          content: ''; position: absolute; inset: 0; border-radius: 20px;
+          background: linear-gradient(135deg, rgba(79,142,247,0.04), transparent);
+          opacity: 0; transition: opacity 0.25s;
+        }
+        .product-card:hover { border-color: rgba(79,142,247,0.2); transform: translateY(-4px); }
+        .product-card:hover::before { opacity: 1; }
+        .product-icon {
+          width: 52px; height: 52px; border-radius: 14px;
+          border: 1px solid rgba(255,255,255,0.08);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 22px; margin-bottom: 24px;
+          background: rgba(255,255,255,0.03);
+        }
+        .product-name { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 12px; letter-spacing: -0.5px; }
+        .product-desc { font-size: 14px; color: rgba(255,255,255,0.38); line-height: 1.7; margin-bottom: 24px; }
+        .product-features { display: flex; flex-direction: column; gap: 10px; }
+        .product-feat {
+          display: flex; align-items: center; gap: 10px;
+          font-size: 13px; color: rgba(255,255,255,0.45);
+        }
+        .product-feat-dot { width: 5px; height: 5px; border-radius: 50%; background: #4f8ef7; flex-shrink: 0; }
+        .product-badge {
+          display: inline-block; font-size: 10px; font-weight: 700;
+          letter-spacing: 1.5px; text-transform: uppercase;
+          padding: 4px 10px; border-radius: 100px;
+          border: 1px solid rgba(79,142,247,0.3); color: #4f8ef7;
+          margin-bottom: 16px;
+        }
+
+        /* SOLUÇÕES */
+        .solutions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .solution-card {
+          border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
+          padding: 32px 28px; background: rgba(255,255,255,0.015);
+          transition: all 0.2s;
+        }
+        .solution-card:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); }
+        .solution-icon { font-size: 28px; margin-bottom: 18px; display: block; }
+        .solution-name { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 10px; letter-spacing: -0.3px; }
+        .solution-desc { font-size: 13px; color: rgba(255,255,255,0.35); line-height: 1.65; }
+
+        /* PREÇOS */
+        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
+        .pricing-card {
+          border: 1px solid rgba(255,255,255,0.07); border-radius: 20px;
+          padding: 36px 32px; background: rgba(255,255,255,0.02);
+          position: relative;
+        }
+        .pricing-card.featured {
+          border-color: rgba(79,142,247,0.35);
+          background: rgba(79,142,247,0.04);
+        }
+        .pricing-popular {
+          position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+          background: linear-gradient(135deg, #4f8ef7, #06b6d4);
+          color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
+          text-transform: uppercase; padding: 4px 14px; border-radius: 100px;
+          white-space: nowrap;
+        }
+        .pricing-plan { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 12px; }
+        .pricing-price { font-size: 42px; font-weight: 900; color: #fff; letter-spacing: -2px; margin-bottom: 4px; }
+        .pricing-price sup { font-size: 20px; font-weight: 700; vertical-align: top; margin-top: 10px; }
+        .pricing-price sub { font-size: 14px; font-weight: 400; color: rgba(255,255,255,0.35); vertical-align: baseline; }
+        .pricing-desc { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 28px; line-height: 1.5; }
+        .pricing-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+        .pricing-feat {
+          display: flex; align-items: center; gap: 10px;
+          font-size: 13px; color: rgba(255,255,255,0.5);
+        }
+        .pricing-check { color: #22c55e; font-size: 14px; flex-shrink: 0; }
+        .btn-pricing {
+          width: 100%; padding: 13px; border-radius: 10px;
+          font-size: 14px; font-weight: 700; text-decoration: none;
+          display: block; text-align: center; transition: all 0.2s;
+        }
+        .btn-pricing-ghost {
+          border: 1px solid rgba(255,255,255,0.12);
+          color: rgba(255,255,255,0.65); background: transparent;
+        }
+        .btn-pricing-ghost:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+        .btn-pricing-solid {
+          background: linear-gradient(135deg, #4f8ef7, #06b6d4);
+          color: #fff; border: none;
+          box-shadow: 0 8px 24px rgba(79,142,247,0.3);
+        }
+        .btn-pricing-solid:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(79,142,247,0.4); }
+
+        /* EMPRESA */
+        .empresa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+        .empresa-text .section-title { margin-bottom: 20px; }
+        .empresa-body { font-size: 15px; color: rgba(255,255,255,0.4); line-height: 1.8; margin-bottom: 32px; }
+        .empresa-contact { display: flex; flex-direction: column; gap: 12px; }
+        .empresa-contact-item {
+          display: flex; align-items: center; gap: 12px;
+          font-size: 13px; color: rgba(255,255,255,0.45);
+        }
+        .empresa-contact-icon {
+          width: 34px; height: 34px; border-radius: 8px;
+          border: 1px solid rgba(255,255,255,0.08);
+          display: flex; align-items: center; justify-content: center;
+          font-size: 14px; background: rgba(255,255,255,0.02); flex-shrink: 0;
+        }
+        .empresa-visual {
+          display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+        }
+        .empresa-stat-card {
+          border: 1px solid rgba(255,255,255,0.07); border-radius: 16px;
+          padding: 28px 24px; background: rgba(255,255,255,0.02);
+        }
+        .empresa-stat-n { font-size: 32px; font-weight: 900; color: #fff; letter-spacing: -1px; margin-bottom: 6px; }
+        .empresa-stat-l { font-size: 12px; color: rgba(255,255,255,0.3); line-height: 1.4; }
+
+        /* CTA FINAL */
+        .cta-section {
+          position: relative; z-index: 1;
+          text-align: center; padding: 100px 80px;
+          max-width: 800px; margin: 0 auto;
+        }
+        .cta-title { font-size: clamp(32px, 5vw, 56px); font-weight: 900; letter-spacing: -2px; color: #fff; margin-bottom: 20px; }
+        .cta-sub { font-size: 16px; color: rgba(255,255,255,0.35); margin-bottom: 40px; line-height: 1.7; }
+
+        /* RESPONSIVE */
+        @media (max-width: 900px) {
+          .hero { padding: 120px 24px 80px; }
+          .section { padding: 70px 24px; }
+          .section-divider { margin: 0 24px; }
+          .products-grid { grid-template-columns: 1fr; }
+          .solutions-grid { grid-template-columns: 1fr 1fr; }
+          .pricing-grid { grid-template-columns: 1fr; }
+          .empresa-grid { grid-template-columns: 1fr; }
+          .cta-section { padding: 70px 24px; }
+          .hero-stats { flex-direction: column; border-radius: 12px; }
+          .hero-stat { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
+          .hero-stat:last-child { border-bottom: none; }
+        }
+        @media (max-width: 600px) {
+          .solutions-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
+
+      <div className="home-root">
+        <div className="bg-grid" />
+        <div className="bg-glow-top" />
+
+        <Navbar />
+
+        {/* ── HERO ── */}
+        <section className="hero">
+          <div className="hero-badge">
+            <span className="hero-badge-dot" />
+            Plataforma ativa · Novo: Ark AOI disponível
           </div>
-          {/* Mock dashboard */}
-          <div style={{ padding: 24, display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
-            {[['💬','1.284','Mensagens','#4f8ef7'],['🗂','347','Conversas','#8b5cf6'],['👥','89','Contatos','#10b981'],['🤖','3','Bots ativos','#f59e0b']].map(([icon,val,label,color]) => (
-              <div key={label} style={{ background: '#12121f', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, padding: 16 }}>
-                <div style={{ fontSize: 20, marginBottom: 8 }}>{icon}</div>
-                <div style={{ fontSize: 22, fontWeight: 800, color }}>{val}</div>
-                <div style={{ fontSize: 11, color: '#475569', marginTop: 4 }}>{label}</div>
+          <h1 className="hero-title">
+            <span className="g">Automatize seu</span><br />
+            <span className="accent">atendimento</span><br />
+            <span className="g">com IA.</span>
+          </h1>
+          <p className="hero-sub">
+            Gerencie chatbots de WhatsApp, conversas e equipes em uma plataforma unificada. Multi-tenant, escalável e sem código.
+          </p>
+          <div className="hero-actions">
+            <Link href="/login" className="btn-primary">Começar gratuitamente →</Link>
+            <Link href="#produtos" className="btn-ghost">Ver produtos</Link>
+          </div>
+          <div className="hero-stats">
+            <div className="hero-stat">
+              <div className="hero-stat-num">10k+</div>
+              <div className="hero-stat-lbl">Mensagens / dia</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-num">99.9%</div>
+              <div className="hero-stat-lbl">Uptime garantido</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-num">&lt; 1s</div>
+              <div className="hero-stat-lbl">Tempo de resposta</div>
+            </div>
+            <div className="hero-stat">
+              <div className="hero-stat-num">Multi</div>
+              <div className="hero-stat-lbl">Tenant isolado</div>
+            </div>
+          </div>
+        </section>
+
+        <div className="section-divider" />
+
+        {/* ── PRODUTOS ── */}
+        <section className="section" id="produtos">
+          <div className="section-tag">Produtos</div>
+          <h2 className="section-title">Uma plataforma,<br />dois produtos.</h2>
+          <p className="section-sub">Soluções complementares para automação completa do seu atendimento digital.</p>
+          <div className="products-grid">
+            <div className="product-card">
+              <div className="product-badge">Principal</div>
+              <div className="product-icon">💬</div>
+              <div className="product-name">Assistente Ark</div>
+              <p className="product-desc">Plataforma completa para criação e gestão de chatbots WhatsApp Business com painel administrativo multi-tenant, editor visual de fluxos e analytics em tempo real.</p>
+              <div className="product-features">
+                <div className="product-feat"><span className="product-feat-dot" />Editor de fluxos sem código</div>
+                <div className="product-feat"><span className="product-feat-dot" />Painel multi-tenant com isolamento</div>
+                <div className="product-feat"><span className="product-feat-dot" />Histórico completo de conversas</div>
+                <div className="product-feat"><span className="product-feat-dot" />Gestão de contatos e tags</div>
+                <div className="product-feat"><span className="product-feat-dot" />Relatórios e analytics avançados</div>
+              </div>
+            </div>
+            <div className="product-card">
+              <div className="product-badge" style={{ borderColor: 'rgba(139,92,246,0.3)', color: '#8b5cf6' }}>Em breve</div>
+              <div className="product-icon">🧠</div>
+              <div className="product-name">Ark AOI</div>
+              <p className="product-desc">Agente Operacional Inteligente — IA autônoma que aprende com seus dados, responde com contexto e age proativamente para resolver demandas complexas sem intervenção humana.</p>
+              <div className="product-features">
+                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />IA com memória de contexto longa</div>
+                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Integração com CRM e ERP</div>
+                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Aprendizado contínuo</div>
+                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Ações autônomas e agendadas</div>
+                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Escalonamento humano inteligente</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div className="section-divider" />
+
+        {/* ── SOLUÇÕES ── */}
+        <section className="section" id="solucoes">
+          <div className="section-tag">Soluções</div>
+          <h2 className="section-title">Tudo que você precisa<br />em um só lugar.</h2>
+          <p className="section-sub">Ferramentas poderosas para automação, análise e gestão de atendimento.</p>
+          <div className="solutions-grid">
+            {[
+              { icon: '⚡', name: 'Automação de Fluxos', desc: 'Crie fluxos de conversa visuais com condições, ramificações e ações automatizadas — sem uma linha de código.' },
+              { icon: '📊', name: 'Analytics em Tempo Real', desc: 'Dashboards completos com métricas de atendimento, taxa de resposta, conversões e performance dos agentes.' },
+              { icon: '👥', name: 'Gestão Multi-Tenant', desc: 'Isole dados por empresa com arquitetura multi-tenant robusta. Cada cliente tem seu ambiente seguro e independente.' },
+              { icon: '🔗', name: 'Integrações Nativas', desc: 'Conecte com CRM, ERP, plataformas de pagamento e qualquer API via webhooks configuráveis.' },
+              { icon: '🛡️', name: 'Segurança Enterprise', desc: 'Autenticação OAuth, criptografia de dados, backups automáticos e conformidade com LGPD.' },
+              { icon: '📱', name: 'WhatsApp Business API', desc: 'Integração oficial com a API do WhatsApp Business para alto volume de mensagens sem restrições.' },
+            ].map(s => (
+              <div key={s.name} className="solution-card">
+                <span className="solution-icon">{s.icon}</span>
+                <div className="solution-name">{s.name}</div>
+                <p className="solution-desc">{s.desc}</p>
               </div>
             ))}
           </div>
-          <div style={{ padding: '0 24px 24px', display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-            <div style={{ background: '#12121f', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 12, color: '#475569', marginBottom: 12 }}>Conversas recentes</div>
-              {[['João Silva','Olá, preciso de ajuda com...','14:32','bot'],['Maria Costa','Quero saber sobre preços','13:15','humano'],['Pedro Alves','Obrigado pelo atendimento!','12:08','fechado']].map(([name,msg,time,status]) => (
-                <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, flexShrink: 0 }}>{name[0]}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0' }}>{name}</div>
-                    <div style={{ fontSize: 11, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{msg}</div>
-                  </div>
-                  <div style={{ fontSize: 10, color: '#334155' }}>{time}</div>
+        </section>
+
+        <div className="section-divider" />
+
+        {/* ── PREÇOS ── */}
+        <section className="section" id="precos">
+          <div className="section-tag">Preços</div>
+          <h2 className="section-title">Planos para todos<br />os tamanhos.</h2>
+          <p className="section-sub">Comece gratuitamente e escale conforme seu negócio cresce.</p>
+          <div className="pricing-grid">
+            <div className="pricing-card">
+              <div className="pricing-plan">Starter</div>
+              <div className="pricing-price"><sup>R$</sup>0<sub>/mês</sub></div>
+              <p className="pricing-desc">Ideal para testar e validar sua operação.</p>
+              <div className="pricing-features">
+                {['1 chatbot ativo', '500 mensagens/mês', 'Painel básico', 'Suporte por e-mail'].map(f => (
+                  <div key={f} className="pricing-feat"><span className="pricing-check">✓</span>{f}</div>
+                ))}
+              </div>
+              <Link href="/login" className="btn-pricing btn-pricing-ghost">Começar grátis</Link>
+            </div>
+            <div className="pricing-card featured">
+              <span className="pricing-popular">Mais popular</span>
+              <div className="pricing-plan">Pro</div>
+              <div className="pricing-price"><sup>R$</sup>297<sub>/mês</sub></div>
+              <p className="pricing-desc">Para negócios que querem escalar o atendimento.</p>
+              <div className="pricing-features">
+                {['Chatbots ilimitados', '10.000 mensagens/mês', 'Analytics avançado', 'Editor visual de fluxos', 'Integrações via webhook', 'Suporte prioritário'].map(f => (
+                  <div key={f} className="pricing-feat"><span className="pricing-check">✓</span>{f}</div>
+                ))}
+              </div>
+              <Link href="/login" className="btn-pricing btn-pricing-solid">Assinar Pro →</Link>
+            </div>
+            <div className="pricing-card">
+              <div className="pricing-plan">Enterprise</div>
+              <div className="pricing-price" style={{ fontSize: 32 }}>Sob consulta</div>
+              <p className="pricing-desc">Para operações de grande escala e necessidades específicas.</p>
+              <div className="pricing-features">
+                {['Mensagens ilimitadas', 'SLA garantido 99.9%', 'Ark AOI incluso', 'Onboarding dedicado', 'Gerente de conta', 'Conformidade LGPD'].map(f => (
+                  <div key={f} className="pricing-feat"><span className="pricing-check">✓</span>{f}</div>
+                ))}
+              </div>
+              <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="btn-pricing btn-pricing-ghost">Falar com vendas</a>
+            </div>
+          </div>
+        </section>
+
+        <div className="section-divider" />
+
+        {/* ── EMPRESA ── */}
+        <section className="section" id="empresa">
+          <div className="empresa-grid">
+            <div className="empresa-text">
+              <div className="section-tag">Empresa</div>
+              <h2 className="section-title">Tecnologia brasileira<br />de alta performance.</h2>
+              <p className="empresa-body">
+                A Arkiel nasceu com a missão de democratizar a automação inteligente para empresas brasileiras. Desenvolvemos soluções SaaS de alto desempenho que transformam o atendimento ao cliente em vantagem competitiva.<br /><br />
+                Nossa equipe combina expertise em inteligência artificial, desenvolvimento de software e experiência do usuário para entregar produtos que realmente funcionam.
+              </p>
+              <div className="empresa-contact">
+                <div className="empresa-contact-item">
+                  <div className="empresa-contact-icon">✉️</div>
+                  <a href="mailto:arkieltech@gmail.com" style={{ color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}>arkieltech@gmail.com</a>
+                </div>
+                <div className="empresa-contact-item">
+                  <div className="empresa-contact-icon">📱</div>
+                  <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}>+55 11 91375-1590</a>
+                </div>
+                <div className="empresa-contact-item">
+                  <div className="empresa-contact-icon">📍</div>
+                  <span>São Paulo, Brasil</span>
+                </div>
+              </div>
+            </div>
+            <div className="empresa-visual">
+              {[
+                { n: '10k+', l: 'Mensagens processadas por dia' },
+                { n: '99.9%', l: 'Uptime da plataforma' },
+                { n: '2024', l: 'Fundação da empresa' },
+                { n: '24/7', l: 'Monitoramento ativo' },
+              ].map(s => (
+                <div key={s.n} className="empresa-stat-card">
+                  <div className="empresa-stat-n">{s.n}</div>
+                  <div className="empresa-stat-l">{s.l}</div>
                 </div>
               ))}
             </div>
-            <div style={{ background: '#12121f', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 12, padding: 16 }}>
-              <div style={{ fontSize: 12, color: '#475569', marginBottom: 12 }}>Status do bot</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-                <span style={{ fontSize: 12, color: '#10b981' }}>Online</span>
-              </div>
-              <div style={{ fontSize: 11, color: '#475569' }}>Bot Principal</div>
-              <div style={{ marginTop: 12, height: 4, background: '#1a1a2e', borderRadius: 4 }}>
-                <div style={{ height: '100%', width: '68%', background: 'linear-gradient(90deg,#4f8ef7,#06b6d4)', borderRadius: 4 }} />
-              </div>
-              <div style={{ fontSize: 10, color: '#475569', marginTop: 6 }}>680 / 1.000 mensagens</div>
-            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Features */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '0 24px 100px', maxWidth: 1000, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <h2 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.5px' }}>Tudo que você precisa</h2>
-          <p style={{ color: '#475569', marginTop: 12, fontSize: 15 }}>Para um atendimento automatizado de verdade</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          {[
-            ['🤖','Bots Inteligentes','Crie fluxos de conversa visuais sem escrever uma linha de código'],
-            ['📊','Analytics Completo','Métricas em tempo real de mensagens, conversas e performance'],
-            ['👥','Multi-Tenant','Gerencie múltiplos clientes em uma única plataforma'],
-            ['🔒','Segurança RLS','Isolamento total de dados por cliente com Row Level Security'],
-            ['⚡','Escalável','De 100 a 1 milhão de mensagens sem mudar nada na arquitetura'],
-            ['🎨','White-label','Personalize com a identidade visual do seu negócio'],
-          ].map(([icon, title, desc]) => (
-            <div key={title} style={{ background: '#0a0a14', border: '1px solid rgba(79,142,247,0.1)', borderRadius: 16, padding: 24, transition: 'border-color 0.2s' }}>
-              <div style={{ fontSize: 28, marginBottom: 14 }}>{icon}</div>
-              <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8, color: '#e2e8f0' }}>{title}</div>
-              <div style={{ fontSize: 13, color: '#475569', lineHeight: 1.6 }}>{desc}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+        <div className="section-divider" />
 
-      {/* Pricing */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '0 24px 100px', maxWidth: 900, margin: '0 auto' }}>
-        <div style={{ textAlign: 'center', marginBottom: 56 }}>
-          <h2 style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.5px' }}>Planos simples</h2>
-          <p style={{ color: '#475569', marginTop: 12, fontSize: 15 }}>Comece grátis, escale quando precisar</p>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          {[
-            { name: 'Free', price: 'R$ 0', period: '/mês', features: ['1 bot', '1.000 mensagens/mês', 'Analytics básico', 'Suporte por email'], cta: 'Começar grátis', highlight: false },
-            { name: 'Pro', price: 'R$ 97', period: '/mês', features: ['5 bots', '50.000 mensagens/mês', 'Analytics avançado', 'Suporte prioritário', 'White-label'], cta: 'Assinar Pro', highlight: true },
-            { name: 'Enterprise', price: 'Sob consulta', period: '', features: ['Bots ilimitados', 'Mensagens ilimitadas', 'SLA garantido', 'Onboarding dedicado', 'API customizada'], cta: 'Falar com vendas', highlight: false },
-          ].map(plan => (
-            <div key={plan.name} style={{
-              background: plan.highlight ? 'linear-gradient(135deg,rgba(79,142,247,0.15),rgba(6,182,212,0.1))' : '#0a0a14',
-              border: plan.highlight ? '1px solid rgba(79,142,247,0.4)' : '1px solid rgba(79,142,247,0.1)',
-              borderRadius: 16, padding: '28px 24px',
-              position: 'relative',
-              boxShadow: plan.highlight ? '0 0 40px rgba(79,142,247,0.15)' : 'none'
-            }}>
-              {plan.highlight && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', borderRadius: 20, padding: '3px 14px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' }}>MAIS POPULAR</div>}
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#94a3b8', marginBottom: 10 }}>{plan.name}</div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 20 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, color: plan.highlight ? '#4f8ef7' : '#e2e8f0' }}>{plan.price}</span>
-                <span style={{ fontSize: 13, color: '#475569' }}>{plan.period}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
-                {plan.features.map(f => (
-                  <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#94a3b8' }}>
-                    <span style={{ color: '#10b981', fontSize: 12 }}>✓</span>{f}
-                  </div>
-                ))}
-              </div>
-              <Link href="/login" style={{
-                display: 'block', textAlign: 'center', padding: '10px',
-                background: plan.highlight ? 'linear-gradient(135deg,#4f8ef7,#06b6d4)' : 'rgba(255,255,255,0.05)',
-                border: plan.highlight ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, textDecoration: 'none'
-              }}>{plan.cta}</Link>
-            </div>
-          ))}
-        </div>
-      </section>
+        {/* ── CTA FINAL ── */}
+        <section className="cta-section">
+          <h2 className="cta-title">Pronto para transformar seu atendimento?</h2>
+          <p className="cta-sub">Junte-se a empresas que já automatizaram seu WhatsApp com a Arkiel. Comece gratuitamente, sem cartão de crédito.</p>
+          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/login" className="btn-primary">Criar conta grátis →</Link>
+            <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="btn-ghost">Falar com especialista</a>
+          </div>
+        </section>
 
-      {/* CTA final */}
-      <section style={{ position: 'relative', zIndex: 1, padding: '0 24px 100px', maxWidth: 700, margin: '0 auto', textAlign: 'center' }}>
-        <div style={{ background: 'linear-gradient(135deg,rgba(79,142,247,0.1),rgba(6,182,212,0.08))', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 20, padding: '56px 40px' }}>
-          <h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 14, letterSpacing: '-0.5px' }}>Pronto para automatizar?</h2>
-          <p style={{ color: '#64748b', fontSize: 15, marginBottom: 32 }}>Crie sua conta grátis em 1 minuto e comece a usar hoje mesmo.</p>
-          <Link href="/login" style={{ display: 'inline-block', padding: '14px 36px', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', borderRadius: 10, color: '#fff', fontSize: 15, fontWeight: 700, textDecoration: 'none', boxShadow: '0 8px 32px rgba(79,142,247,0.3)' }}>
-            Criar conta grátis →
-          </Link>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid rgba(79,142,247,0.08)', padding: '32px 40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: 13, fontWeight: 800, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Assistente Ark</div>
-        <div style={{ fontSize: 12, color: '#334155' }}>© 2025 Assistente Ark. Todos os direitos reservados.</div>
-      </footer>
-    </div>
+        <Footer />
+      </div>
+    </>
   )
 }
