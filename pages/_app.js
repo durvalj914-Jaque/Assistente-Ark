@@ -4,20 +4,22 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 
+const PUBLIC_PAGES = ['/', '/login', '/termos', '/privacidade', '/cookies']
+
 export default function App({ Component, pageProps }) {
   const router = useRouter()
 
   useEffect(() => {
-    // Captura o token do OAuth redirect (Google, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Se estiver na página de login ou na raiz, redireciona para o admin
-        if (router.pathname === '/login' || router.pathname === '/') {
+        if (router.pathname === '/login') {
           router.replace('/admin')
         }
       }
       if (event === 'SIGNED_OUT') {
-        router.replace('/login')
+        if (!PUBLIC_PAGES.includes(router.pathname)) {
+          router.replace('/login')
+        }
       }
     })
     return () => subscription.unsubscribe()
@@ -35,20 +37,17 @@ export default function App({ Component, pageProps }) {
     <>
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
-        <title>Assistente Ark — Chatbot WhatsApp SaaS</title>
-        <meta name="description" content="Plataforma SaaS para criação e gestão de chatbots WhatsApp. Multi-tenant, sem código, escalável." />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <title>Arkiel — Automação Inteligente para WhatsApp Business</title>
+        <meta name="description" content="Plataforma SaaS para chatbots WhatsApp com IA. Multi-tenant, sem código, escalável." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta property="og:title" content="Assistente Ark" />
-        <meta property="og:description" content="Automatize seu WhatsApp com inteligência." />
+        <meta property="og:title" content="Arkiel — Automação Inteligente" />
+        <meta property="og:description" content="Automatize seu atendimento WhatsApp com inteligência artificial." />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://arkiel.com.br/og-image.png" />
+        <meta property="og:image" content="https://arkiel.com.br/arkiel-logo.png" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="theme-color" content="#080810" />
+        <meta name="theme-color" content="#000000" />
         <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" href="/favicon.ico" />
       </Head>
