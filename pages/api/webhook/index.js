@@ -44,7 +44,11 @@ export default async function handler(req, res) {
     if (!msgs?.length) return
 
     const msg           = msgs[0]
-    const from          = msg.from
+    const fromRaw        = msg.from
+    // Normalizar número brasileiro: 55 + DDD + 9 + número (13 dígitos)
+    const from = fromRaw.startsWith('55') && fromRaw.length === 12
+      ? fromRaw.slice(0, 4) + '9' + fromRaw.slice(4)
+      : fromRaw
     const phoneNumberId = change?.metadata?.phone_number_id
     const wamId         = msg.id
 
