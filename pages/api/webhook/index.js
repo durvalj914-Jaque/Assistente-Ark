@@ -1,10 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
-import { sendText, sendButtons, markRead } from '../../../lib/meta'
-import { processMessage } from '../../../lib/flowEngine'
 
 export const config = { api: { bodyParser: true } }
 
-function db() {
+function getDB() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY,
@@ -12,13 +10,33 @@ function db() {
   )
 }
 
-async function log(step, error, payload) {
+async function savelog(db, step, error, payload) {
   try {
-    await db().from('webhook_logs').insert({ step, error: String(error||''), payload: payload||null })
+    await db.from('webhook_logs').insert({ step, error: String(error || ''), payload: payload || null })
   } catch(e) {}
 }
 
+async function sendText(phoneId, token, to, text) {
+  const r = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'text', text: { body: text } })
+  })
+  const data = await r.json()
+  if (!r.ok) throw new Error(JSON.stringify(data))
+  return data
+}
+
+async function markRead(phoneId, token, messageId) {
+  await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: messageId })
+  }).catch(() => {})
+}
+
 export default async function handler(req, res) {
+  // GET — verificação Meta
   if (req.method === 'GET') {
     const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query
     if (mode === 'subscribe' && token === (process.env.WEBHOOK_VERIFY_TOKEN || 'ark_secret_arkiel_2025')) {
@@ -30,76 +48,88 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
   res.status(200).end()
 
+  const db = getDB()
+
   try {
     const body   = req.body
     const change = body?.entry?.[0]?.changes?.[0]?.value
 
-    await log('received', null, body)
+    await savelog(db, 'received', null, { object: body?.object, has_change: !!change })
 
-    if (change?.statuses?.length) return
+    // Ignorar status updates
+    if (change?.statuses?.length) {
+      await savelog(db, 'status_update', 'ignored', null)
+      return
+    }
+
     const msgs = change?.messages
-    if (!msgs?.length) { await log('no_messages', 'no messages in payload', body); return }
+    if (!msgs?.length) {
+      await savelog(db, 'no_messages', 'no messages array', { keys: Object.keys(change || {}) })
+      return
+    }
 
     const msg           = msgs[0]
-    const fromRaw       = msg.from
-    const from          = (fromRaw.startsWith('55') && fromRaw.length === 12)
-                          ? fromRaw.slice(0,4) + '9' + fromRaw.slice(4)
-                          : fromRaw
+    const fromRaw       = msg.from || ''
+    // Normalizar número: 55 + DDD(2) + 9 + número(8) = 13 dígitos
+    // Se vier sem o 9 (12 dígitos): adiciona o 9 após o DDD
+    const from = (fromRaw.startsWith('55') && fromRaw.length === 12)
+      ? fromRaw.slice(0, 4) + '9' + fromRaw.slice(4)
+      : fromRaw
+
     const phoneNumberId = change?.metadata?.phone_number_id
     const wamId         = msg.id
 
     let userText = ''
-    if (msg.type === 'text') userText = msg.text?.body || ''
-    else if (msg.type === 'button') userText = msg.button?.text || msg.button?.payload || ''
+    if (msg.type === 'text')             userText = msg.text?.body || ''
+    else if (msg.type === 'button')      userText = msg.button?.text || msg.button?.payload || ''
     else if (msg.type === 'interactive') {
       const br = msg.interactive?.button_reply
       const lr = msg.interactive?.list_reply
       userText = br?.title || br?.id || lr?.title || lr?.id || ''
     }
 
-    await log('parsed', null, { from, phoneNumberId, userText })
+    await savelog(db, 'parsed', null, { from, fromRaw, phoneNumberId, userText, type: msg.type })
 
-    const client = db()
-
-    // 1. Bot
-    const { data: botArr, error: botErr } = await client
+    // 1. Buscar bot
+    const { data: botArr, error: botErr } = await db
       .from('bots')
-      .select('*, tenants(id, plan, status, max_messages_month)')
+      .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,flow,tenants(id,plan,status,max_messages_month)')
       .eq('phone_number_id', phoneNumberId)
       .eq('status', 'active')
       .limit(1)
 
-    if (botErr) { await log('bot_error', botErr.message, null); return }
+    if (botErr) { await savelog(db, 'bot_error', botErr.message, null); return }
     const bot = botArr?.[0]
-    if (!bot) { await log('bot_not_found', `phone_number_id=${phoneNumberId}`, null); return }
-    if (bot.tenants?.status !== 'active') { await log('tenant_inactive', bot.tenants?.status, null); return }
+    if (!bot) { await savelog(db, 'bot_not_found', `phoneNumberId=${phoneNumberId}`, null); return }
+    if (bot.tenants?.status !== 'active') { await savelog(db, 'tenant_inactive', bot.tenants?.status, null); return }
 
-    await log('bot_found', null, { bot_id: bot.id, tenant: bot.tenant_id })
+    await savelog(db, 'bot_found', null, { bot_id: bot.id, bot_name: bot.name })
 
     const tenantId = bot.tenant_id
-    const month    = new Date().toISOString().slice(0,7)
+    const month    = new Date().toISOString().slice(0, 7)
 
     // 2. Incrementa uso
-    await client.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month }).catch(e => log('increment_err', e.message))
+    await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month }).catch(e => savelog(db, 'increment_err', e.message))
 
-    // 3. markRead
-    await markRead(bot.phone_number_id, bot.access_token, wamId).catch(() => {})
+    // 3. Mark read
+    await markRead(bot.phone_number_id, bot.access_token, wamId)
 
     // 4. Upsert contato
     const contactName = change?.contacts?.[0]?.profile?.name || ''
-    const { data: contact, error: contactErr } = await client
+    const { data: contact, error: contactErr } = await db
       .from('contacts')
       .upsert(
         { tenant_id: tenantId, phone: from, name: contactName || undefined, updated_at: new Date().toISOString() },
         { onConflict: 'tenant_id,phone' }
       )
-      .select().single()
+      .select('id,phone,name')
+      .single()
 
-    if (contactErr) { await log('contact_error', contactErr.message, null); return }
-    await log('contact_ok', null, { contact_id: contact.id })
+    if (contactErr) { await savelog(db, 'contact_error', contactErr.message, { from, tenantId }); return }
+    await savelog(db, 'contact_ok', null, { contact_id: contact.id, phone: contact.phone })
 
-    // 5. Conversa
-    let { data: conv } = await client
+    // 5. Busca ou cria conversa
+    let { data: conv } = await db
       .from('conversations')
       .select('*')
       .eq('tenant_id', tenantId).eq('bot_id', bot.id).eq('contact_id', contact.id)
@@ -109,62 +139,86 @@ export default async function handler(req, res) {
       .maybeSingle()
 
     if (!conv) {
-      const { data: newConv, error: convErr } = await client
+      const { data: newConv, error: convErr } = await db
         .from('conversations')
         .insert({ tenant_id: tenantId, bot_id: bot.id, contact_id: contact.id, status: 'bot' })
-        .select().single()
-      if (convErr) { await log('conv_error', convErr.message, null); return }
+        .select('*').single()
+      if (convErr) { await savelog(db, 'conv_error', convErr.message, null); return }
       conv = newConv
     }
-    await log('conv_ok', null, { conv_id: conv.id })
+    await savelog(db, 'conv_ok', null, { conv_id: conv.id, status: conv.status })
 
-    // 6. Mensagem inbound
-    await client.from('messages').insert({
+    // 6. Salva inbound
+    await db.from('messages').insert({
       tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
       contact_id: contact.id, direction: 'inbound', type: msg.type,
       content: userText || `[${msg.type}]`, meta_message_id: wamId
-    }).then(({ error: e }) => { if (e) log('msg_inbound_err', e.message) })
+    }).then(({ error: e }) => { if (e) savelog(db, 'msg_inbound_err', e.message) })
 
     // 7. Human takeover
-    if (conv.status === 'human') { await log('human_mode', null, null); return }
+    if (conv.status === 'human') { await savelog(db, 'human_mode', null, null); return }
 
     if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
-      await client.from('conversations').update({ status: 'human' }).eq('id', conv.id)
+      await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
       const reply = '👤 Transferindo para um atendente.'
-      await sendText(bot.phone_number_id, bot.access_token, from, reply).catch(e => log('send_err', e.message))
+      await sendText(bot.phone_number_id, bot.access_token, from, reply).catch(e => savelog(db, 'send_err', e.message))
+      await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
       return
     }
 
-    // 8. Flow
-    const { reply, node } = await processMessage(bot, conv, userText, {
-      supabase: client,
-      sendFn: async (text) => sendText(bot.phone_number_id, bot.access_token, from, text)
-    })
+    // 8. Processar fluxo
+    const nodes = bot.flow?.nodes || []
+    let reply = bot.greeting || 'Olá! Sou o assistente da Arkiel. Como posso ajudar?'
+    let nodeId = null
 
-    await log('flow_ok', null, { reply: reply?.substring(0,100) })
+    await savelog(db, 'flow_start', null, { nodes_count: nodes.length, current_node: conv.current_node_id })
 
-    // 9. Envio
-    if (node?.type === 'menu' && node.options?.length && node.options.length <= 3) {
-      await sendButtons(bot.phone_number_id, bot.access_token, from, reply,
-        node.options.slice(0,3).map((o,i) => ({ id: o.id || `opt_${i}`, title: o.label?.substring(0,20) || `Opção ${i+1}` })))
-        .catch(e => log('send_buttons_err', e.message))
-    } else {
-      await sendText(bot.phone_number_id, bot.access_token, from, reply)
-        .catch(e => log('send_text_err', e.response?.data ? JSON.stringify(e.response.data) : e.message))
+    if (nodes.length > 0) {
+      let currentNode
+      if (!conv.current_node_id) {
+        currentNode = nodes.find(n => !n.parentId) || nodes[0]
+      } else {
+        const cur = nodes.find(n => n.id === conv.current_node_id)
+        if (cur?.type === 'menu') {
+          const opt = cur.options?.find(o =>
+            o.keyword?.toLowerCase() === userText?.toLowerCase() || o.id === userText
+          )
+          currentNode = opt?.nextId ? nodes.find(n => n.id === opt.nextId) : null
+        } else {
+          const firstChild = cur?.children?.[0]
+          currentNode = firstChild ? nodes.find(n => n.id === firstChild) : null
+        }
+        if (!currentNode) {
+          reply = bot.fallback_message || 'Não entendi. Pode repetir?'
+          nodeId = conv.current_node_id
+        }
+      }
+      if (currentNode) {
+        reply = currentNode.text || reply
+        nodeId = currentNode.id
+      }
     }
 
-    // 10. Outbound + atualiza conversa
-    await client.from('messages').insert({
+    await savelog(db, 'flow_done', null, { reply: reply?.substring(0, 80), nodeId })
+
+    // 9. Enviar resposta
+    await sendText(bot.phone_number_id, bot.access_token, from, reply)
+      .catch(e => savelog(db, 'send_text_err', typeof e === 'string' ? e : e?.message, null))
+
+    // 10. Salva outbound + atualiza conversa
+    await db.from('messages').insert({
       tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
       contact_id: contact.id, direction: 'outbound', content: reply
     })
-    await client.from('conversations').update({
-      last_message: reply, last_message_at: new Date().toISOString(), current_node_id: node?.id || null
+    await db.from('conversations').update({
+      last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId
     }).eq('id', conv.id)
 
-    await log('done', null, { from, reply: reply?.substring(0,50) })
+    await savelog(db, 'done', null, { to: from, reply: reply?.substring(0, 50) })
 
   } catch(err) {
-    await log('fatal', err?.message + ' | ' + err?.stack?.substring(0,300), null)
+    try {
+      await db.from('webhook_logs').insert({ step: 'fatal', error: String(err?.message) + ' | ' + String(err?.stack).substring(0, 300), payload: null })
+    } catch(e2) {}
   }
 }
