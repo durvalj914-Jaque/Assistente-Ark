@@ -1,18 +1,26 @@
-/**
- * /api/webhook — Webhook oficial da Meta (WhatsApp Business API)
- */
-import { supabaseAdmin } from '../../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { sendText, sendButtons, markRead } from '../../../lib/meta'
 import { processMessage } from '../../../lib/flowEngine'
 
 export const config = { api: { bodyParser: true } }
 
+function db() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { persistSession: false } }
+  )
+}
+
+async function log(step, error, payload) {
+  try {
+    await db().from('webhook_logs').insert({ step, error: String(error||''), payload: payload||null })
+  } catch(e) {}
+}
+
 export default async function handler(req, res) {
-  // ── GET: verificação Meta ──────────────────────────────────
   if (req.method === 'GET') {
-    const mode      = req.query['hub.mode']
-    const token     = req.query['hub.verify_token']
-    const challenge = req.query['hub.challenge']
+    const { 'hub.mode': mode, 'hub.verify_token': token, 'hub.challenge': challenge } = req.query
     if (mode === 'subscribe' && token === (process.env.WEBHOOK_VERIFY_TOKEN || 'ark_secret_arkiel_2025')) {
       return res.status(200).send(challenge)
     }
@@ -20,33 +28,28 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') return res.status(405).end()
-
-  // Responde 200 imediatamente (Meta requer < 5s)
   res.status(200).end()
-
-  const errors = []
 
   try {
     const body   = req.body
-    const entry  = body?.entry?.[0]
-    const change = entry?.changes?.[0]?.value
+    const change = body?.entry?.[0]?.changes?.[0]?.value
+
+    await log('received', null, body)
 
     if (change?.statuses?.length) return
     const msgs = change?.messages
-    if (!msgs?.length) return
+    if (!msgs?.length) { await log('no_messages', 'no messages in payload', body); return }
 
     const msg           = msgs[0]
     const fromRaw       = msg.from
-    // Normalizar número BR: se 55 + 10 dígitos (sem o 9), adiciona o 9
-    const from = fromRaw.startsWith('55') && fromRaw.length === 12
-      ? fromRaw.slice(0, 4) + '9' + fromRaw.slice(4)
-      : fromRaw
-
+    const from          = (fromRaw.startsWith('55') && fromRaw.length === 12)
+                          ? fromRaw.slice(0,4) + '9' + fromRaw.slice(4)
+                          : fromRaw
     const phoneNumberId = change?.metadata?.phone_number_id
     const wamId         = msg.id
 
     let userText = ''
-    if (msg.type === 'text')        userText = msg.text?.body || ''
+    if (msg.type === 'text') userText = msg.text?.body || ''
     else if (msg.type === 'button') userText = msg.button?.text || msg.button?.payload || ''
     else if (msg.type === 'interactive') {
       const br = msg.interactive?.button_reply
@@ -54,56 +57,37 @@ export default async function handler(req, res) {
       userText = br?.title || br?.id || lr?.title || lr?.id || ''
     }
 
-    let db
-    try {
-      db = supabaseAdmin()
-    } catch (e) {
-      console.error('[webhook] Erro ao criar supabaseAdmin:', e.message)
-      return
-    }
+    await log('parsed', null, { from, phoneNumberId, userText })
 
-    // 1. Busca bot
-    const { data: botArr, error: botErr } = await db
+    const client = db()
+
+    // 1. Bot
+    const { data: botArr, error: botErr } = await client
       .from('bots')
       .select('*, tenants(id, plan, status, max_messages_month)')
       .eq('phone_number_id', phoneNumberId)
       .eq('status', 'active')
       .limit(1)
 
-    if (botErr) { console.error('[webhook] Erro ao buscar bot:', botErr.message); return }
+    if (botErr) { await log('bot_error', botErr.message, null); return }
     const bot = botArr?.[0]
-    if (!bot) { console.warn('[webhook] Nenhum bot ativo para:', phoneNumberId); return }
-    if (bot.tenants?.status !== 'active') { console.warn('[webhook] Tenant suspenso'); return }
+    if (!bot) { await log('bot_not_found', `phone_number_id=${phoneNumberId}`, null); return }
+    if (bot.tenants?.status !== 'active') { await log('tenant_inactive', bot.tenants?.status, null); return }
+
+    await log('bot_found', null, { bot_id: bot.id, tenant: bot.tenant_id })
 
     const tenantId = bot.tenant_id
-    const month    = new Date().toISOString().slice(0, 7)
+    const month    = new Date().toISOString().slice(0,7)
 
-    // 2. Verifica limite
-    const { data: usageRow } = await db
-      .from('usage').select('messages')
-      .eq('tenant_id', tenantId).eq('month', month)
-      .maybeSingle()
+    // 2. Incrementa uso
+    await client.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month }).catch(e => log('increment_err', e.message))
 
-    const maxMsg  = bot.tenants?.max_messages_month || 500
-    const usedMsg = usageRow?.messages || 0
-
-    if (usedMsg >= maxMsg) {
-      await sendText(bot.phone_number_id, bot.access_token, from,
-        '⚠️ Limite de mensagens atingido. Entre em contato com o suporte.')
-      return
-    }
-
-    // 3. Incrementa uso
-    await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month }).catch(e => {
-      console.error('[webhook] increment_usage erro:', e.message)
-    })
-
-    // 4. Marca como lida
+    // 3. markRead
     await markRead(bot.phone_number_id, bot.access_token, wamId).catch(() => {})
 
-    // 5. Upsert contato
+    // 4. Upsert contato
     const contactName = change?.contacts?.[0]?.profile?.name || ''
-    const { data: contact, error: contactErr } = await db
+    const { data: contact, error: contactErr } = await client
       .from('contacts')
       .upsert(
         { tenant_id: tenantId, phone: from, name: contactName || undefined, updated_at: new Date().toISOString() },
@@ -111,86 +95,76 @@ export default async function handler(req, res) {
       )
       .select().single()
 
-    if (contactErr) { console.error('[webhook] Erro upsert contato:', contactErr.message); return }
+    if (contactErr) { await log('contact_error', contactErr.message, null); return }
+    await log('contact_ok', null, { contact_id: contact.id })
 
-    // 6. Busca ou cria conversa
-    let { data: conv } = await db
+    // 5. Conversa
+    let { data: conv } = await client
       .from('conversations')
       .select('*')
-      .eq('tenant_id', tenantId)
-      .eq('bot_id', bot.id)
-      .eq('contact_id', contact.id)
+      .eq('tenant_id', tenantId).eq('bot_id', bot.id).eq('contact_id', contact.id)
       .neq('status', 'closed')
       .order('last_message_at', { ascending: false })
       .limit(1)
       .maybeSingle()
 
     if (!conv) {
-      const { data: newConv, error: convErr } = await db
+      const { data: newConv, error: convErr } = await client
         .from('conversations')
         .insert({ tenant_id: tenantId, bot_id: bot.id, contact_id: contact.id, status: 'bot' })
         .select().single()
-      if (convErr) { console.error('[webhook] Erro criar conversa:', convErr.message); return }
+      if (convErr) { await log('conv_error', convErr.message, null); return }
       conv = newConv
     }
+    await log('conv_ok', null, { conv_id: conv.id })
 
-    // 7. Salva mensagem inbound
-    await db.from('messages').insert({
-      tenant_id:       tenantId,
-      conversation_id: conv.id,
-      bot_id:          bot.id,
-      contact_id:      contact.id,
-      direction:       'inbound',
-      type:            msg.type,
-      content:         userText || `[${msg.type}]`,
-      meta_message_id: wamId
-    }).then(({ error: e }) => { if (e) console.error('[webhook] Erro salvar msg inbound:', e.message) })
+    // 6. Mensagem inbound
+    await client.from('messages').insert({
+      tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
+      contact_id: contact.id, direction: 'inbound', type: msg.type,
+      content: userText || `[${msg.type}]`, meta_message_id: wamId
+    }).then(({ error: e }) => { if (e) log('msg_inbound_err', e.message) })
 
-    // 8. Human takeover check
-    if (conv.status === 'human') {
-      await db.from('conversations').update({ last_message: userText, last_message_at: new Date().toISOString() }).eq('id', conv.id)
-      return
-    }
+    // 7. Human takeover
+    if (conv.status === 'human') { await log('human_mode', null, null); return }
 
-    // 9. Keyword para humano
     if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
-      await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
-      const reply = '👤 Transferindo para um atendente. Aguarde um momento.'
-      await sendText(bot.phone_number_id, bot.access_token, from, reply)
-      await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
+      await client.from('conversations').update({ status: 'human' }).eq('id', conv.id)
+      const reply = '👤 Transferindo para um atendente.'
+      await sendText(bot.phone_number_id, bot.access_token, from, reply).catch(e => log('send_err', e.message))
       return
     }
 
-    // 10. Processa fluxo
+    // 8. Flow
     const { reply, node } = await processMessage(bot, conv, userText, {
-      supabase: db,
+      supabase: client,
       sendFn: async (text) => sendText(bot.phone_number_id, bot.access_token, from, text)
     })
 
-    // 11. Envia resposta
+    await log('flow_ok', null, { reply: reply?.substring(0,100) })
+
+    // 9. Envio
     if (node?.type === 'menu' && node.options?.length && node.options.length <= 3) {
       await sendButtons(bot.phone_number_id, bot.access_token, from, reply,
-        node.options.slice(0, 3).map((o, i) => ({ id: o.id || `opt_${i}`, title: o.label?.substring(0, 20) || `Opção ${i+1}` })))
+        node.options.slice(0,3).map((o,i) => ({ id: o.id || `opt_${i}`, title: o.label?.substring(0,20) || `Opção ${i+1}` })))
+        .catch(e => log('send_buttons_err', e.message))
     } else {
-      const { error: sendErr } = await sendText(bot.phone_number_id, bot.access_token, from, reply)
-        .catch(e => ({ error: e }))
-      if (sendErr) console.error('[webhook] Erro ao enviar resposta:', sendErr?.message || sendErr)
+      await sendText(bot.phone_number_id, bot.access_token, from, reply)
+        .catch(e => log('send_text_err', e.response?.data ? JSON.stringify(e.response.data) : e.message))
     }
 
-    // 12. Salva mensagem outbound
-    await db.from('messages').insert({
+    // 10. Outbound + atualiza conversa
+    await client.from('messages').insert({
       tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
       contact_id: contact.id, direction: 'outbound', content: reply
-    }).then(({ error: e }) => { if (e) console.error('[webhook] Erro salvar msg outbound:', e.message) })
-
-    // 13. Atualiza conversa
-    await db.from('conversations').update({
+    })
+    await client.from('conversations').update({
       last_message: reply, last_message_at: new Date().toISOString(), current_node_id: node?.id || null
     }).eq('id', conv.id)
 
-    console.log('[webhook] ✅ Mensagem processada de', from, '→ reply:', reply?.substring(0, 50))
+    await log('done', null, { from, reply: reply?.substring(0,50) })
 
-  } catch (err) {
-    console.error('[webhook] Erro fatal:', err?.message || err, err?.stack?.substring(0, 300))
+  } catch(err) {
+    await log('fatal', err?.message + ' | ' + err?.stack?.substring(0,300), null)
   }
 }
