@@ -20,6 +20,12 @@ async function savelog(db, step, error, payload) {
   } catch(_) {}
 }
 
+async function safeInsert(db, table, data) {
+  try {
+    await db.from(table).insert(data)
+  } catch(e) { /* silencioso */ }
+}
+
 async function sendText(phoneId, token, to, text) {
   const r = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
     method: 'POST',
@@ -66,9 +72,8 @@ async function processWebhook(body) {
     .eq('status', 'active')
     .limit(1)
 
-  if (botErr) { await savelog(db, 'bot_error', botErr.message); return }
-  const bot = botArr?.[0]
-  if (!bot)   { await savelog(db, 'bot_not_found', `phoneNumberId=${phoneNumberId}`); return }
+  if (botErr || !botArr?.length) { await savelog(db, 'bot_not_found', botErr?.message || 'empty'); return }
+  const bot = botArr[0]
   if (bot.tenants?.status !== 'active') { await savelog(db, 'tenant_inactive', bot.tenants?.status); return }
   await savelog(db, 'bot_found', null, { bot_id: bot.id })
 
@@ -87,7 +92,7 @@ async function processWebhook(body) {
       headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: wamId })
     })
-  } catch(e) { await savelog(db, 'markread_err', e?.message) }
+  } catch(_) {}
 
   // Contato
   let contact
@@ -119,12 +124,13 @@ async function processWebhook(body) {
   }
   await savelog(db, 'conv_ok', null, { node: conv.current_node_id, status: conv.status })
 
-  // Salvar inbound
-  await db.from('messages').insert({
+  // Salvar inbound — await sem .catch()
+  await safeInsert(db, 'messages', {
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
     content: userText || `[${msg.type}]`, meta_message_id: wamId
-  }).catch(() => {})
+  })
+  await savelog(db, 'msg_inbound_ok')
 
   // Human mode
   if (conv.status === 'human') { await savelog(db, 'human_mode'); return }
@@ -133,13 +139,13 @@ async function processWebhook(body) {
   if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
     await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
     const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
-    await sendText(phoneNumberId, tkn, from, reply).catch(() => {})
-    await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
+    try { await sendText(phoneNumberId, tkn, from, reply) } catch(_) {}
+    await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
     await savelog(db, 'done_human')
     return
   }
 
-  // RESET — "0" ou palavras de reset voltam ao menu principal
+  // RESET — "0" ou palavras reservadas voltam ao menu
   const isReset = RESET_KEYWORDS.includes(userText?.toLowerCase())
 
   // FLUXO
@@ -148,22 +154,17 @@ async function processWebhook(body) {
   let nodeId = null
 
   if (nodes.length === 0 || !conv.current_node_id || isReset) {
-    // Primeira interação ou reset — envia menu principal
     const rootNode = nodes.find(n => !n.parentId) || nodes[0]
     if (rootNode) { reply = rootNode.text; nodeId = rootNode.id }
     else reply = bot.greeting || 'Olá! Como posso ajudar? 🤖'
-    if (isReset) await savelog(db, 'flow_reset', null, { trigger: userText })
-    else await savelog(db, 'flow_root')
+    await savelog(db, isReset ? 'flow_reset' : 'flow_root', null, { nodeId })
   } else {
-    // Navegar pelo fluxo
     const currentNode = nodes.find(n => n.id === conv.current_node_id)
 
     if (!currentNode) {
-      // Nó inválido — reseta
       const rootNode = nodes.find(n => !n.parentId) || nodes[0]
       reply = rootNode?.text || bot.greeting; nodeId = rootNode?.id || null
     } else if (currentNode.type === 'menu') {
-      // Busca opção pelo keyword
       const opt = currentNode.options?.find(o =>
         o.keyword?.toLowerCase() === userText?.toLowerCase()
       )
@@ -172,12 +173,10 @@ async function processWebhook(body) {
         reply  = nextNode?.text || bot.fallback_message || 'Opção inválida.'
         nodeId = nextNode?.id || currentNode.id
       } else {
-        // Opção inválida — repete o menu atual
         reply  = currentNode.text
         nodeId = currentNode.id
       }
     } else {
-      // Nó texto — qualquer entrada volta ao menu principal
       const rootNode = nodes.find(n => !n.parentId) || nodes[0]
       reply = rootNode?.text || bot.greeting; nodeId = rootNode?.id || null
     }
@@ -194,8 +193,11 @@ async function processWebhook(body) {
     await savelog(db, 'send_err', e?.message)
   }
 
-  // Salvar outbound + atualizar conversa
-  await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
+  // Outbound + atualizar conversa
+  await safeInsert(db, 'messages', {
+    tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
+    contact_id: contact.id, direction: 'outbound', content: reply
+  })
   await db.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }).eq('id', conv.id)
   await savelog(db, 'done', null, { nodeId, reply: reply?.substring(0,50) })
 }
