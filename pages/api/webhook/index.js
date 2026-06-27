@@ -8,6 +8,8 @@ const PHONE_ID  = process.env.WHATSAPP_PHONE_ID || '1055720357624339'
 const WA_TOKEN  = process.env.WHATSAPP_ACCESS_TOKEN
 const VERIFY_TK = process.env.WEBHOOK_VERIFY_TOKEN || 'ark_secret_arkiel_2025'
 
+const RESET_KEYWORDS = ['0', 'menu', 'inicio', 'início', 'reiniciar', 'comecar', 'começar']
+
 function getDB() {
   return createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
 }
@@ -45,6 +47,7 @@ async function processWebhook(body) {
                         : fromRaw
   const phoneNumberId = change?.metadata?.phone_number_id || PHONE_ID
   const wamId         = msg.id
+
   let userText = ''
   if (msg.type === 'text')        userText = msg.text?.body?.trim() || ''
   else if (msg.type === 'button') userText = msg.button?.text || msg.button?.payload || ''
@@ -75,7 +78,6 @@ async function processWebhook(body) {
   // Incrementar uso
   try {
     await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) })
-    await savelog(db, 'increment_ok')
   } catch(e) { await savelog(db, 'increment_err', e?.message) }
 
   // Mark read
@@ -85,7 +87,6 @@ async function processWebhook(body) {
       headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: wamId })
     })
-    await savelog(db, 'markread_ok')
   } catch(e) { await savelog(db, 'markread_err', e?.message) }
 
   // Contato
@@ -102,7 +103,6 @@ async function processWebhook(body) {
     if (contactErr) { await savelog(db, 'contact_error', contactErr.message); return }
     contact = newContact
   }
-  await savelog(db, 'contact_ok', null, { id: contact.id })
 
   // Conversa
   let { data: conv } = await db
@@ -117,85 +117,76 @@ async function processWebhook(body) {
     if (convErr) { await savelog(db, 'conv_error', convErr.message); return }
     conv = newConv
   }
-  await savelog(db, 'conv_ok', null, { conv_id: conv.id, node: conv.current_node_id })
+  await savelog(db, 'conv_ok', null, { node: conv.current_node_id, status: conv.status })
 
-  // Inbound
+  // Salvar inbound
   await db.from('messages').insert({
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
     content: userText || `[${msg.type}]`, meta_message_id: wamId
-  }).catch(e => savelog(db, 'msg_inbound_err', e?.message))
+  }).catch(() => {})
 
-  // Human takeover
+  // Human mode
   if (conv.status === 'human') { await savelog(db, 'human_mode'); return }
+
+  // Human takeover keyword
   if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
     await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
     const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
-    await sendText(phoneNumberId, tkn, from, reply).catch(e => savelog(db, 'send_err', e?.message))
+    await sendText(phoneNumberId, tkn, from, reply).catch(() => {})
     await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
     await savelog(db, 'done_human')
     return
   }
 
-  // Comando "menu" — volta ao início a qualquer momento
-  const isMenuCmd = userText?.toLowerCase() === 'menu' || userText?.toLowerCase() === 'início' || userText?.toLowerCase() === 'inicio'
+  // RESET — "0" ou palavras de reset voltam ao menu principal
+  const isReset = RESET_KEYWORDS.includes(userText?.toLowerCase())
 
   // FLUXO
   const nodes = bot.flow?.nodes || []
-  let reply = bot.greeting || 'Olá! Como posso ajudar?'
+  let reply  = bot.greeting || 'Olá! Como posso ajudar?'
   let nodeId = null
 
-  if (nodes.length === 0) {
-    // Sem fluxo configurado — usa greeting
-    reply = bot.greeting || 'Olá! Como posso ajudar? 🤖'
-    nodeId = null
-  } else if (!conv.current_node_id || isMenuCmd) {
-    // Primeira mensagem ou comando "menu" — envia o nó raiz (menu principal)
+  if (nodes.length === 0 || !conv.current_node_id || isReset) {
+    // Primeira interação ou reset — envia menu principal
     const rootNode = nodes.find(n => !n.parentId) || nodes[0]
-    reply = rootNode.text || reply
-    nodeId = rootNode.id
-    await savelog(db, 'flow_root', null, { node: nodeId, menu_cmd: isMenuCmd })
+    if (rootNode) { reply = rootNode.text; nodeId = rootNode.id }
+    else reply = bot.greeting || 'Olá! Como posso ajudar? 🤖'
+    if (isReset) await savelog(db, 'flow_reset', null, { trigger: userText })
+    else await savelog(db, 'flow_root')
   } else {
-    // Navegar a partir do nó atual
+    // Navegar pelo fluxo
     const currentNode = nodes.find(n => n.id === conv.current_node_id)
-    await savelog(db, 'flow_nav', null, { currentNode: currentNode?.id, type: currentNode?.type, input: userText })
 
     if (!currentNode) {
-      // Nó não encontrado — volta ao menu
+      // Nó inválido — reseta
       const rootNode = nodes.find(n => !n.parentId) || nodes[0]
-      reply = rootNode.text || reply
-      nodeId = rootNode.id
+      reply = rootNode?.text || bot.greeting; nodeId = rootNode?.id || null
     } else if (currentNode.type === 'menu') {
-      // Nó menu — procura opção pelo keyword ou número
+      // Busca opção pelo keyword
       const opt = currentNode.options?.find(o =>
-        o.keyword?.toLowerCase() === userText?.toLowerCase() ||
-        o.id === userText
+        o.keyword?.toLowerCase() === userText?.toLowerCase()
       )
       if (opt?.nextId) {
         const nextNode = nodes.find(n => n.id === opt.nextId)
-        if (nextNode) {
-          reply = nextNode.text || reply
-          nodeId = nextNode.id
-        } else {
-          reply = bot.fallback_message || 'Não entendi. Digite o número da opção ou *menu* para reiniciar.'
-          nodeId = currentNode.id
-        }
+        reply  = nextNode?.text || bot.fallback_message || 'Opção inválida.'
+        nodeId = nextNode?.id || currentNode.id
       } else {
-        // Opção inválida — repete o menu
-        reply = currentNode.text || bot.fallback_message || 'Não entendi. Por favor, escolha uma das opções acima.'
+        // Opção inválida — repete o menu atual
+        reply  = currentNode.text
         nodeId = currentNode.id
       }
     } else {
-      // Nó text/outro — qualquer entrada volta ao menu principal
+      // Nó texto — qualquer entrada volta ao menu principal
       const rootNode = nodes.find(n => !n.parentId) || nodes[0]
-      reply = rootNode.text || reply
-      nodeId = rootNode.id
+      reply = rootNode?.text || bot.greeting; nodeId = rootNode?.id || null
     }
+    await savelog(db, 'flow_nav', null, { from_node: conv.current_node_id, to_node: nodeId, input: userText })
   }
 
-  await savelog(db, 'flow_done', null, { reply: reply?.substring(0,80), nodeId })
+  await savelog(db, 'flow_done', null, { nodeId, reply: reply?.substring(0,60) })
 
-  // Enviar resposta
+  // Enviar
   try {
     await sendText(phoneNumberId, tkn, from, reply)
     await savelog(db, 'send_ok', null, { to: from })
@@ -206,7 +197,7 @@ async function processWebhook(body) {
   // Salvar outbound + atualizar conversa
   await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
   await db.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }).eq('id', conv.id)
-  await savelog(db, 'done', null, { to: from, nodeId, reply: reply?.substring(0,50) })
+  await savelog(db, 'done', null, { nodeId, reply: reply?.substring(0,50) })
 }
 
 export default async function handler(req, res) {
@@ -222,7 +213,7 @@ export default async function handler(req, res) {
   } catch(err) {
     try {
       const db = getDB()
-      await db.from('webhook_logs').insert({ step: 'fatal', error: String(err?.message) + ' | ' + String(err?.stack).substring(0,300), payload: null })
+      await db.from('webhook_logs').insert({ step: 'fatal', error: String(err?.message) + ' | ' + String(err?.stack).substring(0,300) })
     } catch(_) {}
   }
 
