@@ -46,7 +46,7 @@ async function processWebhook(body) {
   const phoneNumberId = change?.metadata?.phone_number_id || PHONE_ID
   const wamId         = msg.id
   let userText = ''
-  if (msg.type === 'text')        userText = msg.text?.body || ''
+  if (msg.type === 'text')        userText = msg.text?.body?.trim() || ''
   else if (msg.type === 'button') userText = msg.button?.text || msg.button?.payload || ''
   else if (msg.type === 'interactive') {
     const br = msg.interactive?.button_reply
@@ -72,15 +72,13 @@ async function processWebhook(body) {
   const tenantId = bot.tenant_id
   const tkn      = bot.access_token || WA_TOKEN
 
-  // Incrementar uso — não bloquear se falhar
+  // Incrementar uso
   try {
     await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) })
     await savelog(db, 'increment_ok')
-  } catch(e) {
-    await savelog(db, 'increment_err', e?.message)
-  }
+  } catch(e) { await savelog(db, 'increment_err', e?.message) }
 
-  // Mark read — não bloquear se falhar
+  // Mark read
   try {
     await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
       method: 'POST',
@@ -88,104 +86,127 @@ async function processWebhook(body) {
       body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: wamId })
     })
     await savelog(db, 'markread_ok')
-  } catch(e) {
-    await savelog(db, 'markread_err', e?.message)
-  }
+  } catch(e) { await savelog(db, 'markread_err', e?.message) }
 
-  // Contato — buscar ou criar (sem upsert problemático)
-  await savelog(db, 'contact_start', null, { phone: from, tenantId })
+  // Contato
   let contact
   const { data: existingContact } = await db
-    .from('contacts')
-    .select('id,phone')
-    .eq('tenant_id', tenantId)
-    .eq('phone', from)
-    .maybeSingle()
+    .from('contacts').select('id,phone').eq('tenant_id', tenantId).eq('phone', from).maybeSingle()
 
   if (existingContact) {
     contact = existingContact
-    await savelog(db, 'contact_found', null, { id: contact.id })
   } else {
     const contactName = change?.contacts?.[0]?.profile?.name || ''
     const { data: newContact, error: contactErr } = await db
-      .from('contacts')
-      .insert({ tenant_id: tenantId, phone: from, name: contactName || null })
-      .select('id,phone').single()
-    if (contactErr) { await savelog(db, 'contact_error', contactErr.message, { from, tenantId }); return }
+      .from('contacts').insert({ tenant_id: tenantId, phone: from, name: contactName || null }).select('id,phone').single()
+    if (contactErr) { await savelog(db, 'contact_error', contactErr.message); return }
     contact = newContact
-    await savelog(db, 'contact_created', null, { id: contact.id })
   }
+  await savelog(db, 'contact_ok', null, { id: contact.id })
 
   // Conversa
-  await savelog(db, 'conv_start')
   let { data: conv } = await db
-    .from('conversations')
-    .select('*')
+    .from('conversations').select('*')
     .eq('tenant_id', tenantId).eq('bot_id', bot.id).eq('contact_id', contact.id)
     .neq('status', 'closed')
-    .order('last_message_at', { ascending: false })
-    .limit(1).maybeSingle()
+    .order('last_message_at', { ascending: false }).limit(1).maybeSingle()
 
   if (!conv) {
     const { data: newConv, error: convErr } = await db
-      .from('conversations')
-      .insert({ tenant_id: tenantId, bot_id: bot.id, contact_id: contact.id, status: 'bot' })
-      .select('*').single()
+      .from('conversations').insert({ tenant_id: tenantId, bot_id: bot.id, contact_id: contact.id, status: 'bot' }).select('*').single()
     if (convErr) { await savelog(db, 'conv_error', convErr.message); return }
     conv = newConv
-    await savelog(db, 'conv_created', null, { conv_id: conv.id })
-  } else {
-    await savelog(db, 'conv_found', null, { conv_id: conv.id, status: conv.status })
   }
+  await savelog(db, 'conv_ok', null, { conv_id: conv.id, node: conv.current_node_id })
 
   // Inbound
-  const { error: msgErr } = await db.from('messages').insert({
+  await db.from('messages').insert({
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
     content: userText || `[${msg.type}]`, meta_message_id: wamId
-  })
-  if (msgErr) await savelog(db, 'msg_inbound_err', msgErr.message)
-  else await savelog(db, 'msg_inbound_ok')
+  }).catch(e => savelog(db, 'msg_inbound_err', e?.message))
 
-  // Human
+  // Human takeover
   if (conv.status === 'human') { await savelog(db, 'human_mode'); return }
+  if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
+    await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
+    const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
+    await sendText(phoneNumberId, tkn, from, reply).catch(e => savelog(db, 'send_err', e?.message))
+    await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
+    await savelog(db, 'done_human')
+    return
+  }
 
-  // Flow
+  // Comando "menu" — volta ao início a qualquer momento
+  const isMenuCmd = userText?.toLowerCase() === 'menu' || userText?.toLowerCase() === 'início' || userText?.toLowerCase() === 'inicio'
+
+  // FLUXO
   const nodes = bot.flow?.nodes || []
-  let reply = bot.greeting || 'Olá! Sou o assistente da Arkiel. Como posso ajudar? 🤖'
+  let reply = bot.greeting || 'Olá! Como posso ajudar?'
   let nodeId = null
 
-  if (nodes.length > 0) {
-    let currentNode
-    if (!conv.current_node_id) {
-      currentNode = nodes.find(n => !n.parentId) || nodes[0]
-    } else {
-      const cur = nodes.find(n => n.id === conv.current_node_id)
-      if (cur?.type === 'menu') {
-        const opt = cur.options?.find(o => o.keyword?.toLowerCase() === userText?.toLowerCase() || o.id === userText)
-        currentNode = opt?.nextId ? nodes.find(n => n.id === opt.nextId) : null
-      } else {
-        const fc = cur?.children?.[0]
-        currentNode = fc ? nodes.find(n => n.id === fc) : null
-      }
-      if (!currentNode) { reply = bot.fallback_message || 'Não entendi. Pode repetir?'; nodeId = conv.current_node_id }
-    }
-    if (currentNode) { reply = currentNode.text || reply; nodeId = currentNode.id }
-  }
-  await savelog(db, 'flow_done', null, { reply: reply?.substring(0,80) })
+  if (nodes.length === 0) {
+    // Sem fluxo configurado — usa greeting
+    reply = bot.greeting || 'Olá! Como posso ajudar? 🤖'
+    nodeId = null
+  } else if (!conv.current_node_id || isMenuCmd) {
+    // Primeira mensagem ou comando "menu" — envia o nó raiz (menu principal)
+    const rootNode = nodes.find(n => !n.parentId) || nodes[0]
+    reply = rootNode.text || reply
+    nodeId = rootNode.id
+    await savelog(db, 'flow_root', null, { node: nodeId, menu_cmd: isMenuCmd })
+  } else {
+    // Navegar a partir do nó atual
+    const currentNode = nodes.find(n => n.id === conv.current_node_id)
+    await savelog(db, 'flow_nav', null, { currentNode: currentNode?.id, type: currentNode?.type, input: userText })
 
-  // Enviar
+    if (!currentNode) {
+      // Nó não encontrado — volta ao menu
+      const rootNode = nodes.find(n => !n.parentId) || nodes[0]
+      reply = rootNode.text || reply
+      nodeId = rootNode.id
+    } else if (currentNode.type === 'menu') {
+      // Nó menu — procura opção pelo keyword ou número
+      const opt = currentNode.options?.find(o =>
+        o.keyword?.toLowerCase() === userText?.toLowerCase() ||
+        o.id === userText
+      )
+      if (opt?.nextId) {
+        const nextNode = nodes.find(n => n.id === opt.nextId)
+        if (nextNode) {
+          reply = nextNode.text || reply
+          nodeId = nextNode.id
+        } else {
+          reply = bot.fallback_message || 'Não entendi. Digite o número da opção ou *menu* para reiniciar.'
+          nodeId = currentNode.id
+        }
+      } else {
+        // Opção inválida — repete o menu
+        reply = currentNode.text || bot.fallback_message || 'Não entendi. Por favor, escolha uma das opções acima.'
+        nodeId = currentNode.id
+      }
+    } else {
+      // Nó text/outro — qualquer entrada volta ao menu principal
+      const rootNode = nodes.find(n => !n.parentId) || nodes[0]
+      reply = rootNode.text || reply
+      nodeId = rootNode.id
+    }
+  }
+
+  await savelog(db, 'flow_done', null, { reply: reply?.substring(0,80), nodeId })
+
+  // Enviar resposta
   try {
     await sendText(phoneNumberId, tkn, from, reply)
     await savelog(db, 'send_ok', null, { to: from })
   } catch(e) {
-    await savelog(db, 'send_text_err', e?.message)
+    await savelog(db, 'send_err', e?.message)
   }
 
-  // Outbound + update
+  // Salvar outbound + atualizar conversa
   await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
   await db.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }).eq('id', conv.id)
-  await savelog(db, 'done', null, { to: from, reply: reply?.substring(0,50) })
+  await savelog(db, 'done', null, { to: from, nodeId, reply: reply?.substring(0,50) })
 }
 
 export default async function handler(req, res) {
