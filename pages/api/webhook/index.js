@@ -4,7 +4,7 @@ export const config = { api: { bodyParser: true } }
 
 const SUPA_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
-const PHONE_ID  = process.env.WHATSAPP_PHONE_ID  || '1055720357624339'
+const PHONE_ID  = process.env.WHATSAPP_PHONE_ID || '1055720357624339'
 const WA_TOKEN  = process.env.WHATSAPP_ACCESS_TOKEN
 const VERIFY_TK = process.env.WEBHOOK_VERIFY_TOKEN || 'ark_secret_arkiel_2025'
 
@@ -29,14 +29,6 @@ async function sendText(phoneId, token, to, text) {
   return data
 }
 
-async function markRead(phoneId, token, msgId) {
-  await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: msgId })
-  }).catch(() => {})
-}
-
 async function processWebhook(body) {
   const db     = getDB()
   const change = body?.entry?.[0]?.changes?.[0]?.value
@@ -44,7 +36,7 @@ async function processWebhook(body) {
 
   if (change?.statuses?.length) { await savelog(db, 'status_update', 'ignored'); return }
   const msgs = change?.messages
-  if (!msgs?.length) { await savelog(db, 'no_messages', 'empty', { keys: Object.keys(change||{}) }); return }
+  if (!msgs?.length) { await savelog(db, 'no_messages', 'empty'); return }
 
   const msg           = msgs[0]
   const fromRaw       = msg.from || ''
@@ -61,7 +53,7 @@ async function processWebhook(body) {
     const lr = msg.interactive?.list_reply
     userText = br?.title || br?.id || lr?.title || lr?.id || ''
   }
-  await savelog(db, 'parsed', null, { from, phoneNumberId, userText, type: msg.type })
+  await savelog(db, 'parsed', null, { from, phoneNumberId, userText })
 
   // Bot
   const { data: botArr, error: botErr } = await db
@@ -79,21 +71,53 @@ async function processWebhook(body) {
 
   const tenantId = bot.tenant_id
   const tkn      = bot.access_token || WA_TOKEN
-  const month    = new Date().toISOString().slice(0,7)
 
-  await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month }).catch(e => savelog(db, 'increment_err', e?.message))
-  await markRead(phoneNumberId, tkn, wamId)
+  // Incrementar uso — não bloquear se falhar
+  try {
+    await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) })
+    await savelog(db, 'increment_ok')
+  } catch(e) {
+    await savelog(db, 'increment_err', e?.message)
+  }
 
-  // Contato
-  const contactName = change?.contacts?.[0]?.profile?.name || ''
-  const { data: contact, error: contactErr } = await db
+  // Mark read — não bloquear se falhar
+  try {
+    await fetch(`https://graph.facebook.com/v19.0/${phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', status: 'read', message_id: wamId })
+    })
+    await savelog(db, 'markread_ok')
+  } catch(e) {
+    await savelog(db, 'markread_err', e?.message)
+  }
+
+  // Contato — buscar ou criar (sem upsert problemático)
+  await savelog(db, 'contact_start', null, { phone: from, tenantId })
+  let contact
+  const { data: existingContact } = await db
     .from('contacts')
-    .upsert({ tenant_id: tenantId, phone: from, name: contactName || undefined, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,phone' })
-    .select('id,phone').single()
-  if (contactErr) { await savelog(db, 'contact_error', contactErr.message, { from }); return }
-  await savelog(db, 'contact_ok', null, { contact_id: contact.id })
+    .select('id,phone')
+    .eq('tenant_id', tenantId)
+    .eq('phone', from)
+    .maybeSingle()
+
+  if (existingContact) {
+    contact = existingContact
+    await savelog(db, 'contact_found', null, { id: contact.id })
+  } else {
+    const contactName = change?.contacts?.[0]?.profile?.name || ''
+    const { data: newContact, error: contactErr } = await db
+      .from('contacts')
+      .insert({ tenant_id: tenantId, phone: from, name: contactName || null })
+      .select('id,phone').single()
+    if (contactErr) { await savelog(db, 'contact_error', contactErr.message, { from, tenantId }); return }
+    contact = newContact
+    await savelog(db, 'contact_created', null, { id: contact.id })
+  }
 
   // Conversa
+  await savelog(db, 'conv_start')
   let { data: conv } = await db
     .from('conversations')
     .select('*')
@@ -109,31 +133,27 @@ async function processWebhook(body) {
       .select('*').single()
     if (convErr) { await savelog(db, 'conv_error', convErr.message); return }
     conv = newConv
+    await savelog(db, 'conv_created', null, { conv_id: conv.id })
+  } else {
+    await savelog(db, 'conv_found', null, { conv_id: conv.id, status: conv.status })
   }
-  await savelog(db, 'conv_ok', null, { conv_id: conv.id, status: conv.status })
 
   // Inbound
-  await db.from('messages').insert({
+  const { error: msgErr } = await db.from('messages').insert({
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
     content: userText || `[${msg.type}]`, meta_message_id: wamId
-  }).catch(e => savelog(db, 'msg_inbound_err', e?.message))
+  })
+  if (msgErr) await savelog(db, 'msg_inbound_err', msgErr.message)
+  else await savelog(db, 'msg_inbound_ok')
 
   // Human
   if (conv.status === 'human') { await savelog(db, 'human_mode'); return }
-  if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
-    await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
-    const reply = '👤 Transferindo para um atendente.'
-    await sendText(phoneNumberId, tkn, from, reply).catch(e => savelog(db, 'send_err', e?.message))
-    await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
-    return
-  }
 
   // Flow
   const nodes = bot.flow?.nodes || []
   let reply = bot.greeting || 'Olá! Sou o assistente da Arkiel. Como posso ajudar? 🤖'
   let nodeId = null
-  await savelog(db, 'flow_start', null, { nodes_count: nodes.length, current_node: conv.current_node_id })
 
   if (nodes.length > 0) {
     let currentNode
@@ -155,10 +175,14 @@ async function processWebhook(body) {
   await savelog(db, 'flow_done', null, { reply: reply?.substring(0,80) })
 
   // Enviar
-  await sendText(phoneNumberId, tkn, from, reply)
-    .then(() => savelog(db, 'send_ok', null, { to: from }))
-    .catch(e => savelog(db, 'send_text_err', e?.message))
+  try {
+    await sendText(phoneNumberId, tkn, from, reply)
+    await savelog(db, 'send_ok', null, { to: from })
+  } catch(e) {
+    await savelog(db, 'send_text_err', e?.message)
+  }
 
+  // Outbound + update
   await db.from('messages').insert({ tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
   await db.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }).eq('id', conv.id)
   await savelog(db, 'done', null, { to: from, reply: reply?.substring(0,50) })
@@ -172,12 +196,13 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return res.status(405).end()
 
-  // Processar ANTES de responder — Vercel mata a função após res.end()
   try {
     await processWebhook(req.body)
   } catch(err) {
-    const db = getDB()
-    await db.from('webhook_logs').insert({ step: 'fatal', error: String(err?.message) + ' | ' + String(err?.stack).substring(0,200), payload: null }).catch(()=>{})
+    try {
+      const db = getDB()
+      await db.from('webhook_logs').insert({ step: 'fatal', error: String(err?.message) + ' | ' + String(err?.stack).substring(0,300), payload: null })
+    } catch(_) {}
   }
 
   return res.status(200).json({ ok: true })
