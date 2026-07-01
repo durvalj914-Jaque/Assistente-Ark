@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { processFlow } from '../../../lib/flowEngine'
 
 export const config = { api: { bodyParser: true } }
 
@@ -7,8 +8,6 @@ const SUPA_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
 const PHONE_ID  = process.env.WHATSAPP_PHONE_ID || '1055720357624339'
 const WA_TOKEN  = process.env.WHATSAPP_ACCESS_TOKEN
 const VERIFY_TK = process.env.WEBHOOK_VERIFY_TOKEN || 'ark_secret_arkiel_2025'
-
-const RESET_KEYWORDS = ['0', 'menu', 'inicio', 'início', 'reiniciar', 'comecar', 'começar']
 
 function getDB() {
   return createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
@@ -21,9 +20,7 @@ async function savelog(db, step, error, payload) {
 }
 
 async function safeInsert(db, table, data) {
-  try {
-    await db.from(table).insert(data)
-  } catch(e) { /* silencioso */ }
+  try { await db.from(table).insert(data) } catch(_) {}
 }
 
 async function sendText(phoneId, token, to, text) {
@@ -124,18 +121,17 @@ async function processWebhook(body) {
   }
   await savelog(db, 'conv_ok', null, { node: conv.current_node_id, status: conv.status })
 
-  // Salvar inbound — await sem .catch()
+  // Salvar inbound
   await safeInsert(db, 'messages', {
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
     content: userText || `[${msg.type}]`, meta_message_id: wamId
   })
-  await savelog(db, 'msg_inbound_ok')
 
   // Human mode
   if (conv.status === 'human') { await savelog(db, 'human_mode'); return }
 
-  // Human takeover keyword
+  // Human takeover keyword (atalho direto, sem depender do fluxo)
   if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
     await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
     const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
@@ -145,45 +141,20 @@ async function processWebhook(body) {
     return
   }
 
-  // RESET — "0" ou palavras reservadas voltam ao menu
-  const isReset = RESET_KEYWORDS.includes(userText?.toLowerCase())
-
-  // FLUXO
+  // ── Motor de fluxo unificado (lib/flowEngine.js) ──
   const nodes = bot.flow?.nodes || []
-  let reply  = bot.greeting || 'Olá! Como posso ajudar?'
-  let nodeId = null
+  const result = processFlow(nodes, conv.current_node_id, userText, { greeting: bot.greeting })
+  await savelog(db, 'flow_result', null, { action: result.action, nodeId: result.nodeId, reply: result.reply?.substring(0,60) })
 
-  if (nodes.length === 0 || !conv.current_node_id || isReset) {
-    const rootNode = nodes.find(n => !n.parentId) || nodes[0]
-    if (rootNode) { reply = rootNode.text; nodeId = rootNode.id }
-    else reply = bot.greeting || 'Olá! Como posso ajudar? 🤖'
-    await savelog(db, isReset ? 'flow_reset' : 'flow_root', null, { nodeId })
-  } else {
-    const currentNode = nodes.find(n => n.id === conv.current_node_id)
+  let reply = result.reply || bot.fallback_message || 'Não entendi. Digite *0* para voltar ao menu.'
+  let nodeId = result.nodeId
+  let convUpdate = { last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }
 
-    if (!currentNode) {
-      const rootNode = nodes.find(n => !n.parentId) || nodes[0]
-      reply = rootNode?.text || bot.greeting; nodeId = rootNode?.id || null
-    } else if (currentNode.type === 'menu') {
-      const opt = currentNode.options?.find(o =>
-        o.keyword?.toLowerCase() === userText?.toLowerCase()
-      )
-      if (opt?.nextId) {
-        const nextNode = nodes.find(n => n.id === opt.nextId)
-        reply  = nextNode?.text || bot.fallback_message || 'Opção inválida.'
-        nodeId = nextNode?.id || currentNode.id
-      } else {
-        reply  = currentNode.text
-        nodeId = currentNode.id
-      }
-    } else {
-      const rootNode = nodes.find(n => !n.parentId) || nodes[0]
-      reply = rootNode?.text || bot.greeting; nodeId = rootNode?.id || null
-    }
-    await savelog(db, 'flow_nav', null, { from_node: conv.current_node_id, to_node: nodeId, input: userText })
+  if (result.action === 'transfer') {
+    convUpdate.status = 'human'
+  } else if (result.action === 'end') {
+    convUpdate.status = 'closed'
   }
-
-  await savelog(db, 'flow_done', null, { nodeId, reply: reply?.substring(0,60) })
 
   // Enviar
   try {
@@ -193,13 +164,12 @@ async function processWebhook(body) {
     await savelog(db, 'send_err', e?.message)
   }
 
-  // Outbound + atualizar conversa
   await safeInsert(db, 'messages', {
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'outbound', content: reply
   })
-  await db.from('conversations').update({ last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }).eq('id', conv.id)
-  await savelog(db, 'done', null, { nodeId, reply: reply?.substring(0,50) })
+  await db.from('conversations').update(convUpdate).eq('id', conv.id)
+  await savelog(db, 'done', null, { nodeId, action: result.action })
 }
 
 export default async function handler(req, res) {
