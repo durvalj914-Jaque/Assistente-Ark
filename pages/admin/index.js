@@ -41,9 +41,16 @@ export default function AdminDashboard() {
       <div style={{ fontSize: 48 }}>⚠️</div>
       <h2 style={{ color: "#f59e0b", fontWeight: 700 }}>Tenant não encontrado</h2>
       <p style={{ color: "#475569", fontSize: 14, textAlign: "center", maxWidth: 400 }}>
-        Sua conta não está vinculada a nenhuma empresa. Entre em contato com o suporte.
+        Sua conta não está vinculada a nenhuma empresa, ou sua sessão pode estar desatualizada.
       </p>
       <p style={{ color: "#334155", fontSize: 12 }}>user: {user?.email}</p>
+      <button
+        onClick={async () => { await supabase.auth.signOut(); router.replace('/login') }}
+        className="ark-btn"
+        style={{ marginTop: 8 }}
+      >
+        🔄 Sair e entrar novamente
+      </button>
     </div>
   )
 
@@ -133,3 +140,4 @@ export default function AdminDashboard() {
     </AdminLayout>
   )
 }
+
