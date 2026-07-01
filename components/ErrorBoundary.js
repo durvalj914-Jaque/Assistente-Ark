@@ -3,7 +3,7 @@ import { Component } from 'react'
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { error: null, info: null }
+    this.state = { error: null }
   }
 
   static getDerivedStateFromError(error) {
@@ -11,25 +11,24 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error('[ErrorBoundary]', error, info)
-    this.setState({ info })
+    // Mantém o log técnico no console para investigação futura, sem expor ao usuário.
+    console.error('[ErrorBoundary]', error, info?.componentStack)
   }
 
   render() {
     if (this.state.error) {
       return (
-        <div style={{ background: '#080810', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: 12, padding: 24, fontFamily: 'monospace' }}>
+        <div style={{ background: '#080810', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', gap: 14, padding: 24, textAlign: 'center' }}>
           <div style={{ fontSize: 40 }}>⚠️</div>
-          <h2 style={{ color: '#f59e0b' }}>Algo quebrou</h2>
-          <pre style={{ color: '#ef4444', maxWidth: 600, whiteSpace: 'pre-wrap', fontSize: 12, textAlign: 'left', background: '#12121f', padding: 12, borderRadius: 8 }}>
-            {String(this.state.error?.message || this.state.error)}
-            {'\n\n'}
-            {this.state.error?.stack || ''}
-            {'\n\n'}
-            {this.state.info?.componentStack || ''}
-          </pre>
-          <button onClick={() => window.location.href = '/admin'} style={{ background: '#4f8ef7', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer' }}>
-            Recarregar
+          <h2 style={{ color: '#f59e0b', fontWeight: 700 }}>Ops, algo deu errado</h2>
+          <p style={{ color: '#475569', fontSize: 13, maxWidth: 380 }}>
+            Tivemos um problema ao carregar esta página. Tente recarregar — se persistir, fale com o suporte.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="ark-btn"
+          >
+            🔄 Recarregar
           </button>
         </div>
       )
