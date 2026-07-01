@@ -3,6 +3,7 @@ import Head from 'next/head'
 import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
+import ErrorBoundary from '../components/ErrorBoundary'
 
 const PUBLIC_PAGES = ['/', '/login', '/termos', '/privacidade', '/cookies']
 
@@ -51,7 +52,9 @@ export default function App({ Component, pageProps }) {
         <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <Component {...pageProps} />
+      <ErrorBoundary>
+        <Component {...pageProps} />
+      </ErrorBoundary>
     </>
   )
 }
