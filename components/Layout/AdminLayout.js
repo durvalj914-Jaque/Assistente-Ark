@@ -8,6 +8,7 @@ const NAV = [
   { href: '/admin', label: 'Dashboard', icon: '⬡', exact: true },
   { href: '/admin/bots', label: 'Bots', icon: '🤖' },
   { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
+  { href: '/admin/products', label: 'Produtos', icon: '📦' },
   { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
   { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
   { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
@@ -179,3 +180,4 @@ export default function AdminLayout({ children, tenant, user, role }) {
     </div>
   )
 }
+
