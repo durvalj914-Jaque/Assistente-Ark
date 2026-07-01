@@ -8,7 +8,7 @@ import { PLANS } from '../../lib/plans'
 export default function AdminDashboard() {
   const router = useRouter()
   const { user, tenant, role, bots, loading } = useTenant()
-  const [stats, setStats] = useState({ messages: 0, conversations: 0, contacts: 0, active: 0 })
+  const [stats, setStats] = useState({ messages: 0, conversations: 0, contacts: 0, monthMessages: 0 })
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
@@ -55,7 +55,7 @@ export default function AdminDashboard() {
   )
 
   const plan = PLANS[tenant.plan] || PLANS.free
-  const usagePct = Math.min((stats.monthMessages / plan.max_messages_month) * 100, 100)
+  const usagePct = Math.min(((stats.monthMessages || 0) / (plan.max_messages_month || 1)) * 100, 100)
   const activeBot = bots.find(b => b.status === 'active')
 
   const STAT_CARDS = [
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: 13, marginBottom: 8 }}>
-            <span>{stats.monthMessages.toLocaleString('pt-BR')} mensagens</span>
+            <span>{(stats.monthMessages || 0).toLocaleString('pt-BR')} mensagens</span>
             <span>{plan.max_messages_month === 999999 ? 'Ilimitado' : plan.max_messages_month.toLocaleString('pt-BR')} limite</span>
           </div>
           <div style={{ background: '#12121f', borderRadius: 8, height: 8, overflow: 'hidden' }}>
