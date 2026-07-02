@@ -7,6 +7,7 @@ export function useTenant() {
   const [role,    setRole]    = useState(null)
   const [bots,    setBots]    = useState([])
   const [usage,   setUsage]   = useState(null)
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(async () => {
@@ -40,6 +41,9 @@ export function useTenant() {
       }
 
       setUser(u)
+
+      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', u.id).maybeSingle()
+      setProfile(profileData || null)
 
       const { data: memberData, error: memberError } = await supabase
         .from('tenant_members')
@@ -111,5 +115,10 @@ export function useTenant() {
     setBots(data || [])
   }, [])
 
-  return { user, tenant, role, bots, usage, loading, refreshBots }
+  const refreshProfile = useCallback(async (userId) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    setProfile(data || null)
+  }, [])
+
+  return { user, tenant, role, bots, usage, profile, loading, refreshBots, refreshProfile }
 }

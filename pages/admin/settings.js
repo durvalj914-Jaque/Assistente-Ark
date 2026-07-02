@@ -7,7 +7,7 @@ import { PLANS } from '../../lib/plans'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { user, tenant, role, loading } = useTenant()
+  const { user, tenant, role, profile, loading } = useTenant()
   const [form, setForm] = useState({ name: '', slug: '' })
   const [members, setMembers] = useState([])
   const [inviteEmail, setInviteEmail] = useState('')
@@ -31,7 +31,7 @@ export default function SettingsPage() {
   const plan = PLANS[tenant.plan] || PLANS.free
 
   return (
-    <AdminLayout tenant={tenant} user={user} role={role}>
+    <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20, marginBottom: 24 }}>⚙️ Configurações</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>

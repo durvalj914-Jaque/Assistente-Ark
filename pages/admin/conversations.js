@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 
 export default function ConversationsPage() {
   const router = useRouter()
-  const { user, tenant, role, loading } = useTenant()
+  const { user, tenant, role, profile, loading } = useTenant()
   const [conversations, setConversations] = useState([])
   const [selected, setSelected] = useState(null)
   const [messages, setMessages] = useState([])
@@ -66,7 +66,7 @@ export default function ConversationsPage() {
   if (loading || !user || !tenant) return null
 
   return (
-    <AdminLayout tenant={tenant} user={user} role={role}>
+    <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20, marginBottom: 20 }}>💬 Conversas</h1>
       <div style={{ display: 'flex', height: 'calc(100vh - 160px)', borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(79,142,247,0.12)' }}>
         {/* Lista */}

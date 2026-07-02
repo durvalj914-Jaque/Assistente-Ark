@@ -6,7 +6,7 @@ import { supabase } from '../../lib/supabase'
 import { PLANS, usagePercent } from '../../lib/plans'
 
 export default function AnalyticsPage() {
-  const { user, tenant, role, usage, loading } = useTenant()
+  const { user, tenant, role, usage, profile, loading } = useTenant()
   const router = useRouter()
   const [history, setHistory] = useState([])
   const [topContacts, setTopContacts] = useState([])
@@ -60,7 +60,7 @@ export default function AnalyticsPage() {
   const CONV_LABELS = { open: 'Abertas', bot: 'Com bot', human: 'Humano', closed: 'Fechadas' }
 
   return (
-    <AdminLayout tenant={tenant} user={user} role={role}>
+    <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>📊 Analytics</h1>
         <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>Visão geral do uso e desempenho</p>

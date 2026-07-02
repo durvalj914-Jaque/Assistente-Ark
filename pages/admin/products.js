@@ -87,7 +87,7 @@ function ProductModal({ product, onClose, onSave }) {
 
 export default function ProductsPage() {
   const router = useRouter()
-  const { user, tenant, role, loading } = useTenant()
+  const { user, tenant, role, profile, loading } = useTenant()
   const [products, setProducts] = useState([])
   const [loadingProducts, setLoadingProducts] = useState(true)
   const [editingProduct, setEditingProduct] = useState(null)
@@ -182,7 +182,7 @@ export default function ProductsPage() {
         />
       )}
 
-      <AdminLayout tenant={tenant} user={user} role={role}>
+      <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>📦 Produtos</h1>

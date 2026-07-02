@@ -71,7 +71,7 @@ function BotModal({ bot, onClose, onSave }) {
 
 export default function BotsPage() {
   const router = useRouter()
-  const { user, tenant, role, bots: initialBots, usage, loading, refreshBots } = useTenant()
+  const { user, tenant, role, bots: initialBots, usage, profile, loading, refreshBots } = useTenant()
   const [bots, setBots] = useState([])
   const [editingBot, setEditingBot] = useState(null)
   const [showModal, setShowModal] = useState(false)
@@ -137,7 +137,7 @@ export default function BotsPage() {
         />
       )}
 
-      <AdminLayout tenant={tenant} user={user} role={role}>
+      <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
           <div>
             <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>🤖 Bots</h1>

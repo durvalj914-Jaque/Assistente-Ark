@@ -7,7 +7,7 @@ import { PLANS } from '../../lib/plans'
 
 export default function AdminDashboard() {
   const router = useRouter()
-  const { user, tenant, role, bots, loading } = useTenant()
+  const { user, tenant, role, bots, profile, loading } = useTenant()
   const [stats, setStats] = useState({ messages: 0, conversations: 0, contacts: 0, monthMessages: 0 })
 
   useEffect(() => {
@@ -66,12 +66,22 @@ export default function AdminDashboard() {
   ]
 
   return (
-    <AdminLayout tenant={tenant} user={user} role={role}>
+    <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       {/* Header */}
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>Olá, {user.email?.split('@')[0]} 👋</h1>
         <p style={{ color: '#475569', fontSize: 14, marginTop: 4 }}>Aqui está o resumo da {tenant.name}</p>
       </div>
+
+      {!activeBot && (
+        <div className="ark-card" style={{ marginBottom: 24, borderColor: 'rgba(245,158,11,0.3)', background: 'rgba(245,158,11,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>📱 Seu WhatsApp ainda não está conectado</div>
+            <div style={{ color: '#94a3b8', fontSize: 13 }}>Enquanto isso, dá uma olhada no fluxo de exemplo do seu bot em "Editor de Fluxo" pra já ir aprendendo como montar o seu.</div>
+          </div>
+          <a href="/admin/whatsapp-setup" className="ark-btn" style={{ whiteSpace: 'nowrap', textDecoration: 'none' }}>Conectar agora →</a>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>

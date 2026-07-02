@@ -6,6 +6,7 @@ import { PLANS } from '../../lib/plans'
 
 const NAV = [
   { href: '/admin', label: 'Dashboard', icon: '⬡', exact: true },
+  { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
   { href: '/admin/bots', label: 'Bots', icon: '🤖' },
   { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
   { href: '/admin/products', label: 'Produtos', icon: '📦' },
@@ -13,9 +14,12 @@ const NAV = [
   { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
   { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
   { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
+  { href: '/admin/api', label: 'API', icon: '🔌' },
 ]
 
-export default function AdminLayout({ children, tenant, user, role }) {
+const PLATFORM_NAV = { href: '/admin/platform', label: 'Painel Arkiel', icon: '🛠️' }
+
+export default function AdminLayout({ children, tenant, user, role, profile }) {
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -64,7 +68,7 @@ export default function AdminLayout({ children, tenant, user, role }) {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-        {NAV.map(item => {
+        {(profile?.is_platform_admin ? [...NAV, PLATFORM_NAV] : NAV).map(item => {
           const active = item.exact
             ? router.pathname === item.href
             : router.pathname === item.href || router.pathname.startsWith(item.href + '/')
@@ -104,8 +108,10 @@ export default function AdminLayout({ children, tenant, user, role }) {
         {!collapsed ? (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#4f8ef7,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0, fontWeight: 700, color: '#fff' }}>
-                {(user?.email || '?')[0].toUpperCase()}
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#4f8ef7,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0, fontWeight: 700, color: '#fff', overflow: 'hidden' }}>
+                {profile?.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : (user?.email || '?')[0].toUpperCase()}
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email?.split('@')[0]}</div>
@@ -164,7 +170,7 @@ export default function AdminLayout({ children, tenant, user, role }) {
           padding: '0 28px', position: 'sticky', top: 0, zIndex: 10,
         }}>
           <div style={{ fontSize: 13, color: '#475569' }}>
-            {NAV.find(n => n.exact ? router.pathname === n.href : router.pathname.startsWith(n.href))?.label || 'Painel'}
+            {[...NAV, PLATFORM_NAV].find(n => n.exact ? router.pathname === n.href : router.pathname.startsWith(n.href))?.label || 'Painel'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />

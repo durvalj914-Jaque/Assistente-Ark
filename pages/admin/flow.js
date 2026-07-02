@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase'
 
 export default function FlowPage() {
   const router = useRouter()
-  const { user, tenant, role, bots, loading } = useTenant()
+  const { user, tenant, role, bots, profile, loading } = useTenant()
   const [selectedBotId, setSelectedBotId] = useState(null)
   const [flow, setFlow] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -39,7 +39,7 @@ export default function FlowPage() {
   if (loading || !user || !tenant) return null
 
   return (
-    <AdminLayout tenant={tenant} user={user} role={role}>
+    <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
           <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>🌿 Editor de Fluxo</h1>

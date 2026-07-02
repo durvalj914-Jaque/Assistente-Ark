@@ -8,7 +8,7 @@ const STATUS_COLORS = { true: '#10b981', false: '#ef4444' }
 
 export default function ContactsPage() {
   const router = useRouter()
-  const { user, tenant, role, loading } = useTenant()
+  const { user, tenant, role, profile, loading } = useTenant()
   const [contacts, setContacts] = useState([])
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
@@ -60,7 +60,7 @@ export default function ContactsPage() {
   if (!user || !tenant) return null
 
   return (
-    <AdminLayout tenant={tenant} user={user} role={role}>
+    <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>👥 Contatos</h1>
