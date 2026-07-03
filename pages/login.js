@@ -13,7 +13,13 @@ export default function Login() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo: `${window.location.origin}/admin` }
+        options: {
+          redirectTo: `${window.location.origin}/admin`,
+          // Força o Google a sempre mostrar o seletor de contas — sem isso, se já
+          // existir uma sessão Google ativa no navegador, ele reloga em silêncio
+          // com a mesma conta em cache, mesmo que o usuário queira trocar de conta.
+          queryParams: { prompt: 'select_account' }
+        }
       })
       if (error) throw error
     } catch (err) {
