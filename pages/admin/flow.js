@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import FlowEditor from '../../components/FlowEditor'
 import Tutorial from '../../components/FlowEditor/Tutorial'
+import AIGenerateButton from '../../components/FlowEditor/AIGenerate'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 
@@ -49,13 +50,18 @@ export default function FlowPage() {
           <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>🌿 Editor de Fluxo</h1>
           <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>Monte a árvore de conversa do seu bot</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           {bots.length > 1 && (
             <select value={selectedBotId} onChange={e => setSelectedBotId(e.target.value)}
               style={{ background: '#12121f', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 8, color: '#fff', padding: '8px 12px', fontSize: 13, outline: 'none' }}>
               {bots.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
+          <AIGenerateButton
+            botId={selectedBotId}
+            hasExistingFlow={(flow?.nodes?.length || 0) > 0}
+            onGenerated={generated => setFlow(generated)}
+          />
           <button onClick={() => setShowTutorial(true)} className="ark-btn-ghost">
             🧭 Como usar
           </button>
