@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import FlowEditor from '../../components/FlowEditor'
+import Tutorial from '../../components/FlowEditor/Tutorial'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 
@@ -12,6 +13,7 @@ export default function FlowPage() {
   const [flow, setFlow] = useState(null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showTutorial, setShowTutorial] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.replace('/login')
@@ -40,7 +42,9 @@ export default function FlowPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
           <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>🌿 Editor de Fluxo</h1>
           <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>Monte a árvore de conversa do seu bot</p>
@@ -52,6 +56,9 @@ export default function FlowPage() {
               {bots.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
           )}
+          <button onClick={() => setShowTutorial(true)} className="ark-btn-ghost">
+            🧭 Como usar
+          </button>
           <button onClick={saveFlow} className="ark-btn" disabled={saving}>
             {saving ? 'Salvando…' : saved ? '✅ Salvo!' : '💾 Salvar fluxo'}
           </button>
