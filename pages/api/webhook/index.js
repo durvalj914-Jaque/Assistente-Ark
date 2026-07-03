@@ -136,7 +136,7 @@ async function processWebhook(body) {
     await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
     const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
     try { await sendText(phoneNumberId, tkn, from, reply) } catch(_) {}
-    await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply })
+    await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply, sent_by: 'bot' })
     await savelog(db, 'done_human')
     return
   }
@@ -166,7 +166,7 @@ async function processWebhook(body) {
 
   await safeInsert(db, 'messages', {
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
-    contact_id: contact.id, direction: 'outbound', content: reply
+    contact_id: contact.id, direction: 'outbound', content: reply, sent_by: 'bot'
   })
   await db.from('conversations').update(convUpdate).eq('id', conv.id)
   await savelog(db, 'done', null, { nodeId, action: result.action })
