@@ -1,8 +1,28 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+
+const labelStyle = { color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 5 }
+
+// Definido FORA do ProductModal: se ficasse dentro, o React recriava esse componente
+// a cada render (cada tecla digitada) e o input perdia o foco a cada caractere.
+function Field({ label, name, value, onChange, placeholder, type = 'text', hint, textarea }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={labelStyle}>{label}</label>
+      {textarea ? (
+        <textarea value={value} onChange={e => onChange(name, e.target.value)}
+          placeholder={placeholder} className="ark-input" rows={3} style={{ resize: 'vertical' }} />
+      ) : (
+        <input type={type} value={value} onChange={e => onChange(name, e.target.value)}
+          placeholder={placeholder} className="ark-input" />
+      )}
+      {hint && <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>{hint}</p>}
+    </div>
+  )
+}
 
 function ProductModal({ product, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -17,6 +37,10 @@ function ProductModal({ product, onClose, onSave }) {
   })
   const [saving, setSaving] = useState(false)
 
+  const setField = useCallback((name, value) => {
+    setForm(f => ({ ...f, [name]: value }))
+  }, [])
+
   async function handleSave() {
     if (!form.name.trim()) return
     setSaving(true)
@@ -28,20 +52,6 @@ function ProductModal({ product, onClose, onSave }) {
     setSaving(false)
   }
 
-  const Field = ({ label, name, placeholder, type = 'text', hint, textarea }) => (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 5 }}>{label}</label>
-      {textarea ? (
-        <textarea value={form[name]} onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
-          placeholder={placeholder} className="ark-input" rows={3} style={{ resize: 'vertical' }} />
-      ) : (
-        <input type={type} value={form[name]} onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
-          placeholder={placeholder} className="ark-input" />
-      )}
-      {hint && <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>{hint}</p>}
-    </div>
-  )
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -51,20 +61,20 @@ function ProductModal({ product, onClose, onSave }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
 
-        <Field label="NOME DO PRODUTO" name="name" placeholder="Ex: Plano Pro Mensal" />
-        <Field label="DESCRIÇÃO" name="description" placeholder="Detalhes do produto/serviço" textarea />
+        <Field label="NOME DO PRODUTO" name="name" value={form.name} onChange={setField} placeholder="Ex: Plano Pro Mensal" />
+        <Field label="DESCRIÇÃO" name="description" value={form.description} onChange={setField} placeholder="Detalhes do produto/serviço" textarea />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="PREÇO (R$)" name="price" type="number" placeholder="97.00" />
-          <Field label="ESTOQUE" name="stock" type="number" placeholder="(vazio = ilimitado)" />
+          <Field label="PREÇO (R$)" name="price" value={form.price} onChange={setField} type="number" placeholder="97.00" />
+          <Field label="ESTOQUE" name="stock" value={form.stock} onChange={setField} type="number" placeholder="(vazio = ilimitado)" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="CATEGORIA" name="category" placeholder="Ex: Assinaturas" />
-          <Field label="SKU" name="sku" placeholder="Código interno" />
+          <Field label="CATEGORIA" name="category" value={form.category} onChange={setField} placeholder="Ex: Assinaturas" />
+          <Field label="SKU" name="sku" value={form.sku} onChange={setField} placeholder="Código interno" />
         </div>
 
-        <Field label="URL DA IMAGEM" name="image_url" placeholder="https://..." hint="Usada nas mensagens de catálogo do bot" />
+        <Field label="URL DA IMAGEM" name="image_url" value={form.image_url} onChange={setField} placeholder="https://..." hint="Usada nas mensagens de catálogo do bot" />
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 }}>
           <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}

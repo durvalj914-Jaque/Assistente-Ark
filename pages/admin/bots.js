@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
@@ -7,6 +7,131 @@ import { PLANS, checkLimit } from '../../lib/plans'
 
 const STATUS_COLOR = { active: '#10b981', inactive: '#475569', paused: '#f59e0b' }
 const STATUS_LABEL = { active: 'Ativo', inactive: 'Inativo', paused: 'Pausado' }
+
+const labelStyle = { color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 5 }
+
+// Definido FORA do BotModal: se ficasse dentro, o React recriava esse componente
+// a cada render (cada tecla digitada) e o input perdia o foco a cada caractere.
+function Field({ label, name, value, onChange, placeholder, type = 'text', hint }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={labelStyle}>{label}</label>
+      <input type={type} value={value} onChange={e => onChange(name, e.target.value)}
+        placeholder={placeholder} className="ark-input" />
+      {hint && <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>{hint}</p>}
+    </div>
+  )
+}
+
+// Seção de foto de perfil do WhatsApp — só aparece quando o bot já tem
+// phone_number_id + access_token configurados (número já conectado na Meta).
+function ProfilePhotoSection({ botId }) {
+  const [currentUrl, setCurrentUrl] = useState(null)
+  const [loadingUrl, setLoadingUrl] = useState(true)
+  const [preview, setPreview] = useState(null)
+  const [file, setFile] = useState(null)
+  const [uploading, setUploading] = useState(false)
+  const [message, setMessage] = useState(null)
+
+  const loadCurrent = useCallback(async () => {
+    setLoadingUrl(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/whatsapp/profile-photo?bot_id=${botId}`, {
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      })
+      const json = await res.json()
+      setCurrentUrl(res.ok ? json.profile_picture_url : null)
+    } catch (e) {
+      setCurrentUrl(null)
+    }
+    setLoadingUrl(false)
+  }, [botId])
+
+  useEffect(() => { loadCurrent() }, [loadCurrent])
+
+  function handlePick(e) {
+    const f = e.target.files?.[0]
+    setMessage(null)
+    if (!f) return
+    if (!['image/jpeg', 'image/png'].includes(f.type)) {
+      setMessage({ type: 'error', text: 'Use uma imagem JPEG ou PNG.' })
+      return
+    }
+    if (f.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Imagem muito grande (máximo 5MB).' })
+      return
+    }
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  function fileToBase64(f) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result.split(',')[1])
+      reader.onerror = reject
+      reader.readAsDataURL(f)
+    })
+  }
+
+  async function handleUpload() {
+    if (!file) return
+    setUploading(true)
+    setMessage(null)
+    try {
+      const file_base64 = await fileToBase64(file)
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/whatsapp/profile-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ bot_id: botId, file_base64, mime_type: file.type })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Falha ao atualizar a foto')
+      setMessage({ type: 'success', text: 'Foto de perfil atualizada! Pode levar alguns minutos pra aparecer no WhatsApp.' })
+      setFile(null)
+      setPreview(null)
+      setTimeout(loadCurrent, 3000)
+    } catch (e) {
+      setMessage({ type: 'error', text: e.message })
+    }
+    setUploading(false)
+  }
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label style={labelStyle}>FOTO DE PERFIL DO WHATSAPP</label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{ width: 64, height: 64, borderRadius: '50%', overflow: 'hidden', background: '#12121f', border: '1px solid rgba(79,142,247,0.2)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {preview ? (
+            <img src={preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : loadingUrl ? (
+            <span style={{ fontSize: 10, color: '#475569' }}>…</span>
+          ) : currentUrl ? (
+            <img src={currentUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ fontSize: 22 }}>📷</span>
+          )}
+        </div>
+        <div style={{ flex: 1 }}>
+          <label className="ark-btn-ghost" style={{ display: 'inline-block', padding: '7px 12px', fontSize: 12, cursor: 'pointer' }}>
+            Escolher imagem
+            <input type="file" accept="image/jpeg,image/png" onChange={handlePick} style={{ display: 'none' }} />
+          </label>
+          {file && (
+            <button onClick={handleUpload} disabled={uploading} className="ark-btn" style={{ marginLeft: 8, padding: '7px 12px', fontSize: 12 }}>
+              {uploading ? 'Enviando…' : 'Salvar foto'}
+            </button>
+          )}
+          {message && (
+            <p style={{ color: message.type === 'error' ? '#ef4444' : '#10b981', fontSize: 11, marginTop: 6 }}>{message.text}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function BotModal({ bot, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -21,20 +146,17 @@ function BotModal({ bot, onClose, onSave }) {
   })
   const [saving, setSaving] = useState(false)
 
+  const setField = useCallback((name, value) => {
+    setForm(f => ({ ...f, [name]: value }))
+  }, [])
+
   async function handleSave() {
     setSaving(true)
     await onSave(form)
     setSaving(false)
   }
 
-  const Field = ({ label, name, placeholder, type = 'text', hint }) => (
-    <div style={{ marginBottom: 14 }}>
-      <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 5 }}>{label}</label>
-      <input type={type} value={form[name]} onChange={e => setForm(f => ({ ...f, [name]: e.target.value }))}
-        placeholder={placeholder} className="ark-input" />
-      {hint && <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>{hint}</p>}
-    </div>
-  )
+  const hasWhatsappConnected = Boolean(bot?.id && bot?.phone_number_id && bot?.access_token)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
@@ -45,18 +167,25 @@ function BotModal({ bot, onClose, onSave }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
 
-        <Field label="NOME DO BOT" name="name" placeholder="Ex: Atendimento Principal" />
-        <Field label="MENSAGEM DE BOAS-VINDAS" name="greeting" placeholder="Olá! Como posso ajudar?" />
-        <Field label="MENSAGEM FALLBACK" name="fallback_message" placeholder="Não entendi. Pode repetir?" />
-        <Field label="KEYWORD → HUMANO" name="human_takeover_keyword" placeholder="humano" hint="Quando o usuário digitar isso, a conversa vai para atendimento humano" />
+        {hasWhatsappConnected && (
+          <>
+            <ProfilePhotoSection botId={bot.id} />
+            <hr className="ark-divider" />
+          </>
+        )}
+
+        <Field label="NOME DO BOT" name="name" value={form.name} onChange={setField} placeholder="Ex: Atendimento Principal" />
+        <Field label="MENSAGEM DE BOAS-VINDAS" name="greeting" value={form.greeting} onChange={setField} placeholder="Olá! Como posso ajudar?" />
+        <Field label="MENSAGEM FALLBACK" name="fallback_message" value={form.fallback_message} onChange={setField} placeholder="Não entendi. Pode repetir?" />
+        <Field label="KEYWORD → HUMANO" name="human_takeover_keyword" value={form.human_takeover_keyword} onChange={setField} placeholder="humano" hint="Quando o usuário digitar isso, a conversa vai para atendimento humano" />
 
         <hr className="ark-divider" />
         <p style={{ color: '#475569', fontSize: 12, marginBottom: 14 }}>⚙️ Configurações da Meta API (opcional — preencher ao conectar WhatsApp)</p>
 
-        <Field label="PHONE NUMBER ID" name="phone_number_id" placeholder="123456789" />
-        <Field label="ACCESS TOKEN" name="access_token" type="password" placeholder="EAAxxxxxx" hint="Token permanente da Meta API" />
-        <Field label="WABA ID" name="waba_id" placeholder="ID da conta WhatsApp Business" />
-        <Field label="WEBHOOK VERIFY TOKEN" name="webhook_verify_token" placeholder="ark_secret" hint="Usado na verificação do webhook da Meta" />
+        <Field label="PHONE NUMBER ID" name="phone_number_id" value={form.phone_number_id} onChange={setField} placeholder="123456789" />
+        <Field label="ACCESS TOKEN" name="access_token" value={form.access_token} onChange={setField} type="password" placeholder="EAAxxxxxx" hint="Token permanente da Meta API" />
+        <Field label="WABA ID" name="waba_id" value={form.waba_id} onChange={setField} placeholder="ID da conta WhatsApp Business" />
+        <Field label="WEBHOOK VERIFY TOKEN" name="webhook_verify_token" value={form.webhook_verify_token} onChange={setField} placeholder="ark_secret" hint="Usado na verificação do webhook da Meta" />
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
           <button onClick={onClose} className="ark-btn-ghost">Cancelar</button>
