@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import { PLANS, checkLimit } from '../../lib/plans'
+import HelpTip from '../../components/HelpTip'
 
 const STATUS_COLOR = { active: '#10b981', inactive: '#475569', paused: '#f59e0b' }
 const STATUS_LABEL = { active: 'Ativo', inactive: 'Inativo', paused: 'Pausado' }
@@ -174,10 +175,10 @@ function BotModal({ bot, onClose, onSave }) {
           </>
         )}
 
-        <Field label="NOME DO BOT" name="name" value={form.name} onChange={setField} placeholder="Ex: Atendimento Principal" />
-        <Field label="MENSAGEM DE BOAS-VINDAS" name="greeting" value={form.greeting} onChange={setField} placeholder="Olá! Como posso ajudar?" />
-        <Field label="MENSAGEM FALLBACK" name="fallback_message" value={form.fallback_message} onChange={setField} placeholder="Não entendi. Pode repetir?" />
-        <Field label="KEYWORD → HUMANO" name="human_takeover_keyword" value={form.human_takeover_keyword} onChange={setField} placeholder="humano" hint="Quando o usuário digitar isso, a conversa vai para atendimento humano" />
+        <Field label="NOME DO BOT" name="name" value={form.name} onChange={setField} placeholder="Ex: Atendimento Principal" hint="Só pra você identificar internamente — o cliente nunca vê esse nome." />
+        <Field label="MENSAGEM DE BOAS-VINDAS" name="greeting" value={form.greeting} onChange={setField} placeholder="Olá! Como posso ajudar?" hint="Primeira mensagem que o bot manda pra qualquer pessoa que escrever pela primeira vez (ou digitar 0 pra reiniciar)." />
+        <Field label="MENSAGEM FALLBACK" name="fallback_message" value={form.fallback_message} onChange={setField} placeholder="Não entendi. Pode repetir?" hint="O que o bot responde quando não entende o que a pessoa digitou." />
+        <Field label="KEYWORD → HUMANO" name="human_takeover_keyword" value={form.human_takeover_keyword} onChange={setField} placeholder="humano" hint="Quando o usuário digitar essa palavra em QUALQUER ponto da conversa, ela vai direto pra atendimento humano." />
 
         <hr className="ark-divider" />
         <p style={{ color: '#475569', fontSize: 12, marginBottom: 10 }}>📱 Conexão com o WhatsApp</p>
@@ -278,7 +279,10 @@ export default function BotsPage() {
       <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
           <div>
-            <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>🤖 Bots</h1>
+            <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22, display: 'flex', alignItems: 'center' }}>
+              🤖 Bots
+              <HelpTip text="Cada bot é um número de WhatsApp com seu próprio fluxo de atendimento automático. A maioria dos negócios só precisa de um. Use 'Fluxo' pra editar o que ele responde e 'Editar' pra ajustar mensagens padrão." />
+            </h1>
             <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
               {bots.length} / {plan.max_bots === 999 ? '∞' : plan.max_bots} bots no plano {plan.label}
             </p>
@@ -349,10 +353,12 @@ export default function BotsPage() {
                     ✏️ Editar
                   </button>
                   <button onClick={() => router.push(`/admin/flow?bot=${bot.id}`)}
-                    className="ark-btn-ghost" style={{ flex: 1, padding: '7px 10px', fontSize: 12, justifyContent: 'center' }}>
+                    className="ark-btn-ghost" style={{ flex: 1, padding: '7px 10px', fontSize: 12, justifyContent: 'center' }}
+                    title="Edite o que o bot responde: menus, mensagens e transferência pra humano">
                     ⚡ Fluxo
                   </button>
                   <button onClick={() => toggleStatus(bot)}
+                    title={bot.status === 'active' ? 'Pausa o bot: ele para de responder automaticamente até você reativar' : 'Reativa as respostas automáticas do bot'}
                     style={{ padding: '7px 12px', fontSize: 12, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
                       background: bot.status === 'active' ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
                       color: bot.status === 'active' ? '#ef4444' : '#10b981' }}>

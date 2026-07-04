@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import HelpTip from '../../components/HelpTip'
 
 const labelStyle = { color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 5 }
 
@@ -61,17 +62,17 @@ function ProductModal({ product, onClose, onSave }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
 
-        <Field label="NOME DO PRODUTO" name="name" value={form.name} onChange={setField} placeholder="Ex: Plano Pro Mensal" />
+        <Field label="NOME DO PRODUTO" name="name" value={form.name} onChange={setField} placeholder="Ex: Plano Pro Mensal" hint="Como vai aparecer pro cliente quando o bot mostrar o catálogo." />
         <Field label="DESCRIÇÃO" name="description" value={form.description} onChange={setField} placeholder="Detalhes do produto/serviço" textarea />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <Field label="PREÇO (R$)" name="price" value={form.price} onChange={setField} type="number" placeholder="97.00" />
-          <Field label="ESTOQUE" name="stock" value={form.stock} onChange={setField} type="number" placeholder="(vazio = ilimitado)" />
+          <Field label="ESTOQUE" name="stock" value={form.stock} onChange={setField} type="number" placeholder="(vazio = ilimitado)" hint="Deixe vazio se não controla estoque (ex: serviços, assinaturas)." />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="CATEGORIA" name="category" value={form.category} onChange={setField} placeholder="Ex: Assinaturas" />
-          <Field label="SKU" name="sku" value={form.sku} onChange={setField} placeholder="Código interno" />
+          <Field label="CATEGORIA" name="category" value={form.category} onChange={setField} placeholder="Ex: Assinaturas" hint="Usada só pra filtrar aqui no painel." />
+          <Field label="SKU" name="sku" value={form.sku} onChange={setField} placeholder="Código interno" hint="Opcional — código só pra seu controle interno." />
         </div>
 
         <Field label="URL DA IMAGEM" name="image_url" value={form.image_url} onChange={setField} placeholder="https://..." hint="Usada nas mensagens de catálogo do bot" />
@@ -79,8 +80,9 @@ function ProductModal({ product, onClose, onSave }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 }}>
           <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
             style={{ width: 16, height: 16, accentColor: '#4f8ef7', cursor: 'pointer' }} />
-          <label style={{ color: '#94a3b8', fontSize: 13, cursor: 'pointer' }} onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}>
+          <label style={{ color: '#94a3b8', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}>
             Produto ativo (visível no catálogo do bot)
+            <HelpTip text="Desmarcado, o produto some do catálogo que o bot mostra pro cliente, mas continua salvo aqui — útil pra pausar sem apagar." />
           </label>
         </div>
 
@@ -195,7 +197,10 @@ export default function ProductsPage() {
       <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>📦 Produtos</h1>
+            <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22, display: 'flex', alignItems: 'center' }}>
+              📦 Produtos
+              <HelpTip text="Cadastre aqui os produtos/planos/serviços que o bot pode mostrar num catálogo quando o cliente pedir. Você referencia esses itens ao montar o fluxo no Editor de Fluxo." />
+            </h1>
             <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
               {products.length} produto{products.length !== 1 ? 's' : ''} · {activeCount} ativo{activeCount !== 1 ? 's' : ''} no catálogo
             </p>

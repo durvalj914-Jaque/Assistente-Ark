@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import HelpTip from '../../components/HelpTip'
 
 const STATUS_COLORS = { true: '#10b981', false: '#ef4444' }
 
@@ -63,7 +64,10 @@ export default function ContactsPage() {
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>👥 Contatos</h1>
+          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22, display: 'flex', alignItems: 'center' }}>
+            👥 Contatos
+            <HelpTip text="Toda pessoa que já escreveu pro seu WhatsApp vira um contato aqui automaticamente. 'Opt-in' mostra se a pessoa aceita receber mensagens; tags são etiquetas que você pode usar pra organizar (ex: 'cliente vip')." />
+          </h1>
           <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>{contacts.length} contatos</p>
         </div>
         <input value={search} onChange={e => setSearch(e.target.value)}
@@ -155,7 +159,10 @@ export default function ContactsPage() {
               ))}
               <hr className="ark-divider" />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#475569', fontSize: 13 }}>Opt-in</span>
+                <span style={{ color: '#475569', fontSize: 13, display: 'flex', alignItems: 'center' }}>
+                  Opt-in
+                  <HelpTip text="Indica se essa pessoa concorda em receber mensagens do seu WhatsApp. Clique no badge ao lado pra mudar manualmente." />
+                </span>
                 <button onClick={() => toggleOptIn(selected)}
                   className={`ark-badge ${selected.opt_in ? 'ark-badge-green' : 'ark-badge-red'}`}
                   style={{ border: 'none', cursor: 'pointer', padding: '5px 12px' }}>
