@@ -10,14 +10,24 @@ export default function SettingsPage() {
   const { user, tenant, role, profile, loading } = useTenant()
   const [form, setForm] = useState({ name: '', slug: '' })
   const [members, setMembers] = useState([])
+  const [invites, setInvites] = useState([])
   const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteMsg, setInviteMsg] = useState('')
+  const [inviting, setInviting] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+
+  function loadMembers() {
+    if (!tenant) return
+    supabase.from('tenant_members').select('*, profiles:user_id(email)').eq('tenant_id', tenant.id).then(({ data }) => setMembers(data || []))
+    supabase.from('tenant_invites').select('*').eq('tenant_id', tenant.id).is('accepted_at', null).then(({ data }) => setInvites(data || []))
+  }
+
   useEffect(() => {
     if (tenant) {
       setForm({ name: tenant.name, slug: tenant.slug })
-      supabase.from('tenant_members').select('*, profiles:user_id(email)').eq('tenant_id', tenant.id).then(({ data }) => setMembers(data || []))
+      loadMembers()
     }
   }, [tenant])
 
@@ -25,6 +35,22 @@ export default function SettingsPage() {
     await supabase.from('tenants').update({ name: form.name }).eq('id', tenant.id)
     setSaved(true)
     setTimeout(() => setSaved(false), 2500)
+  }
+
+  async function sendInvite() {
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    setInviteMsg('')
+    const email = inviteEmail.trim().toLowerCase()
+    const { error } = await supabase.from('tenant_invites').insert({ tenant_id: tenant.id, email, role: 'member', invited_by: user.id })
+    if (error) {
+      setInviteMsg('❌ ' + error.message)
+    } else {
+      setInviteMsg(`✅ Convite criado. Quando ${email} entrar com Google usando esse e-mail, já cai direto na sua equipe.`)
+      setInviteEmail('')
+      loadMembers()
+    }
+    setInviting(false)
   }
 
   if (loading || !user || !tenant) return null
@@ -85,14 +111,26 @@ export default function SettingsPage() {
                 </span>
               </div>
             ))}
+            {invites.map(i => (
+              <div key={i.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#12121f', borderRadius: 8, padding: '10px 14px', opacity: 0.7 }}>
+                <div style={{ color: '#e2e8f0', fontSize: 13 }}>{i.email}</div>
+                <span className="ark-badge" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid transparent' }}>
+                  ⏳ convite pendente
+                </span>
+              </div>
+            ))}
           </div>
           {role === 'owner' || role === 'admin' ? (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
-                placeholder="email@empresa.com" className="ark-input" style={{ maxWidth: 300 }} />
-              <button className="ark-btn" style={{ whiteSpace: 'nowrap' }} onClick={() => alert('Convite enviado! (integre com e-mail)')}>
-                + Convidar
-              </button>
+            <div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input value={inviteEmail} onChange={e => setInviteEmail(e.target.value)}
+                  placeholder="email@empresa.com" className="ark-input" style={{ maxWidth: 300 }} />
+                <button disabled={inviting || !inviteEmail.trim()} className="ark-btn" style={{ whiteSpace: 'nowrap' }} onClick={sendInvite}>
+                  {inviting ? 'Enviando…' : '+ Convidar'}
+                </button>
+              </div>
+              <p style={{ color: '#334155', fontSize: 11, marginTop: 8 }}>ℹ️ A pessoa precisa entrar em arkiel.com.br com login do Google usando esse e-mail exato pra entrar na sua equipe automaticamente.</p>
+              {inviteMsg && <p style={{ fontSize: 12, marginTop: 8, color: inviteMsg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{inviteMsg}</p>}
             </div>
           ) : null}
         </div>
