@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import FlowEditor from '../../components/FlowEditor'
 import Tutorial from '../../components/FlowEditor/Tutorial'
 import AIGenerateButton from '../../components/FlowEditor/AIGenerate'
+import JsonTools from '../../components/FlowEditor/JsonTools'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 
@@ -62,6 +63,7 @@ export default function FlowPage() {
             hasExistingFlow={(flow?.nodes?.length || 0) > 0}
             onGenerated={generated => setFlow(generated)}
           />
+          <JsonTools flow={flow} onChange={setFlow} />
           <button onClick={() => setShowTutorial(true)} className="ark-btn-ghost">
             🧭 Como usar
           </button>
