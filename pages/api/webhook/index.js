@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { processFlow } from '../../../lib/flowEngine'
 import { sendPushToTenant } from '../../../lib/webpush'
+import { sendFcmToTenant } from '../../../lib/fcm'
 
 export const config = { api: { bodyParser: true } }
 
@@ -139,12 +140,13 @@ async function processWebhook(body) {
     try { await sendText(phoneNumberId, tkn, from, reply) } catch(_) {}
     await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply, sent_by: 'bot' })
     try {
-      await sendPushToTenant(tenantId, {
+      const pushPayload = {
         title: '👤 Cliente pediu atendimento humano',
         body: `${contact.name || contact.phone} está esperando no ${bot.name}`,
         url: '/admin/conversations',
         tag: `ark-human-${conv.id}`,
-      })
+      }
+      await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
     } catch (_) {}
     await savelog(db, 'done_human')
     return
@@ -181,12 +183,13 @@ async function processWebhook(body) {
 
   if (result.action === 'transfer') {
     try {
-      await sendPushToTenant(tenantId, {
+      const pushPayload = {
         title: '👤 Cliente pediu atendimento humano',
         body: `${contact.name || contact.phone} está esperando no ${bot.name}`,
         url: '/admin/conversations',
         tag: `ark-human-${conv.id}`,
-      })
+      }
+      await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
     } catch (_) {}
   }
 
