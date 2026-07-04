@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import { PLANS } from '../../lib/plans'
+import NotificationsCard from '../../components/NotificationsCard'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -59,6 +60,8 @@ export default function SettingsPage() {
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20, marginBottom: 24 }}>⚙️ Configurações</h1>
+
+      <NotificationsCard />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Empresa */}

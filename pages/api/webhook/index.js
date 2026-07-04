@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { processFlow } from '../../../lib/flowEngine'
+import { sendPushToTenant } from '../../../lib/webpush'
 
 export const config = { api: { bodyParser: true } }
 
@@ -137,6 +138,14 @@ async function processWebhook(body) {
     const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
     try { await sendText(phoneNumberId, tkn, from, reply) } catch(_) {}
     await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply, sent_by: 'bot' })
+    try {
+      await sendPushToTenant(tenantId, {
+        title: '👤 Cliente pediu atendimento humano',
+        body: `${contact.name || contact.phone} está esperando no ${bot.name}`,
+        url: '/admin/conversations',
+        tag: `ark-human-${conv.id}`,
+      })
+    } catch (_) {}
     await savelog(db, 'done_human')
     return
   }
@@ -169,6 +178,18 @@ async function processWebhook(body) {
     contact_id: contact.id, direction: 'outbound', content: reply, sent_by: 'bot'
   })
   await db.from('conversations').update(convUpdate).eq('id', conv.id)
+
+  if (result.action === 'transfer') {
+    try {
+      await sendPushToTenant(tenantId, {
+        title: '👤 Cliente pediu atendimento humano',
+        body: `${contact.name || contact.phone} está esperando no ${bot.name}`,
+        url: '/admin/conversations',
+        tag: `ark-human-${conv.id}`,
+      })
+    } catch (_) {}
+  }
+
   await savelog(db, 'done', null, { nodeId, action: result.action })
 }
 

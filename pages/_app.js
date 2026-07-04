@@ -32,6 +32,12 @@ export default function App({ Component, pageProps }) {
     return () => router.events.off('routeChangeComplete', handle)
   }, [router.events])
 
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
+  }, [])
+
   const canonicalUrl = 'https://arkiel.com.br' + router.pathname
 
   return (
@@ -51,6 +57,7 @@ export default function App({ Component, pageProps }) {
         <meta name="theme-color" content="#000000" />
         <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" href="/favicon.ico" />
+        <link rel="manifest" href="/manifest.json" />
       </Head>
       <ErrorBoundary>
         <Component {...pageProps} />
