@@ -107,7 +107,7 @@ export default function ClientPortal() {
 
     const month = new Date().toISOString().slice(0,7)
     const [{ data: botData }, { data: convData }, { data: usageData }] = await Promise.all([
-      supabase.from('bots').select('*').eq('tenant_id', t.id).order('created_at'),
+      supabase.from('bots').select('id, tenant_id, name, status, phone_number_id, waba_id, greeting, fallback_message, human_takeover_keyword, flow, total_messages, active_sessions, created_at, updated_at, human_takeover_timeout').eq('tenant_id', t.id).order('created_at'),
       supabase.from('conversations')
         .select('*, contacts(name,phone), bots(name)')
         .eq('tenant_id', t.id)

@@ -139,10 +139,6 @@ function BotModal({ bot, onClose, onSave }) {
     greeting:               bot?.greeting || 'Olá! Como posso ajudar? 🤖',
     fallback_message:       bot?.fallback_message || 'Não entendi. Pode repetir?',
     human_takeover_keyword: bot?.human_takeover_keyword || 'humano',
-    phone_number_id:        bot?.phone_number_id || '',
-    access_token:           bot?.access_token || '',
-    waba_id:                bot?.waba_id || '',
-    webhook_verify_token:   bot?.webhook_verify_token || 'ark_secret',
   })
   const [saving, setSaving] = useState(false)
 
@@ -156,7 +152,11 @@ function BotModal({ bot, onClose, onSave }) {
     setSaving(false)
   }
 
-  const hasWhatsappConnected = Boolean(bot?.id && bot?.phone_number_id && bot?.access_token)
+  // Conexão com o WhatsApp é feita só pela equipe Arkiel (Painel Arkiel → Clientes),
+  // nunca aqui — por isso não expomos nem deixamos editar o token/IDs da Meta
+  // nesta tela. O token é um segredo de longa duração; melhor prática é ele
+  // nunca trafegar pro navegador do cliente, nem mascarado.
+  const hasWhatsappConnected = Boolean(bot?.id && bot?.phone_number_id)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
@@ -180,12 +180,21 @@ function BotModal({ bot, onClose, onSave }) {
         <Field label="KEYWORD → HUMANO" name="human_takeover_keyword" value={form.human_takeover_keyword} onChange={setField} placeholder="humano" hint="Quando o usuário digitar isso, a conversa vai para atendimento humano" />
 
         <hr className="ark-divider" />
-        <p style={{ color: '#475569', fontSize: 12, marginBottom: 14 }}>⚙️ Configurações da Meta API (opcional — preencher ao conectar WhatsApp)</p>
-
-        <Field label="PHONE NUMBER ID" name="phone_number_id" value={form.phone_number_id} onChange={setField} placeholder="123456789" />
-        <Field label="ACCESS TOKEN" name="access_token" value={form.access_token} onChange={setField} type="password" placeholder="EAAxxxxxx" hint="Token permanente da Meta API" />
-        <Field label="WABA ID" name="waba_id" value={form.waba_id} onChange={setField} placeholder="ID da conta WhatsApp Business" />
-        <Field label="WEBHOOK VERIFY TOKEN" name="webhook_verify_token" value={form.webhook_verify_token} onChange={setField} placeholder="ark_secret" hint="Usado na verificação do webhook da Meta" />
+        <p style={{ color: '#475569', fontSize: 12, marginBottom: 10 }}>📱 Conexão com o WhatsApp</p>
+        <div style={{
+          background: hasWhatsappConnected ? 'rgba(16,185,129,0.08)' : 'rgba(245,158,11,0.08)',
+          border: `1px solid ${hasWhatsappConnected ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.25)'}`,
+          borderRadius: 8, padding: '12px 14px', marginBottom: 4,
+        }}>
+          <div style={{ color: hasWhatsappConnected ? '#10b981' : '#f59e0b', fontSize: 13, fontWeight: 600 }}>
+            {hasWhatsappConnected ? '🟢 WhatsApp conectado' : '🟡 WhatsApp ainda não conectado'}
+          </div>
+          <p style={{ color: '#64748b', fontSize: 11.5, marginTop: 6, lineHeight: 1.5 }}>
+            {hasWhatsappConnected
+              ? 'Por segurança, as credenciais da Meta não ficam visíveis aqui. Se precisar trocar o número ou o token, fale com a equipe Arkiel.'
+              : 'Vá em "Conectar WhatsApp" no menu pra pedir a conexão do seu número — nossa equipe cuida da parte técnica com a Meta pra você.'}
+          </p>
+        </div>
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
           <button onClick={onClose} className="ark-btn-ghost">Cancelar</button>
@@ -218,7 +227,7 @@ export default function BotsPage() {
     setCreating(true)
     const { data } = await supabase.from('bots')
       .insert({ tenant_id: tenant.id, name: 'Novo Bot' })
-      .select().single()
+      .select('id, tenant_id, name, status, phone_number_id, waba_id, greeting, fallback_message, human_takeover_keyword, flow, total_messages, active_sessions, created_at, updated_at, human_takeover_timeout').single()
     if (data) {
       setBots(prev => [...prev, data])
       setEditingBot(data)
@@ -231,7 +240,7 @@ export default function BotsPage() {
     const { data, error } = await supabase.from('bots')
       .update({ ...form, updated_at: new Date().toISOString() })
       .eq('id', editingBot.id)
-      .select().single()
+      .select('id, tenant_id, name, status, phone_number_id, waba_id, greeting, fallback_message, human_takeover_keyword, flow, total_messages, active_sessions, created_at, updated_at, human_takeover_timeout').single()
     if (!error) {
       setBots(prev => prev.map(b => b.id === editingBot.id ? data : b))
       setShowModal(false)

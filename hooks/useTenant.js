@@ -96,7 +96,7 @@ export function useTenant() {
   async function loadBotsAndUsage(tenantId) {
     const month = new Date().toISOString().slice(0, 7)
     const [{ data: botData, error: botError }, { data: usageData }] = await Promise.all([
-      supabase.from('bots').select('*').eq('tenant_id', tenantId).order('created_at'),
+      supabase.from('bots').select('id, tenant_id, name, status, phone_number_id, waba_id, greeting, fallback_message, human_takeover_keyword, flow, total_messages, active_sessions, created_at, updated_at, human_takeover_timeout').eq('tenant_id', tenantId).order('created_at'),
       supabase.from('usage').select('*').eq('tenant_id', tenantId).eq('month', month).maybeSingle()
     ])
     if (botError) console.error('[useTenant] bots error', botError)
@@ -111,7 +111,7 @@ export function useTenant() {
   }, [load])
 
   const refreshBots = useCallback(async (tenantId) => {
-    const { data } = await supabase.from('bots').select('*').eq('tenant_id', tenantId).order('created_at')
+    const { data } = await supabase.from('bots').select('id, tenant_id, name, status, phone_number_id, waba_id, greeting, fallback_message, human_takeover_keyword, flow, total_messages, active_sessions, created_at, updated_at, human_takeover_timeout').eq('tenant_id', tenantId).order('created_at')
     setBots(data || [])
   }, [])
 
