@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import WhatsAppEmbeddedSignup from '../../components/WhatsAppEmbeddedSignup'
+import WhatsAppSmsConnect from '../../components/WhatsAppSmsConnect'
 
 export default function WhatsappSetupPage() {
   const router = useRouter()
@@ -74,9 +75,17 @@ export default function WhatsappSetupPage() {
       )}
 
       {!activeBot && bots?.[0] && (
-        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.35)' }}>
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática (recomendado)</h3>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Conecte seu WhatsApp Business agora mesmo, sem esperar nossa equipe — leva menos de 2 minutos.</p>
+        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.35)' }}>
+          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática (recomendado — sem precisar de Facebook)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Digite seu número, confirme o código que chega por SMS, e pronto — seu bot fica ativo na hora, sem precisar de conta Facebook.</p>
+          <WhatsAppSmsConnect botId={bots[0].id} businessName={tenant?.name} onConnected={() => window.location.reload()} />
+        </div>
+      )}
+
+      {!activeBot && bots?.[0] && (
+        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.25)' }}>
+          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📶 Prefere logar com o Facebook?</h3>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Se você já tem uma conta WhatsApp Business própria no Facebook, pode conectar direto por lá.</p>
           <WhatsAppEmbeddedSignup botId={bots[0].id} onConnected={() => window.location.reload()} />
         </div>
       )}
