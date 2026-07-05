@@ -8,7 +8,7 @@
  * Header: Authorization: Bearer <supabase_session_token>
  */
 import { supabaseAdmin } from '../../../lib/supabase'
-import { addPhoneNumberToWaba, requestVerificationCode } from '../../../lib/meta'
+import { addPhoneNumberToWaba, requestVerificationCode, listWabaPhoneNumbers } from '../../../lib/meta'
 
 const SHARED_WABA_ID = process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798'
 
@@ -38,10 +38,31 @@ export default async function handler(req, res) {
   const systemToken = process.env.META_SYSTEM_USER_TOKEN
   if (!systemToken) return res.status(500).json({ error: 'META_SYSTEM_USER_TOKEN não configurado no servidor' })
 
+  const digitsOnly = (s) => (s || '').replace(/\D/g, '')
+  const targetDigits = digitsOnly(cc) + digitsOnly(phone_number)
+
   try {
-    const addRes = await addPhoneNumberToWaba(SHARED_WABA_ID, systemToken, cc, phone_number, verified_name)
-    const phoneNumberId = addRes.data.id
-    if (!phoneNumberId) throw new Error('Meta não retornou um ID pro número adicionado')
+    let phoneNumberId
+
+    try {
+      const addRes = await addPhoneNumberToWaba(SHARED_WABA_ID, systemToken, cc, phone_number, verified_name)
+      phoneNumberId = addRes.data.id
+    } catch (addErr) {
+      const metaMsg = addErr?.response?.data?.error?.message || addErr?.response?.data?.error?.error_user_msg || ''
+      // Esse número já existe como recurso na WABA (ex.: tentativa anterior, ou
+      // número que já passou por aqui antes) — em vez de falhar, localizamos o
+      // recurso já existente e seguimos o fluxo normalmente a partir dele.
+      if (/already|existe|registrad/i.test(metaMsg)) {
+        const listRes = await listWabaPhoneNumbers(SHARED_WABA_ID, systemToken)
+        const existing = (listRes.data.data || []).find(p => digitsOnly(p.display_phone_number).endsWith(targetDigits.slice(-11)))
+        if (!existing) throw addErr
+        phoneNumberId = existing.id
+      } else {
+        throw addErr
+      }
+    }
+
+    if (!phoneNumberId) throw new Error('Meta não retornou um ID pro número informado')
 
     await requestVerificationCode(phoneNumberId, systemToken, 'SMS')
 
