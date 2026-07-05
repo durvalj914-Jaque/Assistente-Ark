@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import WhatsAppEmbeddedSignup from '../../components/WhatsAppEmbeddedSignup'
 
 export default function WhatsappSetupPage() {
   const router = useRouter()
@@ -72,9 +73,17 @@ export default function WhatsappSetupPage() {
         </div>
       )}
 
+      {!activeBot && bots?.[0] && (
+        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.35)' }}>
+          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática (recomendado)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Conecte seu WhatsApp Business agora mesmo, sem esperar nossa equipe — leva menos de 2 minutos.</p>
+          <WhatsAppEmbeddedSignup botId={bots[0].id} onConnected={() => window.location.reload()} />
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: request ? '1fr 1fr' : '1fr', gap: 20, maxWidth: 900 }}>
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📋 Dados pra conexão</h3>
+          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📋 Ou preencha manualmente</h3>
           <form onSubmit={submitRequest}>
             <div style={{ marginBottom: 14 }}>
               <label style={label}>NOME DA EMPRESA</label>
