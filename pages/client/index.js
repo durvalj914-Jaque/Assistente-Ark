@@ -7,6 +7,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter } from 'next/router'
 import { PLANS, isPlanActive } from '../../lib/plans'
+import WhatsAppSmsConnect from '../../components/WhatsAppSmsConnect'
 import Head from 'next/head'
 import Link from 'next/link'
 
@@ -176,7 +177,8 @@ export default function ClientPortal() {
             {[
               { key: 'conversations', icon: '💬', label: 'Conversas', count: convs.length },
               { key: 'bots',          icon: '🤖', label: 'Meus Bots', count: bots.length },
-              { key: 'usage',         icon: '📊', label: 'Uso & Plano' }
+              { key: 'whatsapp',       icon: '📶', label: 'WhatsApp' },
+            { key: 'usage',         icon: '📊', label: 'Uso & Plano' }
             ].map(n => (
               <button key={n.key} onClick={() => setTab(n.key)}
                 style={{ ...styles.navItem, ...(tab === n.key ? styles.navItemActive : {}) }}>

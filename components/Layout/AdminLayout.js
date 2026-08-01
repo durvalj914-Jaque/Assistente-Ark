@@ -17,7 +17,7 @@ const NAV = [
   { href: '/admin/api', label: 'API', icon: '🔌' },
 ]
 
-const PLATFORM_NAV = { href: '/admin/platform', label: 'Painel Arkiel', icon: '🛠️' }
+const PLATFORM_NAV = { href: '/painel', label: 'Painel Arkiel', icon: '⚡' }
 
 export default function AdminLayout({ children, tenant, user, role, profile }) {
   const router = useRouter()
