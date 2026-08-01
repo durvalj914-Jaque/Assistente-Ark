@@ -97,8 +97,8 @@ export default function Navbar() {
 
       <nav className="ark-nav">
         <Link href="/" className="ark-nav-logo">
-          <img src="/arkiel-logo.png" alt="Arkiel" />
-          <span className="ark-nav-logo-text">Arkiel</span>
+          <img src="/arkiel-logo.png" alt="Assistente Ark" />
+          <span className="ark-nav-logo-text">Assistente Ark</span>
         </Link>
 
         <ul className="ark-nav-links">

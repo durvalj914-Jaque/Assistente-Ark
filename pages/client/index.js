@@ -21,7 +21,7 @@ function Paywall({ tenant, onRefresh }) {
   return (
     <div style={styles.paywallRoot}>
       <div style={styles.paywallCard}>
-        <img src="/arkiel-logo.png" alt="Arkiel" style={{ width: 48, height: 48, objectFit: 'contain', marginBottom: 20 }} />
+        <img src="/arkiel-logo.png" alt="Assistente Ark" style={{ width: 48, height: 48, objectFit: 'contain', marginBottom: 20 }} />
         <div style={styles.paywallBadge}>⚡ Acesso Premium</div>
         <h2 style={styles.paywallTitle}>Ative seu plano para continuar</h2>
         <p style={styles.paywallSub}>
@@ -151,7 +151,7 @@ export default function ClientPortal() {
 
   return (
     <>
-      <Head><title>Portal do Cliente — Arkiel</title></Head>
+      <Head><title>Portal do Cliente — Assistente Ark</title></Head>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #000; color: #fff; font-family: 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -164,8 +164,8 @@ export default function ClientPortal() {
         <aside style={styles.sidebar}>
           <div style={styles.sidebarTop}>
             <Link href="/" style={styles.logoWrap}>
-              <img src="/arkiel-logo.png" alt="Arkiel" style={{ width: 28, height: 28, objectFit: 'contain' }} />
-              <span style={styles.logoText}>Arkiel</span>
+              <img src="/arkiel-logo.png" alt="Assistente Ark" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+              <span style={styles.logoText}>Assistente Ark</span>
             </Link>
             <div style={styles.planBadge}>
               <span style={{ ...styles.planDot, background: tenant.status === 'active' ? '#22c55e' : '#ef4444' }} />

@@ -6,8 +6,8 @@ export default function Termos() {
   return (
     <>
       <Head>
-        <title>Termos de Uso — Arkiel</title>
-        <meta name="description" content="Termos de uso da plataforma Arkiel." />
+        <title>Termos de Uso — Assistente Ark</title>
+        <meta name="description" content="Termos de uso da plataforma Assistente Ark." />
       </Head>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -38,7 +38,7 @@ export default function Termos() {
         </div>
         <div className="legal-body">
           <h2>1. Aceitação dos Termos</h2>
-          <p>Ao acessar ou utilizar a plataforma Arkiel ("Plataforma"), você concorda em cumprir e estar vinculado a estes Termos de Uso. Caso não concorde com qualquer parte destes termos, não utilize a Plataforma.</p>
+          <p>Ao acessar ou utilizar a plataforma Assistente Ark ("Plataforma"), você concorda em cumprir e estar vinculado a estes Termos de Uso. Caso não concorde com qualquer parte destes termos, não utilize a Plataforma.</p>
 
           <h2>2. Descrição do Serviço</h2>
           <p>A Arkiel Tecnologia LTDA disponibiliza uma plataforma SaaS (Software as a Service) para automação de atendimento via WhatsApp Business, incluindo os produtos Assistente Ark e Ark AOI. Os serviços incluem:</p>

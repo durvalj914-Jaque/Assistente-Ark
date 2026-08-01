@@ -56,7 +56,7 @@ export default async function handler(req, res) {
           messaging_product: 'whatsapp',
           to: from,
           type: 'text',
-          text: { body: bot.greeting || 'Olá! Sou o assistente da Arkiel. 🤖' }
+          text: { body: bot.greeting || 'Olá! Sou o assistente Ark. 🤖' }
         },
         { headers: { Authorization: `Bearer ${bot.access_token}`, 'Content-Type': 'application/json' } }
       ).catch(e => ({ data: { error: e.response?.data || e.message } }))

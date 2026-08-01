@@ -1,5 +1,5 @@
 /**
- * /painel — Painel Arkiel de Administracao
+ * /painel — Painel Assistente Ark de Administracao
  * Painel completo e centralizado para gestao de clientes, bots, conversas,
  * atividade do servidor e monitoramento em tempo real.
  * Acesso: apenas is_platform_admin = true.
@@ -95,12 +95,12 @@ export default function PainelAdminPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
-      <Head><title>Painel Arkiel — Administracao</title></Head>
+      <Head><title>Painel Assistente Ark — Administracao</title></Head>
       {showNewClient && <NewClientModal onClose={() => setShowNewClient(false)} onCreated={loadAll} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>Painel Arkiel</h1>
+          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>Painel Assistente Ark</h1>
           <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>Controle total da plataforma — clientes, bots, atividade e servidor.</p>
         </div>
         {tab === 'clients' && (

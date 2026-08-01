@@ -31,8 +31,8 @@ export default function Login() {
   return (
     <>
       <Head>
-        <title>Entrar — Arkiel</title>
-        <meta name="description" content="Acesse sua conta Arkiel." />
+        <title>Entrar — Assistente Ark</title>
+        <meta name="description" content="Acesse sua conta Assistente Ark." />
       </Head>
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -144,12 +144,12 @@ export default function Login() {
         {/* Left */}
         <div className="left-panel">
           <Link href="/" className="left-logo">
-            <img src="/arkiel-logo.png" alt="Arkiel" />
-            <span>Arkiel</span>
+            <img src="/arkiel-logo.png" alt="Assistente Ark" />
+            <span>Assistente Ark</span>
           </Link>
 
           <div className="left-hero">
-            <div className="left-tag">Plataforma Arkiel · v2.0</div>
+            <div className="left-tag">Plataforma Assistente Ark · v2.0</div>
             <h1 className="left-title">
               Bem-vindo<br />de <span className="accent">volta.</span>
             </h1>
@@ -174,12 +174,12 @@ export default function Login() {
         <div className="right-panel">
           {/* Mobile logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48, justifyContent: 'center' }}>
-            <img src="/arkiel-logo.png" alt="Arkiel" style={{ width: 32, height: 32, objectFit: 'contain' }} />
-            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 4, color: '#fff', textTransform: 'uppercase' }}>Arkiel</span>
+            <img src="/arkiel-logo.png" alt="Assistente Ark" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 4, color: '#fff', textTransform: 'uppercase' }}>Assistente Ark</span>
           </div>
 
           <h2 className="login-card-title">Acesse sua conta</h2>
-          <p className="login-card-sub">Use sua conta Google para entrar com segurança no painel Arkiel.</p>
+          <p className="login-card-sub">Use sua conta Google para entrar com segurança no painel Assistente Ark.</p>
 
           <button onClick={handleGoogleLogin} disabled={loading} className="btn-google">
             {loading ? (
