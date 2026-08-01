@@ -71,7 +71,7 @@ export default function Footer() {
       <footer className="ark-footer">
         <div className="ark-footer-grid">
           <div className="footer-brand">
-            <img src="/arkiel-logo.png" alt="Assistente Ark" />
+            <img src="/assistente-ark-logo.png" alt="Assistente Ark" />
             <div className="footer-brand-name">Assistente Ark</div>
             <p className="footer-brand-desc">
               Plataforma de automação inteligente para WhatsApp Business. Escale seu atendimento com IA, sem código e sem complicação.

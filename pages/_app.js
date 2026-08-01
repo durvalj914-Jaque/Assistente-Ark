@@ -52,7 +52,7 @@ export default function App({ Component, pageProps }) {
         <meta property="og:description" content="Automatize seu atendimento WhatsApp com inteligência artificial." />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://arkiel.com.br/arkiel-logo.png" />
+        <meta property="og:image" content="https://arkiel.com.br/assistente-ark-logo.png" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="theme-color" content="#000000" />
         <link rel="canonical" href={canonicalUrl} />
