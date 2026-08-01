@@ -40,19 +40,28 @@ export default async function handler(req, res) {
   const phoneNumberId = bot.pending_phone_number_id
 
   try {
+    // 1. Verifica o código SMS
     await verifyPhoneCode(phoneNumberId, systemToken, code)
 
+    // 2. Registra na Cloud API (resiliente — lida com PIN mismatch e já-registrado)
     try {
       await registerPhoneNumber(phoneNumberId, systemToken)
     } catch (regErr) {
+      const code = regErr?.response?.data?.error?.code
       const msg = regErr?.response?.data?.error?.message || ''
-      if (!/already|registered/i.test(msg)) throw regErr
+      // 133010 = "not registered" — tenta registrar de novo
+      if (code === 133010) {
+        await registerPhoneNumber(phoneNumberId, systemToken)
+      } else if (!/already|registered/i.test(msg)) {
+        throw regErr
+      }
+      // se chegou aqui, já estava registrado — ok
     }
 
-    // A WABA compartilhada já deve estar assinada, mas isso é idempotente —
-    // seguro chamar de novo a cada novo número.
+    // 3. Garante que o app tá inscrito nos webhooks da WABA
     try { await subscribeAppToWaba(SHARED_WABA_ID, systemToken) } catch (_) { /* já assinado, ok */ }
 
+    // 4. Ativa o bot no banco
     const { error: updateErr } = await db.from('bots').update({
       phone_number_id: phoneNumberId,
       waba_id: SHARED_WABA_ID,
@@ -63,6 +72,7 @@ export default async function handler(req, res) {
     }).eq('id', bot_id)
     if (updateErr) throw updateErr
 
+    // 5. Marca o onboarding como conectado
     await db.from('whatsapp_onboarding_requests')
       .update({ status: 'connected', admin_notes: 'Conectado automaticamente via verificação por SMS' })
       .eq('tenant_id', bot.tenant_id)
