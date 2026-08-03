@@ -144,7 +144,7 @@ export default function Login() {
         {/* Left */}
         <div className="left-panel">
           <Link href="/" className="left-logo">
-            <img src="/assistente-ark-logo.png" alt="Assistente Ark" />
+            <img src="/assistente-ark-icon.png" alt="Assistente Ark" />
             <span>Assistente Ark</span>
           </Link>
 
@@ -174,7 +174,7 @@ export default function Login() {
         <div className="right-panel">
           {/* Mobile logo */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 48, justifyContent: 'center' }}>
-            <img src="/assistente-ark-logo.png" alt="Assistente Ark" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+            <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 32, height: 32, objectFit: 'contain' }} />
             <span style={{ fontSize: 13, fontWeight: 800, letterSpacing: 4, color: '#fff', textTransform: 'uppercase' }}>Assistente Ark</span>
           </div>
 

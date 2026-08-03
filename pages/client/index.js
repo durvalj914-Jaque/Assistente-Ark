@@ -21,7 +21,7 @@ function Paywall({ tenant, onRefresh }) {
   return (
     <div style={styles.paywallRoot}>
       <div style={styles.paywallCard}>
-        <img src="/assistente-ark-logo.png" alt="Assistente Ark" style={{ width: 48, height: 48, objectFit: 'contain', marginBottom: 20 }} />
+        <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 48, height: 48, objectFit: 'contain', marginBottom: 20 }} />
         <div style={styles.paywallBadge}>⚡ Acesso Premium</div>
         <h2 style={styles.paywallTitle}>Ative seu plano para continuar</h2>
         <p style={styles.paywallSub}>
@@ -133,7 +133,7 @@ export default function ClientPortal() {
 
   if (loading) return (
     <div style={styles.loadingScreen}>
-      <img src="/assistente-ark-logo.png" style={{ width: 44, opacity: 0.7 }} alt="" />
+      <img src="/assistente-ark-icon.png" style={{ width: 44, opacity: 0.7 }} alt="" />
       <p style={{ color: 'rgba(255,255,255,0.3)', marginTop: 16, fontSize: 13 }}>Carregando portal…</p>
     </div>
   )
@@ -164,7 +164,7 @@ export default function ClientPortal() {
         <aside style={styles.sidebar}>
           <div style={styles.sidebarTop}>
             <Link href="/" style={styles.logoWrap}>
-              <img src="/assistente-ark-logo.png" alt="Assistente Ark" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+              <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 28, height: 28, objectFit: 'contain' }} />
               <span style={styles.logoText}>Assistente Ark</span>
             </Link>
             <div style={styles.planBadge}>

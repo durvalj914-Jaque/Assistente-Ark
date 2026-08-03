@@ -39,13 +39,13 @@ export default function AdminLayout({ children, tenant, user, role, profile }) {
         {!collapsed && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/assistente-ark-logo.png" alt="Assistente Ark" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain', flexShrink: 0 }} />
+              <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain', flexShrink: 0 }} />
               <span style={{ fontWeight: 800, fontSize: 14, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Assistente Ark</span>
             </div>
           </div>
         )}
         {collapsed && (
-          <img src="/assistente-ark-logo.png" alt="Assistente Ark" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain' }} />
+          <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain' }} />
         )}
         <button onClick={() => setCollapsed(c => !c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#334155', fontSize: 14, padding: 4, marginLeft: collapsed ? 0 : 0 }}>
           {collapsed ? '→' : '←'}
