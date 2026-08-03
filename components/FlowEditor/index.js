@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, Component } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
 const NODE_TYPES = {
@@ -9,6 +9,55 @@ const NODE_TYPES = {
   condition: { label: 'Condição',    icon: '🔀', color: '#10b981' },
   transfer:  { label: 'Transferir',  icon: '🙋', color: '#f97316' },
   end:       { label: 'Encerrar',    icon: '🔚', color: '#ef4444' },
+}
+
+// Guarda de profundidade máxima — protege contra recursão infinita
+// caso haja ciclos nos dados que escaparam da normalização
+const MAX_DEPTH = 25
+
+// ─────────────────────────────────────────────
+// Error Boundary — impede que a página inteira quebre
+// ─────────────────────────────────────────────
+class FlowErrorBoundary extends Component {
+  constructor(props) {
+    super(props)
+    this.state = { hasError: false, errorMsg: '' }
+  }
+
+  static getDerivedStateFromError(err) {
+    return { hasError: true, errorMsg: String(err?.message || err) }
+  }
+
+  componentDidCatch(err) {
+    console.error('[FlowEditor] Erro capturado:', err)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+          <div style={{ fontSize: 36, marginBottom: 10 }}>⚠️</div>
+          <p style={{ color: '#ef4444', fontSize: 14, fontWeight: 600, marginBottom: 6 }}>
+            Erro ao renderizar o fluxo
+          </p>
+          <p style={{ color: '#64748b', fontSize: 12, marginBottom: 16, maxWidth: 400, margin: '0 auto 16px' }}>
+            {this.state.errorMsg}<br/>
+            Recarregue a página e tente novamente. Se persistir, use "Colar JSON" com um fluxo corrigido.
+          </p>
+          <button
+            onClick={() => {
+              this.setState({ hasError: false, errorMsg: '' })
+              this.props.onReset?.()
+            }}
+            style={{ background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', border: 'none', borderRadius: 8, color: '#fff', padding: '10px 24px', cursor: 'pointer', fontWeight: 700, fontSize: 13 }}
+          >
+            Voltar ao menu
+          </button>
+        </div>
+      )
+    }
+    return this.props.children
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -70,8 +119,8 @@ function NodeCard({ node, onEdit, onDelete, onAddBelow, onAddParallel, isRoot })
             }}
             title="Remover nó"
             onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-            onMouseLeave={e => e.currentTarget.style.color = '#475569'}
-          >×</button>
+            onMouseLeave={e => e.currentTarget.style.color = '#475569'
+          }>×</button>
         )}
       </div>
 
@@ -107,47 +156,72 @@ function NodeCard({ node, onEdit, onDelete, onAddBelow, onAddParallel, isRoot })
 }
 
 // ─────────────────────────────────────────────
-// Renderização recursiva de nível
+// Renderização recursiva de nível — com proteção contra ciclos
 // ─────────────────────────────────────────────
-function NodeLevel({ nodeIds, allNodes, onEdit, onDelete, onAddBelow, onAddParallel, depth }) {
+function NodeLevel({ nodeIds, allNodes, onEdit, onDelete, onAddBelow, onAddParallel, depth, visited }) {
   if (!nodeIds?.length) return null
-  const nodes = nodeIds.map(id => allNodes.find(n => n.id === id)).filter(Boolean)
+  if (depth > MAX_DEPTH) {
+    return (
+      <div style={{ fontSize: 11, color: '#f59e0b', padding: 8 }}>
+        ⚠️ Profundidade máxima atingida — possível ciclo
+      </div>
+    )
+  }
+
+  const nodes = nodeIds
+    .map(id => allNodes.find(n => n.id === id))
+    .filter(Boolean)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'row', gap: 28, alignItems: 'flex-start', justifyContent: 'center' }}>
-      {nodes.map((node, idx) => (
-        <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          {/* Linha de entrada (não root) */}
-          {depth > 0 && (
-            <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />
-          )}
-          <NodeCard
-            node={node}
-            isRoot={depth === 0 && idx === 0}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onAddBelow={onAddBelow}
-            onAddParallel={onAddParallel}
-          />
-          {/* Filhos */}
-          {node.children?.length > 0 && (
-            <>
+      {nodes.map((node, idx) => {
+        // Proteção contra ciclos: pula nós já visitados neste ramo
+        if (visited.has(node.id)) {
+          return (
+            <div key={`${node.id}_cycle`} style={{ fontSize: 11, color: '#f59e0b', padding: 4 }}>
+              ↩️ (ciclo cortado)
+            </div>
+          )
+        }
+        const childVisited = new Set(visited)
+        childVisited.add(node.id)
+
+        return (
+          <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {/* Linha de entrada (não root) */}
+            {depth > 0 && (
               <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />
-              {node.children.length > 1 && (
-                <div style={{ height: 2, background: 'rgba(79,142,247,0.15)', width: Math.max(node.children.length - 1, 1) * 228 }} />
-              )}
-              <NodeLevel
-                nodeIds={node.children}
-                allNodes={allNodes}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onAddBelow={onAddBelow}
-                onAddParallel={onAddParallel}
-                depth={depth + 1}
-              />
-            </>
-          )}
-        </div>
-      ))}
+            )}
+            <NodeCard
+              node={node}
+              isRoot={depth === 0 && idx === 0}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              onAddBelow={onAddBelow}
+              onAddParallel={onAddParallel}
+            />
+            {/* Filhos */}
+            {node.children?.length > 0 && (
+              <>
+                <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />
+                {node.children.length > 1 && (
+                  <div style={{ height: 2, background: 'rgba(79,142,247,0.15)', width: Math.max(node.children.length - 1, 1) * 228 }} />
+                )}
+                <NodeLevel
+                  nodeIds={node.children}
+                  allNodes={allNodes}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onAddBelow={onAddBelow}
+                  onAddParallel={onAddParallel}
+                  depth={depth + 1}
+                  visited={childVisited}
+                />
+              </>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -228,10 +302,11 @@ function EditModal({ node, onSave, onClose }) {
 }
 
 // ─────────────────────────────────────────────
-// FlowEditor principal
+// FlowEditor principal — com Error Boundary
 // ─────────────────────────────────────────────
 export default function FlowEditor({ flow, onChange }) {
   const [editing, setEditing] = useState(null)
+  const [renderKey, setRenderKey] = useState(0)
   const nodes = flow?.nodes || []
   const rootIds = nodes.filter(n => !n.parentId).map(n => n.id)
 
@@ -271,6 +346,11 @@ export default function FlowEditor({ flow, onChange }) {
     setEditing(null)
   }
 
+  function handleReset() {
+    setRenderKey(k => k + 1)
+    onChange({ ...flow, nodes: [] })
+  }
+
   if (!nodes.length) {
     return (
       <div style={{ textAlign: 'center', padding: '60px 20px' }}>
@@ -287,11 +367,12 @@ export default function FlowEditor({ flow, onChange }) {
   }
 
   return (
-    <div>
+    <FlowErrorBoundary key={renderKey} onReset={handleReset}>
       {editing && <EditModal node={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}
       <div style={{ overflowX: 'auto', padding: '36px 24px', minHeight: 300 }}>
         <div style={{ display: 'inline-block', minWidth: '100%' }}>
           <NodeLevel
+            key={`tree_${renderKey}`}
             nodeIds={rootIds}
             allNodes={nodes}
             onEdit={setEditing}
@@ -299,12 +380,13 @@ export default function FlowEditor({ flow, onChange }) {
             onAddBelow={addBelow}
             onAddParallel={addParallel}
             depth={0}
+            visited={new Set()}
           />
         </div>
       </div>
       <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(79,142,247,0.08)', fontSize: 12, color: '#334155' }}>
         💡 <b style={{ color: '#4f8ef7' }}>+</b> próximo passo &nbsp;·&nbsp; <b style={{ color: '#a78bfa' }}>+ ramo</b> opção paralela &nbsp;·&nbsp; Clique no card para editar
       </div>
-    </div>
+    </FlowErrorBoundary>
   )
 }

@@ -2,19 +2,20 @@ import { useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 
 // Normaliza um fluxo colado em JSON pro formato exato que o Editor de Fluxo
-// e o motor de execução esperam — preenche campos que faltarem, sem travar
-// por causa de JSON "quase certo" (ex: exportado de outro bot, editado à mão,
-// ou vindo da IA sem passar pelo endpoint de geração).
+// e o motor de execução esperam — preenche campos que faltarem, deriva children
+// das options quando necessário, detecta e quebra referências circulares.
 function normalizeFlow(parsed) {
   if (!parsed || typeof parsed !== 'object') throw new Error('JSON inválido: esperado um objeto')
+  if (typeof parsed === 'string') throw new Error('JSON inválido: veio uma string, não um objeto')
   if (!Array.isArray(parsed.nodes)) throw new Error('JSON inválido: falta o array "nodes"')
   if (!parsed.nodes.length) throw new Error('O fluxo colado não tem nenhum nó')
 
   // Garante id único em todo nó (gera um novo se faltar ou vier duplicado)
   const seenIds = new Set()
-  const nodes = parsed.nodes.map(n => {
+  const nodes = parsed.nodes.map((n, i) => {
+    if (!n || typeof n !== 'object') throw new Error(`Nó ${i + 1} não é um objeto válido`)
     let id = n.id
-    if (!id || seenIds.has(id)) id = uuidv4()
+    if (!id || seenIds.has(id)) id = `node_${i}_${uuidv4().slice(0, 8)}`
     seenIds.add(id)
     return {
       ...n,
@@ -22,21 +23,79 @@ function normalizeFlow(parsed) {
       type: n.type || 'message',
       text: n.text || '',
       parentId: n.parentId ?? null,
-      children: Array.isArray(n.children) ? n.children : [],
-      options: Array.isArray(n.options) ? n.options : [],
+      children: Array.isArray(n.children) ? [...n.children] : [],
+      options: Array.isArray(n.options) ? n.options.map(o => ({
+        id: o.id || `opt_${id}_${uuidv4().slice(0, 6)}`,
+        keyword: o.keyword || '',
+        label: o.label || '',
+        nextId: o.nextId || null,
+      })) : [],
     }
   })
 
   const validIds = new Set(nodes.map(n => n.id))
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]))
 
-  // Remove referências (children/options.nextId) que apontem pra ids que não existem
-  const cleaned = nodes.map(n => ({
+  // Se um nó não tem children mas tem options com nextId, deriva children a partir delas
+  // (caso típico: fluxo gerado pela IA, que não inclui children no JSON)
+  nodes.forEach(n => {
+    if ((!n.children || n.children.length === 0) && n.options.length > 0) {
+      n.children = n.options
+        .map(o => o.nextId)
+        .filter(id => id && validIds.has(id))
+      // Remove duplicatas
+      n.children = [...new Set(n.children)]
+    }
+  })
+
+  // Garante que o nó raiz (welcome ou sem parentId) tenha parentId null
+  // e que todos os outros tenham parentId apontando pro pai correto
+  const root = nodes.find(n => n.type === 'welcome') || nodes[0]
+  nodes.forEach(n => {
+    if (n.id === root.id) n.parentId = null
+  })
+
+  // Detecta e quebra referências circulares percorrendo a árvore
+  const visited = new Set()
+  function breakCycles(nodeId, fromId) {
+    if (visited.has(nodeId)) return // já visitou — ciclo detectado, ignora
+    visited.add(nodeId)
+    const node = byId[nodeId]
+    if (!node) return
+    const cleanChildren = []
+    for (const childId of node.children) {
+      if (!validIds.has(childId)) continue
+      if (visited.has(childId)) continue // seria um ciclo — corta
+      cleanChildren.push(childId)
+      breakCycles(childId, nodeId)
+    }
+    node.children = cleanChildren
+  }
+  breakCycles(root.id, null)
+
+  // Nós que não foram visitados (órfãos) não têm pai nem children válidas
+  // — encadeia no final do último nó visitado pra não perder conteúdo
+  const unreached = nodes.filter(n => !visited.has(n.id))
+  let lastReached = nodes.filter(n => visited.has(n.id)).pop()
+  unreached.forEach(n => {
+    if (!lastReached) return
+    lastReached.children = [...(lastReached.children || []), n.id]
+    n.parentId = lastReached.id
+    visited.add(n.id)
+    lastReached = n
+  })
+
+  // Limpa referências inválidas em options.nextId
+  const finalNodes = nodes.map(n => ({
     ...n,
-    children: n.children.filter(c => validIds.has(c)),
-    options: n.options.map(o => (o.nextId && !validIds.has(o.nextId)) ? { ...o, nextId: null } : o),
+    children: (n.children || []).filter(c => validIds.has(c)),
+    options: (n.options || []).map(o => ({
+      ...o,
+      nextId: o.nextId && validIds.has(o.nextId) ? o.nextId : null,
+    })),
   }))
 
-  return { name: parsed.name || 'Fluxo Principal', nodes: cleaned }
+  return { name: parsed.name || 'Fluxo Principal', nodes: finalNodes }
 }
 
 export default function JsonTools({ flow, onChange }) {
