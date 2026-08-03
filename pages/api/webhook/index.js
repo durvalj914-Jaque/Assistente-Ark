@@ -3,7 +3,7 @@ import { processFlow } from '../../../lib/flowEngine'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
 
-export const config = { api: { bodyParser: true } }
+export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
 const SUPA_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY

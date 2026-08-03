@@ -10,6 +10,8 @@
 import { supabaseAdmin } from '../../lib/supabase'
 import { generateFlowFromDescription } from '../../lib/ai'
 
+export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -17,8 +19,8 @@ export default async function handler(req, res) {
   if (!bot_id || !description?.trim()) {
     return res.status(400).json({ error: 'bot_id e description são obrigatórios' })
   }
-  if (description.length > 1500) {
-    return res.status(400).json({ error: 'Descrição muito longa (máximo 1500 caracteres)' })
+  if (description.length > 5000) {
+    return res.status(400).json({ error: 'Descrição muito longa (máximo 5000 caracteres)' })
   }
 
   const authHeader = req.headers.authorization || ''

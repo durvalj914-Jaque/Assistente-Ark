@@ -182,7 +182,7 @@ function EditModal({ node, onSave, onClose }) {
         <textarea
           value={form.text}
           onChange={e => setForm(f => ({ ...f, text: e.target.value }))}
-          rows={4} placeholder="O que o bot vai dizer aqui?"
+          rows={8} placeholder="O que o bot vai dizer aqui? (até 4000 caracteres)"
           style={{ width: '100%', background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, color: '#e2e8f0', padding: '10px 12px', fontSize: 13, fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'vertical', marginBottom: 18 }}
         />
 

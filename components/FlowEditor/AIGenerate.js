@@ -61,7 +61,7 @@ export default function AIGenerateButton({ botId, onGenerated, hasExistingFlow }
               value={description}
               onChange={e => setDescription(e.target.value)}
               rows={5}
-              maxLength={1500}
+              maxLength={5000}
               placeholder='Ex: "Sou uma clínica odontológica. Quero que o bot tire dúvidas sobre tratamentos, agende consulta e transfira pra recepção em casos urgentes."'
               style={{ width: '100%', background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, color: '#e2e8f0', padding: '10px 12px', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical', marginBottom: 14 }}
             />
