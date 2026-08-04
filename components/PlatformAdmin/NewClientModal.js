@@ -13,6 +13,10 @@ export default function NewClientModal({ onClose, onCreated }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState(null)
+  const [smsCode, setSmsCode] = useState('')
+  const [confirming, setConfirming] = useState(false)
+  const [confirmed, setConfirmed] = useState(false)
+  const [confirmError, setConfirmError] = useState('')
 
   async function create() {
     if (!companyName.trim() || !ownerEmail.trim()) return
@@ -26,14 +30,12 @@ export default function NewClientModal({ onClose, onCreated }) {
         plan,
       }
 
-      // Inclui o número de WhatsApp se foi preenchido
       const digitsOnly = (s) => (s || '').replace(/\D/g, '')
       const cc = digitsOnly(whatsappCc)
       const num = digitsOnly(whatsappNumber)
       if (cc && num) {
         body.whatsapp_cc = cc
         body.whatsapp_number = num
-        // Usa o nome da empresa como verified_name se o campo estiver vazio
         body.whatsapp_name = whatsappName.trim() || companyName.trim()
       }
 
@@ -53,45 +55,124 @@ export default function NewClientModal({ onClose, onCreated }) {
     }
   }
 
+  async function confirmCode() {
+    if (!smsCode.trim() || smsCode.trim().length < 6) return
+    setConfirming(true)
+    setConfirmError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/admin/confirm-whatsapp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ bot_id: result.whatsapp.bot_id, code: smsCode.trim() }),
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || 'Erro ao confirmar código')
+      setConfirmed(true)
+    } catch (e) {
+      setConfirmError(e.message)
+    } finally {
+      setConfirming(false)
+    }
+  }
+
+  // Helper pra saber se o WhatsApp foi cadastrado e tá aguardando SMS
+  const awaitingSms = result?.whatsapp?.sms_sent && !confirmed
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
-      onClick={e => e.target === e.currentTarget && !loading && onClose()}>
+      onClick={e => e.target === e.currentTarget && !loading && !confirming && onClose()}>
       <div style={{ background: '#0d0d1e', border: '1px solid rgba(79,142,247,0.25)', borderRadius: 16, padding: 28, width: 480, maxWidth: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
 
         {result ? (
           <>
-            <h3 style={{ color: '#fff', fontWeight: 700, marginBottom: 14, fontSize: 15 }}>✅ Cliente criado!</h3>
+            <h3 style={{ color: '#fff', fontWeight: 700, marginBottom: 14, fontSize: 15 }}>
+              {confirmed ? '✅ Cliente pronto e WhatsApp ativo!' : '✅ Cliente criado!'}
+            </h3>
+
             <div style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12.5, color: '#cbd5e1', lineHeight: 1.6 }}>
               <b style={{ color: '#e2e8f0' }}>{result.tenant.name}</b> foi criado no plano <b style={{ color: '#e2e8f0' }}>{PLANS[result.tenant.plan]?.label}</b>, com um bot padrão pronto.
               {result.linked_existing ? (
                 <> Esse e-mail já tinha conta no Assistente Ark — já foi vinculado direto como dono(a).</>
               ) : (
-                <> Assim que <b style={{ color: '#e2e8f0' }}>{ownerEmail}</b> entrar em arkiel.com.br com login do Google, a conta já vai estar pronta e vinculada automaticamente — nada pra ele(a) configurar antes.</>
+                <> Assim que <b style={{ color: '#e2e8f0' }}>{ownerEmail}</b> entrar em arkiel.com.br com login do Google, a conta já vai estar pronta e vinculada automaticamente.</>
               )}
             </div>
 
             {/* Status do WhatsApp */}
             {result.whatsapp && (
-              <div style={{
-                background: result.whatsapp.sms_sent ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.08)',
-                border: `1px solid ${result.whatsapp.sms_sent ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
-                borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12.5, color: '#cbd5e1', lineHeight: 1.6
-              }}>
-                {result.whatsapp.sms_sent ? (
-                  <>
-                    📱 <b style={{ color: '#e2e8f0' }}>WhatsApp:</b> Número <b style={{ color: '#e2e8f0' }}>{result.whatsapp.display_number}</b> adicionado e SMS de verificação enviado!
+              <>
+                {/* Confirmação bem-sucedida */}
+                {confirmed && (
+                  <div style={{
+                    background: 'rgba(16,185,129,0.12)',
+                    border: '1px solid rgba(16,185,129,0.4)',
+                    borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 13, color: '#10b981', lineHeight: 1.6
+                  }}>
+                    🎉 <b>WhatsApp ativado!</b> O número <b>{result.whatsapp.display_number}</b> está registrado, conectado e o bot já está ativo.
+                    <br/>Pode testar mandando uma mensagem agora mesmo.
+                  </div>
+                )}
+
+                {/* Aguardando SMS — campo de confirmação na hora */}
+                {awaitingSms && (
+                  <div style={{
+                    background: 'rgba(6,182,212,0.08)',
+                    border: '1px solid rgba(6,182,212,0.3)',
+                    borderRadius: 8, padding: '14px 16px', marginBottom: 16, fontSize: 12.5, color: '#cbd5e1', lineHeight: 1.6
+                  }}>
+                    📱 <b style={{ color: '#e2e8f0' }}>SMS enviado!</b> O número <b style={{ color: '#e2e8f0' }}>{result.whatsapp.display_number}</b> recebeu um código de 6 dígitos.
                     <br/><br/>
-                    O cliente vai receber um código por SMS. Ele digita esse código no <b style={{ color: '#e2e8f0' }}>portal do cliente</b> (arkiel.com.br/client) ou você pode confirmar por ele no <b style={{ color: '#e2e8f0' }}>painel</b> → Clientes → Gerenciar.
-                    <br/><br/>
-                    <span style={{ color: '#f59e0b' }}>⏳ O bot fica ativo só depois de confirmar o código SMS.</span>
-                  </>
-                ) : (
-                  <>
+                    <b style={{ color: '#06b6d4' }}>Peça o código pro cliente</b> e digite aqui pra ativar o bot agora:
+                  </div>
+                )}
+
+                {/* Campo de input do código SMS */}
+                {awaitingSms && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        value={smsCode}
+                        onChange={e => setSmsCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        onKeyDown={e => e.key === 'Enter' && smsCode.trim().length >= 6 && confirmCode()}
+                        placeholder="000000"
+                        maxLength={6}
+                        style={{
+                          flex: 1, background: '#12121f', border: '1px solid rgba(6,182,212,0.25)',
+                          borderRadius: 8, color: '#fff', padding: '12px 16px', fontSize: 22,
+                          fontFamily: 'monospace', letterSpacing: 8, textAlign: 'center', outline: 'none',
+                        }}
+                      />
+                      <button
+                        onClick={confirmCode}
+                        disabled={confirming || smsCode.trim().length < 6}
+                        className="ark-btn"
+                        style={{ opacity: confirming || smsCode.trim().length < 6 ? 0.6 : 1, padding: '12px 20px', whiteSpace: 'nowrap' }}
+                      >
+                        {confirming ? 'Confirmando…' : 'Ativar'}
+                      </button>
+                    </div>
+                    {confirmError && (
+                      <p style={{ color: '#ef4444', fontSize: 12, marginTop: 8 }}>{confirmError}</p>
+                    )}
+                    <span style={{ color: '#334155', fontSize: 10.5, marginTop: 6, display: 'block' }}>
+                      O código expira em alguns minutos. Se não chegou, pode reenviar pelo portal do cliente.
+                    </span>
+                  </div>
+                )}
+
+                {/* WhatsApp falhou */}
+                {!result.whatsapp.sms_sent && !confirmed && (
+                  <div style={{
+                    background: 'rgba(239,68,68,0.08)',
+                    border: '1px solid rgba(239,68,68,0.25)',
+                    borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12.5, color: '#cbd5e1', lineHeight: 1.6
+                  }}>
                     ⚠️ <b style={{ color: '#e2e8f0' }}>WhatsApp:</b> {result.whatsapp.error}
                     <br/>O cliente pode ativar o número pelo portal (arkiel.com.br/client).
-                  </>
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
             {result.warning && (
@@ -100,7 +181,14 @@ export default function NewClientModal({ onClose, onCreated }) {
               </div>
             )}
 
-            <button onClick={onClose} className="ark-btn" style={{ width: '100%' }}>Fechar</button>
+            <button
+              onClick={onClose}
+              className="ark-btn"
+              style={{ width: '100%' }}
+              disabled={confirming}
+            >
+              {confirmed ? 'Fechar' : awaitingSms ? 'Confirmar depois' : 'Fechar'}
+            </button>
           </>
         ) : (
           <>
@@ -139,10 +227,10 @@ export default function NewClientModal({ onClose, onCreated }) {
             <div style={{ borderTop: '1px solid rgba(79,142,247,0.12)', margin: '18px 0', paddingTop: 18 }}>
               <label style={{ color: '#06b6d4', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'flex', alignItems: 'center', marginBottom: 4 }}>
                 📱 WHATSAPP (OPCIONAL)
-                <HelpTip text="Se você já tem o número do cliente, pode cadastrar agora. O sistema adiciona o número na WABA da Arkiel e manda um SMS com código de verificação pro cliente. Ele só precisa digitar o código no portal pra ativar o bot." />
+                <HelpTip text="Se você já tem o número do cliente, pode cadastrar agora. O sistema adiciona o número na WABA da Arkiel e manda um SMS com código de verificação pro cliente. Como você tá junto com ele, é só pedir o código e digitar aqui mesmo — o bot ativa na hora." />
               </label>
               <p style={{ color: '#475569', fontSize: 11, marginBottom: 12, lineHeight: 1.5 }}>
-                Preencha se quiser já deixar o WhatsApp pronto. O cliente recebe um SMS com o código e digita no portal pra confirmar.
+                Preencha se quiser já ativar o WhatsApp agora. O sistema manda um SMS pro cliente e você digita o código aqui mesmo pra ativar o bot na hora.
               </p>
 
               {/* Nome do perfil WhatsApp */}
