@@ -5,6 +5,7 @@ const NODE_TYPES = {
   welcome:   { label: 'Boas-vindas', icon: '👋', color: '#06b6d4' },
   message:   { label: 'Mensagem',    icon: '💬', color: '#4f8ef7' },
   menu:      { label: 'Menu',        icon: '📋', color: '#8b5cf6' },
+  catalog:   { label: 'Catálogo',    icon: '📦', color: '#22c55e' },
   input:     { label: 'Input',       icon: '✏️', color: '#f59e0b' },
   condition: { label: 'Condição',    icon: '🔀', color: '#10b981' },
   transfer:  { label: 'Transferir',  icon: '🙋', color: '#f97316' },
@@ -230,7 +231,7 @@ function NodeLevel({ nodeIds, allNodes, onEdit, onDelete, onAddBelow, onAddParal
 // Modal de edição de nó
 // ─────────────────────────────────────────────
 function EditModal({ node, onSave, onClose }) {
-  const [form, setForm] = useState({ type: node.type, text: node.text || '', options: node.options || [] })
+  const [form, setForm] = useState({ type: node.type, text: node.text || '', options: node.options || [], category: node.category || '' })
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#0d0d1e', border: '1px solid rgba(79,142,247,0.25)', borderRadius: 16, padding: 28, width: 460, maxHeight: '85vh', overflowY: 'auto' }}>
@@ -259,6 +260,22 @@ function EditModal({ node, onSave, onClose }) {
           rows={8} placeholder="O que o bot vai dizer aqui? (até 4000 caracteres)"
           style={{ width: '100%', background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, color: '#e2e8f0', padding: '10px 12px', fontSize: 13, fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'vertical', marginBottom: 18 }}
         />
+
+        {/* Categoria (catálogo) */}
+        {form.type === 'catalog' && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 6 }}>CATEGORIA (opcional)</label>
+            <input
+              value={form.category}
+              onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+              placeholder="Deixe vazio pra mostrar todos os produtos ativos"
+              style={{ width: '100%', background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, color: '#e2e8f0', padding: '10px 12px', fontSize: 13, outline: 'none' }}
+            />
+            <p style={{ color: '#334155', fontSize: 11, marginTop: 6 }}>
+              O bot vai enviar até 30 produtos ativos (cadastrados em Produtos) como catálogo nativo do WhatsApp — com foto, preço e botão de carrinho, direto na conversa.
+            </p>
+          </div>
+        )}
 
         {/* Opções (menu) */}
         {form.type === 'menu' && (

@@ -134,7 +134,18 @@ export default function ProductsPage() {
     setCreating(false)
   }
 
+  async function syncCatalog(productId, action) {
+    try {
+      await fetch('/api/products/sync-catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, tenantId: tenant.id, action }),
+      })
+    } catch (_) { /* sincronização é best-effort — não bloqueia o CRUD local */ }
+  }
+
   async function handleSave(form) {
+    let savedId = null
     if (editingProduct) {
       const { data, error } = await supabase.from('products')
         .update({ ...form, updated_at: new Date().toISOString() })
@@ -142,6 +153,7 @@ export default function ProductsPage() {
         .select().single()
       if (!error) {
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? data : p))
+        savedId = data.id
       }
     } else {
       const { data, error } = await supabase.from('products')
@@ -149,10 +161,12 @@ export default function ProductsPage() {
         .select().single()
       if (!error) {
         setProducts(prev => [data, ...prev])
+        savedId = data.id
       }
     }
     setShowModal(false)
     setEditingProduct(null)
+    if (savedId) syncCatalog(savedId, 'upsert')
   }
 
   async function toggleActive(product) {
@@ -160,7 +174,10 @@ export default function ProductsPage() {
       .update({ is_active: !product.is_active, updated_at: new Date().toISOString() })
       .eq('id', product.id)
       .select().single()
-    if (!error) setProducts(prev => prev.map(p => p.id === product.id ? data : p))
+    if (!error) {
+      setProducts(prev => prev.map(p => p.id === product.id ? data : p))
+      syncCatalog(product.id, 'upsert')
+    }
   }
 
   async function handleDelete(productId) {
@@ -168,6 +185,7 @@ export default function ProductsPage() {
     setDeleting(productId)
     await supabase.from('products').delete().eq('id', productId)
     setProducts(prev => prev.filter(p => p.id !== productId))
+    syncCatalog(productId, 'remove')
     setDeleting(null)
   }
 

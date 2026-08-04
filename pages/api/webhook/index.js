@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { processFlow } from '../../../lib/flowEngine'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
+import { sendProductList } from '../../../lib/metaCatalog'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -23,6 +24,35 @@ async function savelog(db, step, error, payload) {
 
 async function safeInsert(db, table, data) {
   try { await db.from(table).insert(data) } catch(_) {}
+}
+
+async function handleOrder(db, msg, from, phoneNumberId) {
+  const order = msg.order
+  if (!order) return
+  const { data: botArr } = await db.from('bots').select('id,tenant_id,name').eq('phone_number_id', phoneNumberId).eq('status', 'active').limit(1)
+  const bot = botArr?.[0]
+  if (!bot) return
+
+  const { data: contact } = await db.from('contacts').select('id,phone,name').eq('tenant_id', bot.tenant_id).eq('phone', from).maybeSingle()
+
+  const total = (order.product_items || []).reduce((sum, it) => sum + (Number(it.item_price || 0) * Number(it.quantity || 1)), 0)
+  const currency = order.product_items?.[0]?.currency || 'BRL'
+
+  await safeInsert(db, 'whatsapp_orders', {
+    tenant_id: bot.tenant_id, bot_id: bot.id, contact_id: contact?.id || null,
+    catalog_id: order.catalog_id, items: order.product_items || [], total, currency,
+    note: order.text || null, status: 'new',
+  })
+
+  try {
+    const pushPayload = {
+      title: '🛒 Novo pedido recebido!',
+      body: `${contact?.name || from} enviou um carrinho de R$ ${total.toFixed(2)} pelo ${bot.name}`,
+      url: '/painel',
+      tag: `ark-order-${from}-${Date.now()}`,
+    }
+    await Promise.all([sendPushToTenant(bot.tenant_id, pushPayload), sendFcmToTenant(bot.tenant_id, pushPayload)])
+  } catch (_) {}
 }
 
 async function sendText(phoneId, token, to, text) {
@@ -62,6 +92,12 @@ async function processWebhook(body) {
     userText = br?.title || br?.id || lr?.title || lr?.id || ''
   }
   await savelog(db, 'parsed', null, { from, phoneNumberId, userText })
+
+  // Pedido enviado via carrinho do catálogo (Multi/Single Product Message)
+  if (msg.type === 'order') {
+    await handleOrder(db, msg, from, phoneNumberId)
+    return
+  }
 
   // Bot
   const { data: botArr, error: botErr } = await db
@@ -169,10 +205,32 @@ async function processWebhook(body) {
 
   // Enviar
   try {
-    await sendText(phoneNumberId, tkn, from, reply)
+    if (result.action === 'catalog') {
+      let q = db.from('products').select('*').eq('tenant_id', tenantId).eq('is_active', true)
+      if (result.category) q = q.eq('category', result.category)
+      const { data: catalogProducts } = await q.order('created_at', { ascending: false }).limit(30)
+
+      if (catalogProducts?.length) {
+        await sendProductList({
+          phoneNumberId, token: tkn, to: from,
+          headerText: bot.name || 'Catálogo',
+          bodyText: reply || 'Dá uma olhada nos nossos produtos 👇',
+          products: catalogProducts, tenantId,
+        })
+        reply = `[catálogo enviado — ${catalogProducts.length} produto(s)]`
+      } else {
+        await sendText(phoneNumberId, tkn, from, reply || 'No momento não temos produtos disponíveis no catálogo. Digite *0* para voltar ao menu.')
+      }
+    } else {
+      await sendText(phoneNumberId, tkn, from, reply)
+    }
     await savelog(db, 'send_ok', null, { to: from })
   } catch(e) {
     await savelog(db, 'send_err', e?.message)
+    // Fallback: se o envio do catálogo falhar (ex: catálogo não configurado ainda), manda texto
+    if (result.action === 'catalog') {
+      try { await sendText(phoneNumberId, tkn, from, bot.fallback_message || 'Não consegui carregar o catálogo agora. Digite *0* para voltar ao menu.') } catch(_) {}
+    }
   }
 
   await safeInsert(db, 'messages', {
