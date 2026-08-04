@@ -12,7 +12,9 @@
  * Idempotente: se ARKIEL_META_CATALOG_ID já existir no ambiente, apenas
  * confirma que a conexão com a WABA está OK.
  *
- * Header: Authorization: Bearer <supabase_session_token> (platform admin)
+ * Autenticação: platform admin (Bearer supabase) OU header
+ * X-Setup-Secret == WEBHOOK_VERIFY_TOKEN (uso único, via terminal, pra setup
+ * inicial sem precisar de sessão logada).
  */
 import axios from 'axios'
 import { requirePlatformAdmin } from '../../../lib/adminAuth'
@@ -23,8 +25,13 @@ const SHARED_WABA_ID = process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const ctx = await requirePlatformAdmin(req, res)
-  if (!ctx) return
+  const setupSecret = req.headers['x-setup-secret']
+  const bypassAuth = setupSecret && setupSecret === process.env.WEBHOOK_VERIFY_TOKEN
+
+  if (!bypassAuth) {
+    const ctx = await requirePlatformAdmin(req, res)
+    if (!ctx) return
+  }
 
   const systemToken = process.env.META_SYSTEM_USER_TOKEN
   if (!systemToken) return res.status(500).json({ error: 'META_SYSTEM_USER_TOKEN não configurado' })
