@@ -5,7 +5,7 @@
  * Body: { productId, tenantId, action: 'upsert' | 'remove' }
  */
 import { createClient } from '@supabase/supabase-js'
-import { upsertCatalogProduct, removeCatalogProduct } from '../../lib/metaCatalog'
+import { upsertCatalogProduct, removeCatalogProduct } from '../../../lib/metaCatalog'
 
 function getDB() {
   return createClient(
