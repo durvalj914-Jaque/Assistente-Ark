@@ -105,37 +105,32 @@ export default function PainelAdminPage() {
     setSyncingContacts(true)
     setContactsMsg('')
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const providerToken = session?.provider_token
-      if (!providerToken) {
-        setContactsMsg('❌ Token do Google não encontrado. Faça logout e login novamente. Você também precisa adicionar o escopo "contacts.readonly" no Supabase Dashboard.')
-        setSyncingContacts(false)
-        return
-      }
       const h = await authHeader()
       const res = await fetch('/api/contacts/sync-google', {
         method: 'POST',
         headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider_token: providerToken, tenant_id: selectedTenantContacts })
+        body: JSON.stringify({ tenant_id: selectedTenantContacts })
       })
       const data = await res.json()
       if (res.ok) {
-        setContactsMsg('✅ ' + data.synced + ' contatos sincronizados! (Total no banco: ' + data.total_in_db + ')')
+        setContactsMsg('✅ ' + data.synced + ' contatos sincronizados! (Total: ' + data.total_in_db + ')')
         loadContacts(selectedTenantContacts)
       } else {
-        setContactsMsg('❌ ' + (data.error || 'Erro ao sincronizar'))
-        if (data.error?.includes('init-table')) {
-          // Tentar inicializar
-          const initRes = await fetch('/api/contacts/init-table', { method: 'POST', headers: h })
-          if (initRes.ok) {
-            setContactsMsg('Tabela criada! Clique em sincronizar novamente.')
-          }
+        if (data.needsAuth) {
+          setContactsMsg('⚠️ Google não conectado. Clique em "Conectar Google" para autorizar.')
+        } else {
+          setContactsMsg('❌ ' + (data.error || 'Erro ao sincronizar'))
         }
       }
     } catch (e) {
       setContactsMsg('❌ ' + e.message)
     }
     setSyncingContacts(false)
+  }
+
+  function connectGoogle() {
+    if (!selectedTenantContacts) return
+    window.location.href = '/api/contacts/google-auth?tenant_id=' + selectedTenantContacts
   }
 
   async function initContactsTable() {
@@ -145,6 +140,22 @@ export default function PainelAdminPage() {
     if (res.ok) setContactsMsg('✅ ' + (data.message || 'Tabela criada'))
     else setContactsMsg('❌ ' + (data.error || 'Erro'))
   }
+
+  // Detectar retorno do OAuth do Google
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('tab') === 'contacts' && params.get('synced') === '1') {
+      const tenant = params.get('tenant')
+      if (tenant) setSelectedTenantContacts(tenant)
+      setContactsMsg('✅ Google conectado! Clique em "Sincronizar Contatos" para importar.')
+      // Limpar URL
+      window.history.replaceState({}, '', '/painel')
+    }
+    if (params.get('tab') === 'contacts' && params.get('error')) {
+      setContactsMsg('❌ ' + params.get('error'))
+      window.history.replaceState({}, '', '/painel')
+    }
+  }, [])
 
   // Auto-selecionar primeiro tenant quando abrir a aba contatos
   useEffect(() => {
@@ -344,11 +355,11 @@ export default function PainelAdminPage() {
               <span style={{ color: '#64748b', fontSize: 12 }}>{contacts.length} contatos</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={initContactsTable} className="ark-btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>
-                📋 Inicializar tabela
+              <button onClick={connectGoogle} className="ark-btn-ghost" style={{ fontSize: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🔵</span> Conectar Google
               </button>
               <button onClick={syncGoogleContacts} className="ark-btn" disabled={syncingContacts} style={{ fontSize: 12, padding: '8px 16px' }}>
-                {syncingContacts ? '🔄 Sincronizando...' : '🔄 Sincronizar Google'}
+                {syncingContacts ? '🔄 Sincronizando...' : '🔄 Sincronizar Contatos'}
               </button>
             </div>
           </div>
