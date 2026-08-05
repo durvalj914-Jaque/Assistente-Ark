@@ -13,6 +13,7 @@ import Head from 'next/head'
 import NewClientModal from '../components/PlatformAdmin/NewClientModal'
 import ClientCard from '../components/PlatformAdmin/ClientCard'
 import HelpTip from '../components/HelpTip'
+import BotEditorModal from '../components/PlatformAdmin/BotEditorModal'
 
 export default function PainelAdminPage() {
   const router = useRouter()
@@ -28,6 +29,7 @@ export default function PainelAdminPage() {
   const [loadingClients, setLoadingClients] = useState(true)
 
   const [allBots, setAllBots] = useState([])
+  const [editingBot, setEditingBot] = useState(null)
   const [loadingBots, setLoadingBots] = useState(true)
 
   const [logs, setLogs] = useState([])
@@ -190,7 +192,7 @@ export default function PainelAdminPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {allBots.map(bot => (
-                <div key={bot.id} className="ark-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={bot.id} className="ark-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                     <div style={{
                       width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
@@ -205,7 +207,7 @@ export default function PainelAdminPage() {
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ textAlign: 'right' }}>
                       <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>{bot.total_messages || 0}</div>
                       <div style={{ color: '#334155', fontSize: 10 }}>mensagens</div>
@@ -217,12 +219,28 @@ export default function PainelAdminPage() {
                     }}>
                       {bot.status}
                     </span>
+                    <button
+                      onClick={() => setEditingBot(bot)}
+                      className="ark-btn"
+                      style={{ fontSize: 12, padding: '8px 16px' }}
+                    >
+                      ⚡ Editar fluxo
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+      )}
+
+      {editingBot && (
+        <BotEditorModal
+          bot={editingBot}
+          tenantName={editingBot.tenant_name}
+          onClose={() => setEditingBot(null)}
+          onSaved={() => loadAll()}
+        />
       )}
 
       {/* ATIVIDADE */}
