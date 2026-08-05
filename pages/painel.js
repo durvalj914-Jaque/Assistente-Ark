@@ -30,6 +30,11 @@ export default function PainelAdminPage() {
 
   const [allBots, setAllBots] = useState([])
   const [editingBot, setEditingBot] = useState(null)
+  const [contacts, setContacts] = useState([])
+  const [contactSearch, setContactSearch] = useState('')
+  const [selectedTenantContacts, setSelectedTenantContacts] = useState('')
+  const [syncingContacts, setSyncingContacts] = useState(false)
+  const [contactsMsg, setContactsMsg] = useState('')
   const [loadingBots, setLoadingBots] = useState(true)
 
   const [logs, setLogs] = useState([])
@@ -83,12 +88,80 @@ export default function PainelAdminPage() {
     loadAll()
   }, [profile])
 
+  async function loadContacts(tenantId) {
+    if (!tenantId) return
+    const h = await authHeader()
+    const res = await fetch('/api/contacts/list?tenant_id=' + tenantId, { headers: h }).then(r => r.json()).catch(() => ({ contacts: [] }))
+    setContacts(res.contacts || [])
+    if (res.needsInit) {
+      setContactsMsg('⚠️ Tabela de contatos ainda não foi criada. Clique em "Inicializar" abaixo.')
+    } else {
+      setContactsMsg('')
+    }
+  }
+
+  async function syncGoogleContacts() {
+    if (!selectedTenantContacts) return
+    setSyncingContacts(true)
+    setContactsMsg('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const providerToken = session?.provider_token
+      if (!providerToken) {
+        setContactsMsg('❌ Token do Google não encontrado. Faça logout e login novamente. Você também precisa adicionar o escopo "contacts.readonly" no Supabase Dashboard.')
+        setSyncingContacts(false)
+        return
+      }
+      const h = await authHeader()
+      const res = await fetch('/api/contacts/sync-google', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider_token: providerToken, tenant_id: selectedTenantContacts })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setContactsMsg('✅ ' + data.synced + ' contatos sincronizados! (Total no banco: ' + data.total_in_db + ')')
+        loadContacts(selectedTenantContacts)
+      } else {
+        setContactsMsg('❌ ' + (data.error || 'Erro ao sincronizar'))
+        if (data.error?.includes('init-table')) {
+          // Tentar inicializar
+          const initRes = await fetch('/api/contacts/init-table', { method: 'POST', headers: h })
+          if (initRes.ok) {
+            setContactsMsg('Tabela criada! Clique em sincronizar novamente.')
+          }
+        }
+      }
+    } catch (e) {
+      setContactsMsg('❌ ' + e.message)
+    }
+    setSyncingContacts(false)
+  }
+
+  async function initContactsTable() {
+    const h = await authHeader()
+    const res = await fetch('/api/contacts/init-table', { method: 'POST', headers: h })
+    const data = await res.json()
+    if (res.ok) setContactsMsg('✅ ' + (data.message || 'Tabela criada'))
+    else setContactsMsg('❌ ' + (data.error || 'Erro'))
+  }
+
+  // Auto-selecionar primeiro tenant quando abrir a aba contatos
+  useEffect(() => {
+    if (clients.length && !selectedTenantContacts) setSelectedTenantContacts(clients[0].id)
+  }, [clients])
+
+  useEffect(() => {
+    if (selectedTenantContacts) loadContacts(selectedTenantContacts)
+  }, [selectedTenantContacts])
+
   if (loading || !user || !tenant || !profile?.is_platform_admin) return null
 
   const tabs = [
     { key: 'dashboard', icon: '\uD83D\uDCCA', label: 'Dashboard' },
     { key: 'clients',   icon: '\uD83C\uDFE2', label: 'Clientes' },
     { key: 'bots',      icon: '\uD83E\uDD16', label: 'Bots' },
+    { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
     { key: 'activity',  icon: '\uD83D\uDCE0', label: 'Atividade' },
     { key: 'logs',      icon: '\uD83D\uDCCB', label: 'Logs do Servidor' },
   ]
@@ -241,6 +314,96 @@ export default function PainelAdminPage() {
           onClose={() => setEditingBot(null)}
           onSaved={() => loadAll()}
         />
+      )}
+
+      {/* CONTATOS */}
+      {tab === 'contacts' && (
+        <div>
+          {/* Barra de ações */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <select
+                value={selectedTenantContacts}
+                onChange={e => setSelectedTenantContacts(e.target.value)}
+                style={{
+                  background: '#12121f', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 8,
+                  color: '#fff', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                }}
+              >
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <input
+                placeholder="🔍 Buscar contato..."
+                value={contactSearch}
+                onChange={e => setContactSearch(e.target.value)}
+                style={{
+                  background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8,
+                  color: '#fff', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit', width: 220,
+                }}
+              />
+              <span style={{ color: '#64748b', fontSize: 12 }}>{contacts.length} contatos</span>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={initContactsTable} className="ark-btn-ghost" style={{ fontSize: 12, padding: '8px 14px' }}>
+                📋 Inicializar tabela
+              </button>
+              <button onClick={syncGoogleContacts} className="ark-btn" disabled={syncingContacts} style={{ fontSize: 12, padding: '8px 16px' }}>
+                {syncingContacts ? '🔄 Sincronizando...' : '🔄 Sincronizar Google'}
+              </button>
+            </div>
+          </div>
+
+          {/* Mensagem de status */}
+          {contactsMsg && (
+            <div style={{
+              padding: '10px 16px', marginBottom: 12, borderRadius: 8, fontSize: 13,
+              background: contactsMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : contactsMsg.startsWith('❌') ? 'rgba(239,68,68,0.1)' : 'rgba(79,142,247,0.1)',
+              color: contactsMsg.startsWith('✅') ? '#22c55e' : contactsMsg.startsWith('❌') ? '#ef4444' : '#4f8ef7',
+            }}>
+              {contactsMsg}
+            </div>
+          )}
+
+          {/* Lista de contatos */}
+          {contacts.length === 0 ? (
+            <div className="ark-card" style={{ padding: 40, textAlign: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📇</div>
+              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 8 }}>Nenhum contato sincronizado ainda</p>
+              <p style={{ color: '#334155', fontSize: 12 }}>Selecione um cliente acima e clique em "Sincronizar Google" para importar contatos do Gmail.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
+              {contacts
+                .filter(c => {
+                  if (!contactSearch) return true
+                  const s = contactSearch.toLowerCase()
+                  return (c.full_name || '').toLowerCase().includes(s) || (c.email || '').toLowerCase().includes(s) || (c.phone || '').includes(s)
+                })
+                .map(c => (
+                  <div key={c.id} className="ark-card" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {c.photo_url ? (
+                      <img src={c.photo_url} alt="" style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{
+                        width: 44, height: 44, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 18, fontWeight: 700, background: 'rgba(79,142,247,0.15)', color: '#4f8ef7',
+                      }}>
+                        {(c.full_name || '?')[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ color: '#fff', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {c.full_name || 'Sem nome'}
+                      </div>
+                      {c.email && <div style={{ color: '#64748b', fontSize: 11, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {c.email}</div>}
+                      {c.phone && <div style={{ color: '#64748b', fontSize: 11, marginTop: 1 }}>📱 {c.phone}</div>}
+                      {c.organization && <div style={{ color: '#334155', fontSize: 10, marginTop: 2 }}>🏢 {c.organization}{c.job_title ? ' · ' + c.job_title : ''}</div>}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* ATIVIDADE */}
