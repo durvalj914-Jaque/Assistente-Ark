@@ -136,7 +136,7 @@ export default function ProductsPage() {
 
   async function syncCatalog(productId, action) {
     try {
-      await fetch('/api/products/sync-catalog', {
+      await fetch('/api/admin/sync-product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId, tenantId: tenant.id, action }),
