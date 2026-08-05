@@ -9,7 +9,7 @@ const NAV = [
   { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
   { href: '/admin/bots', label: 'Bots', icon: '🤖' },
   { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
-  { href: '/admin/products', label: 'Produtos', icon: '📦' },
+  { href: '/admin/products', label: 'Catálogo', icon: '📦' },
   { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
   { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
   { href: '/admin/analytics', label: 'Analytics', icon: '📊' },

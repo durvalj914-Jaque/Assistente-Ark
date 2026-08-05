@@ -58,7 +58,7 @@ function ProductModal({ product, onClose, onSave }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: '#0d0d1a', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{product ? 'Editar Produto' : 'Novo Produto'}</h2>
+          <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{product ? 'Editar Item' : 'Novo Item'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
 
@@ -81,15 +81,15 @@ function ProductModal({ product, onClose, onSave }) {
           <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
             style={{ width: 16, height: 16, accentColor: '#4f8ef7', cursor: 'pointer' }} />
           <label style={{ color: '#94a3b8', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => setForm(f => ({ ...f, is_active: !f.is_active }))}>
-            Produto ativo (visível no catálogo do bot)
-            <HelpTip text="Desmarcado, o produto some do catálogo que o bot mostra pro cliente, mas continua salvo aqui — útil pra pausar sem apagar." />
+            Item ativo (visível no catálogo do WhatsApp)
+            <HelpTip text="Desmarcado, o item some do catálogo do WhatsApp, mas continua salvo aqui — útil pra pausar sem apagar." />
           </label>
         </div>
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 20 }}>
           <button onClick={onClose} className="ark-btn-ghost">Cancelar</button>
           <button onClick={handleSave} className="ark-btn" disabled={saving || !form.name.trim()}>
-            {saving ? 'Salvando…' : 'Salvar Produto'}
+            {saving ? 'Salvando…' : 'Salvar Item'}
           </button>
         </div>
       </div>
@@ -216,15 +216,15 @@ export default function ProductsPage() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28, flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22, display: 'flex', alignItems: 'center' }}>
-              📦 Produtos
-              <HelpTip text="Cadastre aqui os produtos/planos/serviços que o bot pode mostrar num catálogo quando o cliente pedir. Você referencia esses itens ao montar o fluxo no Editor de Fluxo." />
+              📦 Catálogo
+              <HelpTip text="Gerencie os produtos e planos do seu catálogo oficial do WhatsApp. Tudo que você cadastra aqui aparece automaticamente no catálogo que o cliente vê no chat." />
             </h1>
             <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>
-              {products.length} produto{products.length !== 1 ? 's' : ''} · {activeCount} ativo{activeCount !== 1 ? 's' : ''} no catálogo
+              {products.length} item{products.length !== 1 ? 's' : ''} no catálogo · {activeCount} ativo{activeCount !== 1 ? 's' : ''}
             </p>
           </div>
           <button onClick={handleCreate} className="ark-btn" disabled={creating}>
-            {creating ? 'Criando…' : '+ Novo Produto'}
+            {creating ? 'Criando…' : '+ Novo Item'}
           </button>
         </div>
 
@@ -233,19 +233,19 @@ export default function ProductsPage() {
           <div className="ark-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 22 }}>📦</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#4f8ef7' }}>{products.length}</div>
-            <div style={{ fontSize: 12, color: '#475569' }}>Produtos cadastrados</div>
+            <div style={{ fontSize: 12, color: '#475569' }}>Itens no catálogo</div>
           </div>
           <div className="ark-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 22 }}>✅</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#10b981' }}>{activeCount}</div>
-            <div style={{ fontSize: 12, color: '#475569' }}>Ativos no catálogo do bot</div>
+            <div style={{ fontSize: 12, color: '#475569' }}>Ativos no WhatsApp</div>
           </div>
           <div className="ark-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 22 }}>💰</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#f59e0b' }}>
               {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
-            <div style={{ fontSize: 12, color: '#475569' }}>Valor total (ativos)</div>
+            <div style={{ fontSize: 12, color: '#475569' }}>Valor total do catálogo</div>
           </div>
         </div>
 
@@ -255,7 +255,7 @@ export default function ProductsPage() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="🔍 Buscar produto…"
+              placeholder="🔍 Buscar no catálogo…"
               className="ark-input"
               style={{ maxWidth: 260 }}
             />
@@ -276,15 +276,15 @@ export default function ProductsPage() {
         ) : products.length === 0 ? (
           <div className="ark-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>📦</div>
-            <h3 style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: 8 }}>Nenhum produto ainda</h3>
+            <h3 style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: 8 }}>Nenhum item no catálogo ainda</h3>
             <p style={{ color: '#475569', fontSize: 14, marginBottom: 24 }}>
-              Cadastre produtos ou planos para exibi-los no catálogo do seu bot de WhatsApp
+              Adicione produtos ou planos para exibi-los no catálogo do WhatsApp
             </p>
-            <button onClick={handleCreate} className="ark-btn">+ Criar primeiro produto</button>
+            <button onClick={handleCreate} className="ark-btn">+ Adicionar primeiro item</button>
           </div>
         ) : filtered.length === 0 ? (
           <div className="ark-card" style={{ textAlign: 'center', padding: '40px' }}>
-            <p style={{ color: '#475569', fontSize: 14 }}>Nenhum produto encontrado com esse filtro.</p>
+            <p style={{ color: '#475569', fontSize: 14 }}>Nenhum item encontrado com esse filtro.</p>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
