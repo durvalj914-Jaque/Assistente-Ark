@@ -101,6 +101,9 @@ export default function ConversationsPage() {
   const fileInputRef = useRef(null)
   const [sending, setSending] = useState(false)
   const [toggling, setToggling] = useState(false)
+  const [chatMenuOpen, setChatMenuOpen] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const endRef = useRef(null)
   const listEndRef = useRef(null)
 
@@ -135,6 +138,23 @@ export default function ConversationsPage() {
   }, [tenant])
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  async function handleDeleteConversation() {
+    if (!selected || deleting) return
+    setDeleting(true)
+    try {
+      // Deletar mensagens primeiro (FK)
+      await supabase.from('messages').delete().eq('conversation_id', selected.id)
+      // Deletar a conversa
+      await supabase.from('conversations').delete().eq('id', selected.id)
+      setDeleteConfirm(false)
+      setSelected(null)
+      setMessages([])
+      loadConversations()
+    } catch (e) {
+      console.error('Erro ao deletar:', e)
+    } finally { setDeleting(false) }
+  }
 
   async function selectConversation(conv) {
     setSelected(conv)
@@ -450,12 +470,46 @@ export default function ConversationsPage() {
                       </span>
                     </button>
                   )}
-                  {selected.status !== 'closed' && (
-                    <button onClick={async () => { await supabase.from('conversations').update({ status: 'closed' }).eq('id', selected.id); loadConversations(); setSelected(p => ({ ...p, status: 'closed' })) }}
-                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', cursor: 'pointer', fontWeight: 600 }}>
-                      Encerrar
-                    </button>
-                  )}
+                  {/* Menu de ações da conversa (⋮) — igual WhatsApp */}
+                  <div style={{ position: 'relative' }}>
+                    <button onClick={() => setChatMenuOpen(o => !o)}
+                      title="Mais opções"
+                      style={{
+                        width: 32, height: 32, borderRadius: '50%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: chatMenuOpen ? 'var(--blue-tint)' : 'transparent',
+                        border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-muted)',
+                      }}>⋮</button>
+
+                    {chatMenuOpen && (
+                      <>
+                        <div onClick={() => setChatMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                        <div style={{
+                          position: 'absolute', top: 38, right: 0, zIndex: 200,
+                          background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                          borderRadius: 12, padding: 6, minWidth: 200,
+                          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                        }}>
+                          {selected.status !== 'closed' && (
+                            <button onClick={async () => { setChatMenuOpen(false); await supabase.from('conversations').update({ status: 'closed' }).eq('id', selected.id); loadConversations(); setSelected(p => ({ ...p, status: 'closed' })) }}
+                              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 15 }}>✖️</span> Encerrar conversa
+                            </button>
+                          )}
+                          {selected.status === 'closed' && (
+                            <button onClick={async () => { setChatMenuOpen(false); await supabase.from('conversations').update({ status: 'open' }).eq('id', selected.id); loadConversations(); setSelected(p => ({ ...p, status: 'open' })) }}
+                              style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 15 }}>🔄</span> Reabrir conversa
+                            </button>
+                          )}
+                          <button onClick={() => { setChatMenuOpen(false); setDeleteConfirm(true) }}
+                            style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                            <span style={{ fontSize: 15 }}>🗑️</span> Deletar conversa
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -545,6 +599,41 @@ export default function ConversationsPage() {
           )}
         </div>
       </div>
+      {/* Modal confirmação de deleção — igual WhatsApp */}
+      {deleteConfirm && selected && (
+        <div onClick={() => !deleting && setDeleteConfirm(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12,
+            padding: 24, maxWidth: 400, width: '100%',
+          }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 17, color: 'var(--text-primary)' }}>🗑️ Deletar conversa?</h3>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 8, lineHeight: 1.5 }}>
+              Todas as mensagens trocadas com <b style={{ color: 'var(--text-primary)' }}>{selected.contacts?.name || selected.contacts?.phone}</b> serão permanentemente apagadas.
+            </p>
+            <p style={{ color: '#f59e0b', fontSize: 12, marginBottom: 16 }}>
+              ⚠️ Esta ação não pode ser desfeita.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setDeleteConfirm(false)} disabled={deleting}
+                className="ark-btn-ghost" style={{ flex: 1, fontSize: 13, padding: '10px 18px' }}>
+                Cancelar
+              </button>
+              <button onClick={handleDeleteConversation} disabled={deleting}
+                style={{
+                  flex: 1, fontSize: 13, padding: '10px 18px', borderRadius: 10,
+                  border: 'none', cursor: 'pointer', fontWeight: 600,
+                  background: deleting ? 'rgba(239,68,68,0.5)' : '#dc2626', color: '#fff',
+                }}>
+                {deleting ? 'Deletando…' : '🗑️ Deletar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </AdminLayout>
   )
 }
