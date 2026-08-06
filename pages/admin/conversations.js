@@ -307,19 +307,32 @@ export default function ConversationsPage() {
                 {messages.map(msg => (
                   <div key={msg.id} style={{ display: 'flex', justifyContent: msg.direction === 'inbound' ? 'flex-start' : 'flex-end' }}>
                     <div style={{
-                      maxWidth: '65%',
+                      maxWidth: '70%',
                       background: msg.direction === 'inbound' ? '#0d0d1e' : (msg.sent_by === 'human' ? 'rgba(245,158,11,0.12)' : 'rgba(79,142,247,0.12)'),
                       border: `1px solid ${msg.direction === 'inbound' ? 'rgba(255,255,255,0.04)' : (msg.sent_by === 'human' ? 'rgba(245,158,11,0.25)' : 'rgba(79,142,247,0.2)')}`,
                       borderRadius: msg.direction === 'inbound' ? '12px 12px 12px 2px' : '12px 12px 2px 12px',
-                      padding: '9px 13px'
+                      padding: msg.media_id ? '6px' : '9px 13px',
+                      overflow: 'hidden'
                     }}>
                       {msg.direction === 'outbound' && (
-                        <div style={{ fontSize: 9, color: msg.sent_by === 'human' ? '#f59e0b' : '#4f8ef7', fontWeight: 700, marginBottom: 3 }}>
+                        <div style={{ fontSize: 9, color: msg.sent_by === 'human' ? '#f59e0b' : '#4f8ef7', fontWeight: 700, marginBottom: 3, padding: msg.media_id ? '3px 7px 0' : 0 }}>
                           {msg.sent_by === 'human' ? '👤 VOCÊ' : '🤖 BOT'}
                         </div>
                       )}
-                      <p style={{ color: '#e2e8f0', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-line' }}>{msg.content}</p>
-                      <div style={{ fontSize: 9, color: '#334155', marginTop: 5, textAlign: 'right' }}>
+                      {msg.media_id && msg.type === 'image' && (
+                        <MediaContent msg={msg} authHeaders={authHeaders} selectedBotId={selected.bots?.id || selected.bot_id} />
+                      )}
+                      {msg.media_id && msg.type === 'video' && (
+                        <MediaContent msg={msg} authHeaders={authHeaders} selectedBotId={selected.bots?.id || selected.bot_id} />
+                      )}
+                      {msg.media_id && msg.type === 'audio' && (
+                        <MediaContent msg={msg} authHeaders={authHeaders} selectedBotId={selected.bots?.id || selected.bot_id} />
+                      )}
+                      {msg.media_id && (msg.type === 'document' || msg.type === 'sticker') && (
+                        <MediaContent msg={msg} authHeaders={authHeaders} selectedBotId={selected.bots?.id || selected.bot_id} />
+                      )}
+                      <p style={{ color: '#e2e8f0', fontSize: 13, lineHeight: 1.5, whiteSpace: 'pre-line', padding: msg.media_id ? '4px 7px 0' : 0 }}>{msg.content}</p>
+                      <div style={{ fontSize: 9, color: '#334155', marginTop: 5, textAlign: 'right', padding: msg.media_id ? '0 7px 3px' : 0 }}>
                         {new Date(msg.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>

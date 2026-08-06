@@ -159,11 +159,41 @@ async function processWebhook(body) {
   }
   await savelog(db, 'conv_ok', null, { node: conv.current_node_id, status: conv.status })
 
+  // Extrair mídia (image, video, document, audio)
+  let mediaId = null
+  let mediaCaption = ''
+  let mediaFilename = ''
+  if (msg.type === 'image' && msg.image) {
+    mediaId = msg.image.id || null
+    mediaCaption = msg.image.caption || ''
+  } else if (msg.type === 'video' && msg.video) {
+    mediaId = msg.video.id || null
+    mediaCaption = msg.video.caption || ''
+  } else if (msg.type === 'document' && msg.document) {
+    mediaId = msg.document.id || null
+    mediaCaption = msg.document.caption || ''
+    mediaFilename = msg.document.filename || ''
+  } else if (msg.type === 'audio' && msg.audio) {
+    mediaId = msg.audio.id || null
+  } else if (msg.type === 'sticker' && msg.sticker) {
+    mediaId = msg.sticker.id || null
+  }
+
+  // Texto exibido para mídia
+  let displayContent = userText
+  if (!displayContent && msg.type === 'image') displayContent = mediaCaption || '🖼️ Imagem'
+  else if (!displayContent && msg.type === 'video') displayContent = mediaCaption || '🎬 Vídeo'
+  else if (!displayContent && msg.type === 'document') displayContent = mediaCaption || '📎 ' + (mediaFilename || 'Documento')
+  else if (!displayContent && msg.type === 'audio') displayContent = '🎵 Áudio'
+  else if (!displayContent && msg.type === 'sticker') displayContent = '🎟️ Sticker'
+  else if (!displayContent) displayContent = `[${msg.type}]`
+
   // Salvar inbound
   await safeInsert(db, 'messages', {
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
-    content: userText || `[${msg.type}]`, meta_message_id: wamId
+    content: displayContent, meta_message_id: wamId,
+    media_id: mediaId, media_caption: mediaCaption || null
   })
 
   // Human mode

@@ -70,6 +70,22 @@ export default async function handler(req, res) {
         conv = newConv
       }
 
+      // Extrair mídia
+      let mediaId = null
+      let mediaCaption = ''
+      if (msg.type === 'image' && msg.image) { mediaId = msg.image.id; mediaCaption = msg.image.caption || '' }
+      else if (msg.type === 'video' && msg.video) { mediaId = msg.video.id; mediaCaption = msg.video.caption || '' }
+      else if (msg.type === 'document' && msg.document) { mediaId = msg.document.id; mediaCaption = msg.document.caption || '' }
+      else if (msg.type === 'audio' && msg.audio) { mediaId = msg.audio.id }
+
+      // Texto exibido
+      let displayContent = userText
+      if (!displayContent && msg.type === 'image') displayContent = mediaCaption || '🖼️ Imagem'
+      else if (!displayContent && msg.type === 'video') displayContent = mediaCaption || '🎬 Vídeo'
+      else if (!displayContent && msg.type === 'document') displayContent = mediaCaption || '📎 Documento'
+      else if (!displayContent && msg.type === 'audio') displayContent = '🎵 Áudio'
+      else if (!displayContent) displayContent = `[${msg.type}]`
+
       // Salva mensagem entrada
       await db.from('messages').insert({
         tenant_id: tenantId,
@@ -78,8 +94,10 @@ export default async function handler(req, res) {
         contact_id: contact.id,
         direction: 'inbound',
         type: msg.type,
-        content: userText,
-        meta_message_id: msg.id
+        content: displayContent,
+        meta_message_id: msg.id,
+        media_id: mediaId,
+        media_caption: mediaCaption || null
       })
 
       // Transferência para humano?
