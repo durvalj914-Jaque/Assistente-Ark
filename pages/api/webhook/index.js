@@ -179,21 +179,21 @@ async function processWebhook(body) {
     mediaId = msg.sticker.id || null
   }
 
-  // Texto exibido para mídia
+  // Texto exibido para mídia — codifica media_id no content para não depender de coluna extra
   let displayContent = userText
-  if (!displayContent && msg.type === 'image') displayContent = mediaCaption || '🖼️ Imagem'
-  else if (!displayContent && msg.type === 'video') displayContent = mediaCaption || '🎬 Vídeo'
-  else if (!displayContent && msg.type === 'document') displayContent = mediaCaption || '📎 ' + (mediaFilename || 'Documento')
-  else if (!displayContent && msg.type === 'audio') displayContent = '🎵 Áudio'
-  else if (!displayContent && msg.type === 'sticker') displayContent = '🎟️ Sticker'
-  else if (!displayContent) displayContent = `[${msg.type}]`
+  if (mediaId) {
+    const caption = mediaCaption || (msg.type === 'image' ? '🖼️ Imagem' : msg.type === 'video' ? '🎬 Vídeo' : msg.type === 'audio' ? '🎵 Áudio' : msg.type === 'document' ? '📎 ' + (mediaFilename || 'Documento') : '🎟️ Sticker')
+    // Formato: __media__:{type}:{media_id}__ {caption}
+    displayContent = `__media__:${msg.type}:${mediaId}__ ${caption}`
+  } else if (!displayContent) {
+    displayContent = `[${msg.type}]`
+  }
 
   // Salvar inbound
   await safeInsert(db, 'messages', {
     tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
     contact_id: contact.id, direction: 'inbound', type: msg.type,
-    content: displayContent, meta_message_id: wamId,
-    media_id: mediaId, media_caption: mediaCaption || null
+    content: displayContent, meta_message_id: wamId
   })
 
   // Human mode

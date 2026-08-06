@@ -73,18 +73,20 @@ export default async function handler(req, res) {
       // Extrair mídia
       let mediaId = null
       let mediaCaption = ''
+      let mediaFilename = ''
       if (msg.type === 'image' && msg.image) { mediaId = msg.image.id; mediaCaption = msg.image.caption || '' }
       else if (msg.type === 'video' && msg.video) { mediaId = msg.video.id; mediaCaption = msg.video.caption || '' }
-      else if (msg.type === 'document' && msg.document) { mediaId = msg.document.id; mediaCaption = msg.document.caption || '' }
+      else if (msg.type === 'document' && msg.document) { mediaId = msg.document.id; mediaCaption = msg.document.caption || ''; mediaFilename = msg.document.filename || '' }
       else if (msg.type === 'audio' && msg.audio) { mediaId = msg.audio.id }
 
-      // Texto exibido
+      // Texto exibido — codifica media_id no content
       let displayContent = userText
-      if (!displayContent && msg.type === 'image') displayContent = mediaCaption || '🖼️ Imagem'
-      else if (!displayContent && msg.type === 'video') displayContent = mediaCaption || '🎬 Vídeo'
-      else if (!displayContent && msg.type === 'document') displayContent = mediaCaption || '📎 Documento'
-      else if (!displayContent && msg.type === 'audio') displayContent = '🎵 Áudio'
-      else if (!displayContent) displayContent = `[${msg.type}]`
+      if (mediaId) {
+        const caption = mediaCaption || (msg.type === 'image' ? '🖼️ Imagem' : msg.type === 'video' ? '🎬 Vídeo' : msg.type === 'audio' ? '🎵 Áudio' : msg.type === 'document' ? '📎 ' + (mediaFilename || 'Documento') : '🎟️ Sticker')
+        displayContent = `__media__:${msg.type}:${mediaId}__ ${caption}`
+      } else if (!displayContent) {
+        displayContent = `[${msg.type}]`
+      }
 
       // Salva mensagem entrada
       await db.from('messages').insert({
@@ -95,9 +97,7 @@ export default async function handler(req, res) {
         direction: 'inbound',
         type: msg.type,
         content: displayContent,
-        meta_message_id: msg.id,
-        media_id: mediaId,
-        media_caption: mediaCaption || null
+        meta_message_id: msg.id
       })
 
       // Transferência para humano?

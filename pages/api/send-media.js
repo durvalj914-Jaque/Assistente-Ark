@@ -99,10 +99,10 @@ export default async function handler(req, res) {
     // 2. Enviar mensagem com mídia
     await sendMedia(bot.phone_number_id, token, contact.phone, mediaType, mediaId, caption || undefined, originalName)
 
-    // 3. Salvar no Supabase
-    const messageContent = caption 
-      ? `${mediaType === 'image' ? '🖼️' : mediaType === 'video' ? '🎬' : mediaType === 'audio' ? '🎵' : '📎'} ${caption}`
-      : `${mediaType === 'image' ? '🖼️' : mediaType === 'video' ? '🎬' : mediaType === 'audio' ? '🎵' : '📎'} ${originalName}`
+    // 3. Salvar no Supabase — codifica media_id no content
+    const icon = mediaType === 'image' ? '🖼️' : mediaType === 'video' ? '🎬' : mediaType === 'audio' ? '🎵' : '📎'
+    const captionText = caption || originalName
+    const messageContent = `__media__:${mediaType}:${mediaId}__ ${icon} ${captionText}`
 
     await db.from('messages').insert({
       tenant_id: conv.tenant_id,
@@ -112,8 +112,6 @@ export default async function handler(req, res) {
       direction: 'outbound',
       type: mediaType,
       content: messageContent,
-      media_url: null,
-      media_id: mediaId,
       sent_by: 'human',
     })
 
