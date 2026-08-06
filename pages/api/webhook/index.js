@@ -280,6 +280,55 @@ async function processWebhook(body) {
 
   // ── Motor de fluxo unificado (lib/flowEngine.js) ──
   const nodes = bot.flow?.nodes || []
+  // Se está aguardando valor de pagamento
+  if (conv.status === 'awaiting_payment_amount') {
+    const payAmount = parseFloat(userText.replace(',', '.').replace(/[^\d.]/g, ''))
+    if (!isNaN(payAmount) && payAmount > 0) {
+      // Criar pagamento com o valor informado
+      const { generatePixCode } = await import('../../../lib/pix')
+      const QRCodeModule = await import('qrcode')
+      const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, name').eq('id', tenantId).maybeSingle()
+
+      const txid = `ARK${Date.now().toString(36).toUpperCase()}`
+      const { data: payment } = await db.from('payments').insert({
+        tenant_id: tenantId, bot_id: bot.id, conversation_id: conv.id, contact_id: contact.id,
+        amount: payAmount, description: 'Pagamento via bot', status: 'pending', method: 'pix', payment_ref: txid, metadata: { txid, from_flow: true },
+      }).select().single()
+
+      if (tenant?.pix_key) {
+        const pixCode = generatePixCode({
+          pixKey: tenant.pix_key,
+          merchantName: (tenant.merchant_name || tenant.name || 'Arkiel').substring(0, 25),
+          merchantCity: (tenant.merchant_city || 'SAO PAULO').substring(0, 15),
+          amount: payAmount, txid,
+        })
+        const qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+        const blob = new Blob([qrBuffer], { type: 'image/png' })
+        const formData = new FormData()
+        formData.append('messaging_product', 'whatsapp')
+        formData.append('type', 'image/png')
+        formData.append('file', blob, 'pix_qr.png')
+        const upRes = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${tkn}` }, body: formData })
+        const upJson = await upRes.json()
+        if (upJson.id) {
+          await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+            body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'image',
+              image: { id: upJson.id, caption: `💰 *Pagamento PIX* - R$ ${payAmount.toFixed(2)}\n\n*Escaneie ou copie:*\n\n${pixCode}` } }),
+          })
+          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment.id)
+        }
+        await sendText(phoneNumberId, tkn, from, '✅ PIX enviado! Após o pagamento, você receberá a confirmação. Digite *0* para voltar ao menu.')
+        await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+        await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: `[PIX R$ ${payAmount.toFixed(2)} enviado]`, sent_by: 'bot' })
+        return res.status(200).json({ ok: true })
+      }
+    } else {
+      await sendText(phoneNumberId, tkn, from, '❌ Valor inválido. Digite um número (ex: 29.90) ou *0* para voltar ao menu.')
+      return res.status(200).json({ ok: true })
+    }
+  }
+
   const result = processFlow(nodes, conv.current_node_id, userText, { greeting: bot.greeting })
   await savelog(db, 'flow_result', null, { action: result.action, nodeId: result.nodeId, reply: result.reply?.substring(0,60) })
 
@@ -310,6 +359,88 @@ async function processWebhook(body) {
         reply = `[catálogo enviado — ${catalogProducts.length} produto(s)]`
       } else {
         await sendText(phoneNumberId, tkn, from, reply || 'No momento não temos produtos disponíveis no catálogo. Digite *0* para voltar ao menu.')
+      }
+    } else if (result.action === 'payment') {
+      // Enviar mensagem do nó de pagamento primeiro
+      if (reply) await sendText(phoneNumberId, tkn, from, reply)
+
+      // Determinar valor
+      let payAmount = result.amount ? parseFloat(result.amount) : null
+      if (!payAmount) {
+        // Se não tem valor fixo, o cliente precisa informar — guarda estado especial
+        await db.from('conversations').update({ current_node_id: nodeId, status: 'awaiting_payment_amount' }).eq('id', conv.id)
+        await sendText(phoneNumberId, tkn, from, '💰 Qual valor você deseja pagar? (ex: 29.90)')
+        reply = '[aguardando valor do pagamento]'
+      } else {
+        // Criar pagamento e enviar
+        const { generatePixCode } = await import('../../../lib/pix')
+        const QRCodeModule = await import('qrcode')
+
+        // Buscar config do tenant
+        const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, mp_access_token, name').eq('id', tenantId).maybeSingle()
+        const payMethod = result.payMethod || 'pix'
+
+        const txid = `ARK${Date.now().toString(36).toUpperCase()}`
+        const { data: payment } = await db.from('payments').insert({
+          tenant_id: tenantId, bot_id: bot.id, conversation_id: conv.id, contact_id: contact.id,
+          amount: payAmount, description: reply?.substring(0, 100) || 'Pagamento via bot',
+          status: 'pending', method: payMethod, payment_ref: txid, metadata: { txid, from_flow: true },
+        }).select().single()
+
+        if (payMethod === 'pix' && tenant?.pix_key) {
+          const pixCode = generatePixCode({
+            pixKey: tenant.pix_key,
+            merchantName: (tenant.merchant_name || tenant.name || 'Arkiel').substring(0, 25),
+            merchantCity: (tenant.merchant_city || 'SAO PAULO').substring(0, 15),
+            amount: payAmount, txid,
+          })
+          const qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+          const blob = new Blob([qrBuffer], { type: 'image/png' })
+          const formData = new FormData()
+          formData.append('messaging_product', 'whatsapp')
+          formData.append('type', 'image/png')
+          formData.append('file', blob, 'pix_qr.png')
+          const upRes = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${tkn}` }, body: formData })
+          const upJson = await upRes.json()
+
+          if (upJson.id) {
+            await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp', to: from, type: 'image',
+                image: { id: upJson.id, caption: `💰 *Pagamento PIX* - R$ ${payAmount.toFixed(2)}\n\n*Escaneie o QR Code ou copie: *\n\n${pixCode}` },
+              }),
+            })
+            await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment.id)
+            reply = `[PIX enviado - R$ ${payAmount.toFixed(2)}]`
+          } else {
+            await sendText(phoneNumberId, tkn, from, `💠 *PIX Copia e Cola* - R$ ${payAmount.toFixed(2)}\n\n${pixCode}`)
+            await db.from('payments').update({ pix_code: pixCode }).eq('id', payment.id)
+            reply = `[PIX enviado - R$ ${payAmount.toFixed(2)}]`
+          }
+        } else if (payMethod === 'mercadopago' && process.env.MERCADOPAGO_ACCESS_TOKEN) {
+          const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}` },
+            body: JSON.stringify({
+              items: [{ title: reply?.substring(0, 50) || 'Pagamento', quantity: 1, unit_price: payAmount, currency_id: 'BRL' }],
+              back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
+              auto_return: 'approved', external_reference: txid,
+              notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+            }),
+          })
+          const mpData = await mpRes.json()
+          if (mpData.init_point) {
+            await sendText(phoneNumberId, tkn, from, `💳 *Pagamento* - R$ ${payAmount.toFixed(2)}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`)
+            await db.from('payments').update({ mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point }).eq('id', payment.id)
+            reply = `[Link MP enviado - R$ ${payAmount.toFixed(2)}]`
+          } else {
+            await sendText(phoneNumberId, tkn, from, '❌ Erro ao gerar pagamento. Tente novamente ou digite *0* para voltar ao menu.')
+            reply = '[erro ao gerar pagamento MP]'
+          }
+        } else {
+          await sendText(phoneNumberId, tkn, from, '⚠️ Pagamento não configurado. Contate o suporte. Digite *0* para voltar ao menu.')
+          reply = '[pagamento não configurado]'
+        }
       }
     } else {
       await sendText(phoneNumberId, tkn, from, reply)

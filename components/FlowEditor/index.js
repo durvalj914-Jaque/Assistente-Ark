@@ -10,6 +10,7 @@ const NODE_TYPES = {
   condition: { label: 'Condição',    icon: '🔀', color: '#10b981' },
   transfer:  { label: 'Transferir',  icon: '🙋', color: '#f97316' },
   end:       { label: 'Encerrar',    icon: '🔚', color: '#ef4444' },
+  payment:   { label: 'Pagamento',   icon: '💰', color: '#22c55e' },
 }
 
 // Guarda de profundidade máxima — protege contra recursão infinita
@@ -231,7 +232,7 @@ function NodeLevel({ nodeIds, allNodes, onEdit, onDelete, onAddBelow, onAddParal
 // Modal de edição de nó
 // ─────────────────────────────────────────────
 function EditModal({ node, onSave, onClose }) {
-  const [form, setForm] = useState({ type: node.type, text: node.text || '', options: node.options || [], category: node.category || '' })
+  const [form, setForm] = useState({ type: node.type, text: node.text || '', options: node.options || [], category: node.category || '', amount: node.amount || '', payMethod: node.payMethod || 'pix' })
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: '#0d0d1e', border: '1px solid rgba(79,142,247,0.25)', borderRadius: 16, padding: 28, width: 460, maxHeight: '85vh', overflowY: 'auto' }}>
@@ -273,6 +274,35 @@ function EditModal({ node, onSave, onClose }) {
             />
             <p style={{ color: '#334155', fontSize: 11, marginTop: 6 }}>
               O bot vai enviar até 30 produtos ativos (cadastrados em Produtos) como catálogo nativo do WhatsApp — com foto, preço e botão de carrinho, direto na conversa.
+            </p>
+          </div>
+        )}
+
+        {/* Campos de pagamento */}
+        {form.type === 'payment' && (
+          <div style={{ marginBottom: 18 }}>
+            <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 6 }}>VALOR (R$)</label>
+            <input type="number" step="0.01" min="0.01"
+              value={form.amount || ''}
+              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+              placeholder="29.90 (deixe vazio para valor livre)"
+              style={{ width: '100%', background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, color: '#e2e8f0', padding: '10px 12px', fontSize: 13, outline: 'none', marginBottom: 10 }}
+            />
+            <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 6 }}>MÉTODO</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button onClick={() => setForm(f => ({ ...f, payMethod: 'pix' }))}
+                style={{ flex: 1, padding: '7px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${form.payMethod === 'pix' ? '#22c55e' : 'rgba(255,255,255,0.08)'}`,
+                  background: form.payMethod === 'pix' ? 'rgba(34,197,94,0.12)' : 'transparent',
+                  color: form.payMethod === 'pix' ? '#22c55e' : '#64748b' }}>💠 PIX</button>
+              <button onClick={() => setForm(f => ({ ...f, payMethod: 'mercadopago' }))}
+                style={{ flex: 1, padding: '7px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  border: `1px solid ${form.payMethod === 'mercadopago' ? '#22c55e' : 'rgba(255,255,255,0.08)'}`,
+                  background: form.payMethod === 'mercadopago' ? 'rgba(34,197,94,0.12)' : 'transparent',
+                  color: form.payMethod === 'mercadopago' ? '#22c55e' : '#64748b' }}>💳 Mercado Pago</button>
+            </div>
+            <p style={{ color: '#334155', fontSize: 11, marginTop: 8 }}>
+              O bot envia cobrança automaticamente. Se o valor estiver vazio, pergunta o valor ao cliente primeiro.
             </p>
           </div>
         )}

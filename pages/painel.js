@@ -202,6 +202,7 @@ export default function PainelAdminPage() {
     { key: 'bots',      icon: '\uD83E\uDD16', label: 'Bots' },
     { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
+    { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
     { key: 'activity',  icon: '\uD83D\uDCE0', label: 'Atividade' },
     { key: 'logs',      icon: '\uD83D\uDCCB', label: 'Logs do Servidor' },
   ]
@@ -663,6 +664,103 @@ export default function PainelAdminPage() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── ABA COMPROVANTES ── */}
+      {tab === 'receipts' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>📄 Comprovantes de Pagamento</h3>
+            <button onClick={() => { setReceiptModal(true); loadPayments() }}
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              + Enviar Comprovante
+            </button>
+          </div>
+
+          {loadingReceipts ? (
+            <p style={{ color: '#64748b' }}>Carregando...</p>
+          ) : receipts.length === 0 ? (
+            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+              Nenhum comprovante enviado. Clique em "Enviar Comprovante" para adicionar.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+              {receipts.map(r => (
+                <div key={r.id} className="ark-card" style={{ padding: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                    <div>
+                      <span style={{ fontSize: 18 }}>{r.file_type === 'pdf' ? '📄' : '🖼️'}</span>
+                      {r.payments && (
+                        <span style={{
+                          marginLeft: 8, padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                          background: r.payments.status === 'paid' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
+                          color: r.payments.status === 'paid' ? '#22c55e' : '#f59e0b'
+                        }}>
+                          {r.payments.status === 'paid' ? '✅ Confirmado' : '⏳ Pendente'}
+                        </span>
+                      )}
+                    </div>
+                    <button onClick={() => deleteReceipt(r.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
+                  </div>
+                  {r.payments && (
+                    <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+                      R$ {parseFloat(r.payments.amount).toFixed(2)} — {r.payments.description || 'Pagamento'}
+                    </div>
+                  )}
+                  {r.file_type === 'pdf' ? (
+                    <a href={r.file_url} target="_blank" rel="noopener" style={{ color: '#4f8ef7', fontSize: 12, textDecoration: 'none' }}>📎 Ver comprovante (PDF)</a>
+                  ) : (
+                    <a href={r.file_url} target="_blank" rel="noopener">
+                      <img src={r.file_url} alt="Comprovante" style={{ width: '100%', borderRadius: 8, maxHeight: 200, objectFit: 'cover', cursor: 'pointer' }} />
+                    </a>
+                  )}
+                  {r.notes && <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 8 }}>📝 {r.notes}</div>}
+                  <div style={{ color: '#334155', fontSize: 10, marginTop: 6 }}>
+                    {r.uploaded_by} • {new Date(r.created_at).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Modal de upload de comprovante */}
+          {receiptModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+                 onClick={() => setReceiptModal(null)}>
+              <div onClick={e => e.stopPropagation()} style={{ background: '#0d0d1e', borderRadius: 16, padding: 24, maxWidth: 420, width: '90%', border: '1px solid rgba(79,142,247,0.25)' }}>
+                <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>📄 Enviar Comprovante</h3>
+
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Associar a pagamento (opcional)</label>
+                <select value={receiptPaymentId} onChange={e => setReceiptPaymentId(e.target.value)}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 12 }}>
+                  <option value="">Sem vínculo</option>
+                  {payments.filter(p => p.status === 'pending').map(p => (
+                    <option key={p.id} value={p.id}>R$ {parseFloat(p.amount).toFixed(2)} — {p.description || 'Pagamento'} ({p.method})</option>
+                  ))}
+                </select>
+                {receiptPaymentId && (
+                  <p style={{ color: '#22c55e', fontSize: 11, marginBottom: 12 }}>
+                    ✓ O pagamento selecionado será marcado como "Pago" automaticamente.
+                  </p>
+                )}
+
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Observações (opcional)</label>
+                <input value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} placeholder="Ex: PIX pago em 06/08"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 16 }} />
+
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Arquivo (imagem ou PDF)</label>
+                <input type="file" accept="image/*,application/pdf" id="receipt-file" style={{ width: '100%', color: '#94a3b8', fontSize: 13, marginBottom: 16 }} />
+
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setReceiptModal(null)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+                  <button onClick={() => { const f = document.getElementById('receipt-file').files[0]; if (f) uploadReceipt(f); else alert('Selecione um arquivo') }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Enviar</button>
+                </div>
+              </div>
             </div>
           )}
         </div>
