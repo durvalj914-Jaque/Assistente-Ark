@@ -38,14 +38,14 @@ export default function ApiPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
-      <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>🔌 API</h1>
+      <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>🔌 API</h1>
       <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24, maxWidth: 640 }}>
         Use sua chave pra enviar mensagens de WhatsApp pelo bot ativo da sua empresa a partir de qualquer sistema seu.
       </p>
 
       <div style={{ display: 'grid', gap: 20, maxWidth: 700 }}>
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>🔑 Sua chave de API</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>🔑 Sua chave de API</h3>
           <div style={{ display: 'flex', gap: 8 }}>
             <input readOnly value={apiKey} className="ark-input" style={{ fontFamily: 'monospace', fontSize: 12 }} />
             <button onClick={copyKey} className="ark-btn" style={{ whiteSpace: 'nowrap' }}>{copied ? '✅ Copiado' : 'Copiar'}</button>
@@ -59,7 +59,7 @@ export default function ApiPage() {
         </div>
 
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>📘 Como usar</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>📘 Como usar</h3>
           <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>Envie um POST pra <code style={{ color: '#4f8ef7' }}>/api/v1/send</code> com sua chave no cabeçalho <code style={{ color: '#4f8ef7' }}>Authorization</code>:</p>
           <pre style={{ background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, padding: 14, color: '#cbd5e1', fontSize: 12, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>{snippet}</pre>
           <p style={{ color: '#334155', fontSize: 11, marginTop: 10 }}>A mensagem sai pelo primeiro bot ativo da sua conta e aparece normalmente em Conversas.</p>

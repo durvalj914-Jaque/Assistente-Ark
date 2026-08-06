@@ -1,189 +1,189 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { supabase } from '../../lib/supabase'
 import { PLANS } from '../../lib/plans'
 
-const NAV = [
-  { href: '/admin', label: 'Dashboard', icon: '⬡', exact: true },
-  { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
-  { href: '/admin/bots', label: 'Bots', icon: '🤖' },
-  { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
-  { href: '/admin/products', label: 'Catálogo', icon: '📦' },
-  { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
-  { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
-  { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
-  { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
-  { href: '/admin/api', label: 'API', icon: '🔌' },
-]
-
-const PLATFORM_NAV = { href: '/painel', label: 'Painel Arkiel', icon: '⚡' }
-
-export default function AdminLayout({ children, tenant, user, role, profile }) {
+/**
+ * Layout estilo WhatsApp Web.
+ * Top bar minimal com: ícone do bot (esquerda) + título da página + botões à direita.
+ * Menu de três pontinhos abre dropdown com toda a navegação.
+ */
+export default function AdminLayout({ children, tenant, user, role, profile, hideTopBar }) {
   const router = useRouter()
-  const [collapsed, setCollapsed] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const plan = PLANS[tenant?.plan] || PLANS.free
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
 
   async function handleLogout() {
     await supabase.auth.signOut()
     router.push('/login')
   }
 
-  const sideW = collapsed ? 64 : 240
+  // Fechar menu ao clicar fora
+  useEffect(() => {
+    function handleClick(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
-  const SidebarContent = () => (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Logo */}
-      <div style={{ padding: collapsed ? '18px 0' : '20px 18px', borderBottom: '1px solid rgba(79,142,247,0.08)', display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'space-between' }}>
-        {!collapsed && (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain', flexShrink: 0 }} />
-              <span style={{ fontWeight: 800, fontSize: 14, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Assistente Ark</span>
-            </div>
-          </div>
-        )}
-        {collapsed && (
-          <img src="/assistente-ark-icon.png" alt="Assistente Ark" style={{ width: 28, height: 28, borderRadius: 7, objectFit: 'contain' }} />
-        )}
-        <button onClick={() => setCollapsed(c => !c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#334155', fontSize: 14, padding: 4, marginLeft: collapsed ? 0 : 0 }}>
-          {collapsed ? '→' : '←'}
-        </button>
-      </div>
+  // Fechar menu ao trocar de rota
+  useEffect(() => { setMenuOpen(false) }, [router.pathname])
 
-      {/* Tenant info */}
-      {!collapsed && tenant && (
-        <div style={{ padding: '10px 18px', borderBottom: '1px solid rgba(79,142,247,0.06)' }}>
-          <div style={{ background: 'rgba(79,142,247,0.07)', borderRadius: 8, padding: '8px 10px' }}>
-            <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tenant.name}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
-              <span style={{ fontSize: 10, color: '#10b981', fontWeight: 600 }}>{plan.label}</span>
-              <span style={{ fontSize: 10, color: '#334155' }}>· {plan.max_bots === 999 ? '∞' : plan.max_bots} bot{plan.max_bots !== 1 ? 's' : ''}</span>
-            </div>
-          </div>
-        </div>
-      )}
+  const isPlatformAdmin = profile?.is_platform_admin
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '10px 0', overflowY: 'auto' }}>
-        {(profile?.is_platform_admin ? [...NAV, PLATFORM_NAV] : NAV).map(item => {
-          const active = item.exact
-            ? router.pathname === item.href
-            : router.pathname === item.href || router.pathname.startsWith(item.href + '/')
-          return (
-            <Link key={item.href} href={item.href}
-              title={collapsed ? item.label : ''}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: collapsed ? '11px 0' : '10px 18px',
-                justifyContent: collapsed ? 'center' : 'flex-start',
-                background: active ? 'rgba(79,142,247,0.1)' : 'transparent',
-                borderLeft: collapsed ? 'none' : (active ? '3px solid #4f8ef7' : '3px solid transparent'),
-                borderRight: collapsed ? (active ? '3px solid #4f8ef7' : '3px solid transparent') : 'none',
-                color: active ? '#4f8ef7' : '#64748b',
-                textDecoration: 'none', fontSize: 13,
-                fontWeight: active ? 600 : 400,
-                transition: 'all 0.15s',
-                position: 'relative',
-              }}>
-              <span style={{ fontSize: 16, flexShrink: 0 }}>{item.icon}</span>
-              {!collapsed && <span>{item.label}</span>}
-            </Link>
-          )
-        })}
-      </nav>
+  const MENU_ITEMS = [
+    { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
+    { href: '/admin/products', label: 'Catálogo', icon: '📦' },
+    { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
+    { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖' },
+    { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
+    { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
+    { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
+    { href: '/admin/api', label: 'API', icon: '🔌' },
+  ]
+  if (isPlatformAdmin) MENU_ITEMS.push({ href: '/painel', label: 'Painel Arkiel', icon: '⚡' })
 
-      {/* Footer */}
-      <div style={{ padding: collapsed ? '12px 0' : '12px 18px', borderTop: '1px solid rgba(79,142,247,0.08)' }}>
-        {!collapsed && tenant?.plan === 'free' && (
-          <Link href="/admin/upgrade" style={{
-            display: 'block', textAlign: 'center', padding: '8px',
-            background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)',
-            borderRadius: 8, color: '#fff', textDecoration: 'none',
-            fontSize: 12, fontWeight: 700, marginBottom: 10
-          }}>⚡ Upgrade para Pro</Link>
-        )}
-        {!collapsed ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#4f8ef7,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, flexShrink: 0, fontWeight: 700, color: '#fff', overflow: 'hidden' }}>
-                {profile?.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : (user?.email || '?')[0].toUpperCase()}
-              </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 11, color: '#e2e8f0', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email?.split('@')[0]}</div>
-                <div style={{ fontSize: 10, color: '#475569' }}>{role}</div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Link href="/client" style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#4f8ef7', textDecoration: 'none', padding: '5px 0', background: 'rgba(79,142,247,0.08)', borderRadius: 6 }}>Portal</Link>
-              <button onClick={handleLogout} style={{ flex: 1, fontSize: 11, color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: 'none', borderRadius: 6, cursor: 'pointer', padding: '5px 0' }}>Sair</button>
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <button onClick={handleLogout} title="Sair" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}>🚪</button>
-          </div>
-        )}
-      </div>
-    </div>
+  // Detectar página atual pra mostrar no título
+  const currentItem = MENU_ITEMS.find(item =>
+    item.href === '/admin/conversations'
+      ? router.pathname === '/admin' || router.pathname === item.href || router.pathname.startsWith(item.href + '/')
+      : router.pathname === item.href || router.pathname.startsWith(item.href + '/')
   )
 
+  if (hideTopBar) {
+    return <div className="ark-layout-main" style={{ minHeight: '100vh', background: 'var(--bg-main)' }}>{children}</div>
+  }
+
   return (
-    <div className="ark-layout-main" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-main)', fontFamily: 'Inter, sans-serif' }}>
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 19, display: 'none' }}
-          className="mobile-overlay" />
-      )}
-
-      {/* Sidebar */}
-      <aside className="ark-layout-sidebar" style={{
-        width: sideW,
-        background: 'var(--bg-sidebar)',
-        borderRight: '1px solid var(--border-medium)',
-        position: 'fixed', top: 0, left: 0, height: '100vh',
-        zIndex: 20,
-        transition: 'width 0.2s ease',
-        overflow: 'hidden',
+    <div className="ark-layout-main" style={{ minHeight: '100vh', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
+      {/* Top bar estilo WhatsApp */}
+      <header className="ark-layout-topbar" style={{
+        height: 60, background: 'var(--bg-topbar)', backdropFilter: 'blur(12px)',
+        borderBottom: '1px solid var(--border-soft)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 16px', position: 'sticky', top: 0, zIndex: 100,
       }}>
-        <SidebarContent />
-      </aside>
+        {/* Esquerda: ícone do bot + nome */}
+        <Link href="/admin/conversations" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: '50%',
+            background: 'linear-gradient(135deg, rgba(79,142,247,0.15), rgba(6,182,212,0.1))',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1.5px solid var(--border-strong)',
+          }}>
+            <img src="/assistente-ark-icon.png" alt="Ark" style={{ width: 24, height: 24, borderRadius: 5, objectFit: 'contain' }} />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <span style={{
+              fontWeight: 800, fontSize: 14,
+              background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            }}>Assistente Ark</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {tenant?.name || '...'}
+            </span>
+          </div>
+        </Link>
 
-      {/* Main */}
-      <main style={{
-        flex: 1,
-        marginLeft: sideW,
-        minHeight: '100vh',
-        transition: 'margin-left 0.2s ease',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
-        {/* Top bar */}
-        <div className="ark-layout-topbar" style={{
-          height: 56, background: 'var(--bg-topbar)', backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid var(--border-soft)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 28px', position: 'sticky', top: 0, zIndex: 10,
-        }}>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-            {[...NAV, PLATFORM_NAV].find(n => n.exact ? router.pathname === n.href : router.pathname.startsWith(n.href))?.label || 'Painel'}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
-            <span style={{ fontSize: 12, color: '#10b981' }}>Sistema operacional</span>
-          </div>
+        {/* Centro: título da página atual */}
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span>{currentItem?.icon || ''}</span>
+          <span>{currentItem?.label || ''}</span>
         </div>
 
-        {/* Content */}
-        <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto' }}>
-          {children}
+        {/* Direita: botão catálogo + três pontinhos */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {/* Botão Catálogo */}
+          <Link href="/admin/products" title="Catálogo de produtos"
+            style={{
+              width: 38, height: 38, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)',
+              cursor: 'pointer', textDecoration: 'none', fontSize: 18,
+              transition: 'background 0.2s',
+            }}>
+            📦
+          </Link>
+
+          {/* Menu três pontinhos */}
+          <div ref={menuRef} style={{ position: 'relative' }}>
+            <button onClick={() => setMenuOpen(o => !o)} title="Menu"
+              style={{
+                width: 38, height: 38, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: menuOpen ? 'var(--blue-tint)' : 'var(--bg-secondary)',
+                border: menuOpen ? '1px solid var(--border-strong)' : '1px solid var(--border-soft)',
+                cursor: 'pointer', fontSize: 18, color: 'var(--text-secondary)',
+                transition: 'all 0.2s',
+              }}>
+              ⋮
+            </button>
+
+            {menuOpen && (
+              <div style={{
+                position: 'absolute', top: 46, right: 0,
+                background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+                borderRadius: 12, padding: 6, minWidth: 220,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)', zIndex: 200,
+              }}>
+                {/* Info do usuário no topo do menu */}
+                <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-soft)', marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'linear-gradient(135deg,#4f8ef7,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', overflow: 'hidden' }}>
+                      {profile?.avatar_url ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : (user?.email || '?')[0].toUpperCase()}
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.email}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{role} · {PLANS[tenant?.plan]?.label || 'Free'}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items de navegação */}
+                {MENU_ITEMS.map(item => {
+                  const active = router.pathname === item.href || router.pathname.startsWith(item.href + '/')
+                  return (
+                    <Link key={item.href} href={item.href}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '9px 12px', borderRadius: 8, textDecoration: 'none',
+                        color: active ? '#4f8ef7' : 'var(--text-secondary)',
+                        background: active ? 'var(--blue-tint)' : 'transparent',
+                        fontSize: 13, fontWeight: active ? 600 : 400,
+                        transition: 'background 0.1s',
+                      }}>
+                      <span style={{ fontSize: 16 }}>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </Link>
+                  )
+                })}
+
+                {/* Separador + Sair */}
+                <div style={{ borderTop: '1px solid var(--border-soft)', marginTop: 4, paddingTop: 4 }}>
+                  <button onClick={handleLogout}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                      padding: '9px 12px', borderRadius: 8, border: 'none',
+                      background: 'transparent', cursor: 'pointer',
+                      color: '#ef4444', fontSize: 13, fontWeight: 500,
+                    }}>
+                    <span style={{ fontSize: 16 }}>🚪</span>
+                    <span>Sair</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </main>
+      </header>
+
+      {/* Conteúdo da página */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        {children}
+      </div>
     </div>
   )
 }
-

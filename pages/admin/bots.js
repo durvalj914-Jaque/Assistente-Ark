@@ -164,7 +164,7 @@ function BotModal({ bot, onClose, onSave }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: '#0d0d1a', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h2 style={{ color: '#fff', fontWeight: 700, fontSize: 16 }}>{bot ? 'Editar Bot' : 'Novo Bot'}</h2>
+          <h2 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16 }}>{bot ? 'Editar Bot' : 'Novo Bot'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
 

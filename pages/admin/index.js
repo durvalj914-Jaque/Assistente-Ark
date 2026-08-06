@@ -15,6 +15,10 @@ export default function AdminDashboard() {
   }, [user, loading])
 
   useEffect(() => {
+    if (!loading && user && tenant) router.replace('/admin/conversations')
+  }, [loading, user, tenant])
+
+  useEffect(() => {
     if (!tenant) return
     async function loadStats() {
       const month = new Date().toISOString().slice(0, 7)

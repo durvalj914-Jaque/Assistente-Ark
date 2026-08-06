@@ -62,7 +62,7 @@ export default function WhatsappSetupPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
-      <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>📱 Conectar WhatsApp</h1>
+      <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>📱 Conectar WhatsApp</h1>
       <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24, maxWidth: 640 }}>
         Pra ativar seu bot, precisamos transformar um número de WhatsApp em conta Business API. Preencha os dados abaixo e nossa equipe finaliza a configuração junto à Meta.
       </p>
@@ -76,7 +76,7 @@ export default function WhatsappSetupPage() {
 
       {!activeBot && bots?.[0] && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.35)' }}>
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática (recomendado — sem precisar de Facebook)</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática (recomendado — sem precisar de Facebook)</h3>
           <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Digite seu número, confirme o código que chega por SMS, e pronto — seu bot fica ativo na hora, sem precisar de conta Facebook.</p>
           <WhatsAppSmsConnect botId={bots[0].id} businessName={tenant?.name} onConnected={() => window.location.reload()} />
         </div>
@@ -84,7 +84,7 @@ export default function WhatsappSetupPage() {
 
       {!activeBot && bots?.[0] && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.25)' }}>
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📶 Prefere logar com o Facebook?</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📶 Prefere logar com o Facebook?</h3>
           <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Se você já tem uma conta WhatsApp Business própria no Facebook, pode conectar direto por lá.</p>
           <WhatsAppEmbeddedSignup botId={bots[0].id} onConnected={() => window.location.reload()} />
         </div>
@@ -92,7 +92,7 @@ export default function WhatsappSetupPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: request ? '1fr 1fr' : '1fr', gap: 20, maxWidth: 900 }}>
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📋 Ou preencha manualmente</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📋 Ou preencha manualmente</h3>
           <form onSubmit={submitRequest}>
             <div style={{ marginBottom: 14 }}>
               <label style={label}>NOME DA EMPRESA</label>
@@ -125,7 +125,7 @@ export default function WhatsappSetupPage() {
 
         {request && (
           <div className="ark-card">
-            <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📨 Último pedido enviado</h3>
+            <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📨 Último pedido enviado</h3>
             <div style={{ marginBottom: 10 }}>
               <span className="ark-badge" style={{ background: (statusMap[request.status]?.color || '#4f8ef7') + '22', color: statusMap[request.status]?.color || '#4f8ef7', border: '1px solid transparent' }}>
                 {statusMap[request.status]?.label || request.status}

@@ -48,7 +48,7 @@ export default function FlowPage() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20 }}>🌿 Editor de Fluxo</h1>
+          <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20 }}>🌿 Editor de Fluxo</h1>
           <p style={{ color: '#475569', fontSize: 13, marginTop: 4 }}>Monte a árvore de conversa do seu bot</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>

@@ -85,7 +85,7 @@ export default function AnalyticsPage() {
       {/* Uso do plano */}
       <div className="ark-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ color: '#fff', fontWeight: 600, fontSize: 14 }}>Uso do plano {plan.label} este mês</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14 }}>Uso do plano {plan.label} este mês</h3>
           <span style={{ fontSize: 12, color: '#475569' }}>
             {(usage?.messages || 0).toLocaleString('pt-BR')} / {plan.max_messages_month === 999999 ? '∞' : plan.max_messages_month.toLocaleString('pt-BR')} msgs
           </span>
@@ -112,7 +112,7 @@ export default function AnalyticsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Gráfico de barras */}
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, fontSize: 14, marginBottom: 20 }}>Mensagens por mês</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 20 }}>Mensagens por mês</h3>
           {history.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#334155', fontSize: 13 }}>
               Dados aparecerão conforme o bot for usado
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
 
         {/* Status das conversas */}
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Status das conversas</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 16 }}>Status das conversas</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {Object.entries(convStats).map(([status, count]) => (
               <div key={status}>
@@ -158,7 +158,7 @@ export default function AnalyticsPage() {
       {/* Top contatos */}
       {topContacts.length > 0 && (
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, fontSize: 14, marginBottom: 16 }}>🏆 Contatos mais ativos</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 16 }}>🏆 Contatos mais ativos</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {topContacts.map(({ contact, count }, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
