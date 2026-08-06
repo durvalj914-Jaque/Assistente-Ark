@@ -92,6 +92,10 @@ export default function ConversationsPage() {
   const { user, tenant, role, profile, loading } = useTenant()
   const [conversations, setConversations] = useState([])
   const [selected, setSelected] = useState(null)
+  const selectedRef = useRef(null)
+
+  // Maném a ref sincronizada com o estado
+  useEffect(() => { selectedRef.current = selected }, [selected])
   const [messages, setMessages] = useState([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -123,19 +127,66 @@ export default function ConversationsPage() {
     setSelected(prev => prev ? { ...prev, ...(data || []).find(c => c.id === prev.id) } : prev)
   }
 
+  // ── Realtime + Polling fallback ──
+  // Realtime pode não estar habilitado em todas as tabelas do Supabase,
+  // então usamos polling a cada 3s como garantia.
   useEffect(() => {
     if (!tenant) return
     loadConversations()
+
+    // Tentativa de realtime (se habilitado no Supabase, funciona instantaneamente)
     const channel = supabase.channel('conversations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations', filter: `tenant_id=eq.${tenant.id}` }, () => loadConversations())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `tenant_id=eq.${tenant.id}` }, (payload) => {
         setSelected(prev => {
-          if (prev && payload.new.conversation_id === prev.id) setMessages(m => [...m, payload.new])
+          if (prev && payload.new.conversation_id === prev.id) {
+            setMessages(m => {
+              // Evita duplicatas (se já existe com mesmo id ou meta_message_id)
+              if (m.some(msg => msg.id === payload.new.id)) return m
+              return [...m, payload.new]
+            })
+          }
           return prev
         })
+        // Atualiza lista de conversas também
+        loadConversations()
       })
       .subscribe()
-    return () => supabase.removeChannel(channel)
+
+    // Polling fallback: a cada 3s, busca novas mensagens da conversa ativa
+    const pollInterval = setInterval(async () => {
+      const sel = selectedRef.current
+      try {
+        if (sel) {
+          const { data: freshMsgs } = await supabase
+            .from('messages')
+            .select('*')
+            .eq('conversation_id', sel.id)
+            .order('created_at', { ascending: true })
+            .limit(100)
+
+          if (freshMsgs) {
+            setMessages(prev => {
+              const existingIds = new Set(prev.map(m => m.id))
+              const newOnes = freshMsgs.filter(m => !existingIds.has(m.id))
+              if (newOnes.length > 0) {
+                return [...prev, ...newOnes]
+              }
+              // Se não há novas, mas a lista está vazia ou desynced, substitui
+              if (prev.length === 0 && freshMsgs.length > 0) return freshMsgs
+              return prev
+            })
+          }
+        }
+        // Sempre atualiza a lista de conversas (última mensagem, etc.)
+        loadConversations()
+      } catch (_) {}
+    }, 3000)
+
+    return () => {
+      supabase.removeChannel(channel)
+      clearInterval(pollInterval)
+    }
   }, [tenant])
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
@@ -192,6 +243,7 @@ export default function ConversationsPage() {
       .eq('conversation_id', conv.id)
       .order('created_at', { ascending: true })
       .limit(100)
+    // Substitui completamente (limpa otimistas antigos)
     setMessages(data || [])
   }
 
