@@ -13,6 +13,9 @@ export default function ConversationsPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [draft, setDraft] = useState('')
+  const [mediaUploading, setMediaUploading] = useState(false)
+  const [mediaPreview, setMediaPreview] = useState(null)
+  const fileInputRef = useRef(null)
   const [sending, setSending] = useState(false)
   const [toggling, setToggling] = useState(false)
   const endRef = useRef(null)
@@ -107,6 +110,67 @@ export default function ConversationsPage() {
       alert(e.message)
     } finally {
       setToggling(false)
+    }
+  }
+
+  async function handleSendMedia(e) {
+    const file = e.target.files?.[0]
+    if (!file || !selected || mediaUploading) return
+    
+    // Validar tamanho (50MB max)
+    if (file.size > 50 * 1024 * 1024) {
+      alert('Arquivo muito grande. Máximo 50MB.')
+      e.target.value = ''
+      return
+    }
+    
+    setMediaUploading(true)
+    setMediaPreview({ name: file.name, type: file.type, size: file.size })
+    
+    // Preview visual para imagem
+    let previewUrl = null
+    if (file.type.startsWith('image/')) {
+      previewUrl = URL.createObjectURL(file)
+      setMediaPreview(p => ({ ...p, url: previewUrl }))
+    }
+    
+    try {
+      const headers = await authHeaders()
+      const formData = new FormData()
+      formData.append('conversation_id', selected.id)
+      formData.append('file', file)
+      if (draft.trim()) formData.append('caption', draft.trim())
+      
+      const res = await fetch('/api/send-media', {
+        method: 'POST',
+        headers: { 'Authorization': headers['Authorization'] },
+        body: formData,
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Falha ao enviar mídia')
+      
+      // Mensagem otimista
+      const icon = file.type.startsWith('image/') ? '🖼️' : file.type.startsWith('video/') ? '🎬' : file.type.startsWith('audio/') ? '🎵' : '📎'
+      const optimistic = {
+        id: `tmp-${Date.now()}`, conversation_id: selected.id, direction: 'outbound',
+        type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : file.type.startsWith('audio/') ? 'audio' : 'document',
+        content: `${icon} ${draft.trim() || file.name}`,
+        sent_by: 'human', created_at: new Date().toISOString(),
+      }
+      setMessages(m => [...m, optimistic])
+      setDraft('')
+      
+      if (selected.status !== 'human') {
+        setSelected(p => ({ ...p, status: 'human' }))
+        loadConversations()
+      }
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      setMediaUploading(false)
+      setMediaPreview(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -277,7 +341,41 @@ export default function ConversationsPage() {
                         🤖 O bot está atendendo automaticamente. Envie uma mensagem ou use o switch acima para assumir o atendimento.
                       </div>
                     )}
+                    {mediaPreview && (
+                      <div style={{ marginBottom: 8, padding: '8px 12px', background: 'rgba(79,142,247,0.08)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {mediaPreview.url ? (
+                          <img src={mediaPreview.url} alt="preview" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
+                        ) : (
+                          <span style={{ fontSize: 20 }}>{mediaPreview.type?.startsWith('video/') ? '🎬' : mediaPreview.type?.startsWith('audio/') ? '🎵' : '📎'}</span>
+                        )}
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: '#e2e8f0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mediaPreview.name}</div>
+                          <div style={{ fontSize: 10, color: '#64748b' }}>{mediaUploading ? 'Enviando…' : `${(mediaPreview.size / 1024 / 1024).toFixed(1)}MB`}</div>
+                        </div>
+                        <span style={{ fontSize: 11, color: '#4f8ef7' }}>⏳</span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip"
+                        onChange={handleSendMedia}
+                        style={{ display: 'none' }}
+                      />
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={mediaUploading || isClosed}
+                        title="Enviar imagem, vídeo ou arquivo"
+                        style={{
+                          padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(79,142,247,0.2)',
+                          background: '#0d0d1e', color: '#94a3b8', cursor: mediaUploading ? 'wait' : 'pointer',
+                          fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          minWidth: 42, minHeight: 42, opacity: mediaUploading ? 0.5 : 1
+                        }}
+                      >
+                        📎
+                      </button>
                       <textarea
                         value={draft}
                         onChange={e => setDraft(e.target.value)}
