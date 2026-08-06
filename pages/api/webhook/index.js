@@ -224,6 +224,103 @@ async function processWebhook(body) {
     content: displayContent, meta_message_id: wamId
   })
 
+  // ── DETECÇÃO AUTOMÁTICA DE COMPROVANTE ──
+  // Se o cliente manda imagem ou documento PDF e há pagamento pendente na conversa,
+  // baixar a mídia do WhatsApp e salvar como comprovante automático
+  if (mediaId && (msg.type === 'image' || msg.type === 'document')) {
+    try {
+      // Verificar se há pagamento pendente nesta conversa
+      const { data: pendingPayments } = await db.from('payments')
+        .select('id, amount, description, method')
+        .eq('conversation_id', conv.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      // Mesmo sem pagamento pendente, se a conversa veio de um nó de pagamento, registrar
+      const hasPending = pendingPayments?.length > 0
+
+      if (hasPending) {
+        // Baixar a mídia do WhatsApp
+        const metaResp = await fetch(`https://graph.facebook.com/v25.0/${mediaId}`, {
+          headers: { Authorization: `Bearer ${tkn}` }
+        })
+        const mediaData = await metaResp.json()
+
+        if (mediaData?.url) {
+          // Baixar o arquivo
+          const fileResp = await fetch(mediaData.url, {
+            headers: { Authorization: `Bearer ${tkn}` }
+          })
+          const buffer = Buffer.from(await fileResp.arrayBuffer())
+          const mimeType = mediaData.mime_type || (msg.type === 'image' ? 'image/jpeg' : 'application/pdf')
+          const ext = mimeType.includes('pdf') ? '.pdf' : mimeType.includes('png') ? '.png' : '.jpg'
+          const fileName = `receipts/${tenantId}/${Date.now()}-${mediaId}${ext}`
+
+          // Upload para o Supabase Storage
+          const { data: upData, error: upErr } = await db.storage
+            .from('payment-receipts')
+            .upload(fileName, buffer, { contentType: mimeType })
+
+          let fileUrl = null
+          if (!upErr) {
+            const { data: urlData } = db.storage.from('payment-receipts').getPublicUrl(fileName)
+            fileUrl = urlData.publicUrl
+          }
+
+          // Criar registro de comprovante
+          const payment = pendingPayments[0]
+          await db.from('payment_receipts').insert({
+            payment_id: payment.id,
+            tenant_id: tenantId,
+            conversation_id: conv.id,
+            contact_id: contact.id,
+            file_url: fileUrl || `__media__:${msg.type}:${mediaId}__`,
+            file_type: msg.type === 'image' ? 'image' : 'pdf',
+            file_name: mediaFilename || `comprovante-${Date.now()}`,
+            uploaded_by: contact.phone || 'customer',
+            notes: `Comprovante automático — R$ ${parseFloat(payment.amount).toFixed(2)} (${payment.method})`,
+            metadata: { media_id: mediaId, auto: true, payment_amount: payment.amount },
+          })
+
+          // Marcar pagamento como pago (comprovação automática)
+          await db.from('payments').update({
+            status: 'paid',
+            paid_at: new Date().toISOString(),
+            metadata: { receipt_auto: true, media_id: mediaId, manual_confirmation: false }
+          }).eq('id', payment.id)
+
+          // Notificar o cliente
+          await sendText(phoneNumberId, tkn, from, `✅ *Comprovante recebido!*
+
+Pagamento de R$ ${parseFloat(payment.amount).toFixed(2)} confirmado.
+
+Obrigado! 🎉`)
+
+          await savelog(db, 'receipt_auto', null, { payment_id: payment.id, media_id: mediaId })
+
+          // Push notification pro atendente
+          try {
+            const pushPayload = {
+              title: '📄 Comprovante recebido',
+              body: `${contact.name || contact.phone} enviou comprovante de R$ ${parseFloat(payment.amount).toFixed(2)}`,
+              url: '/painel?tab=receipts',
+              tag: `ark-receipt-${payment.id}`,
+            }
+            await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
+          } catch (_) {}
+
+          // Não processar fluxo — comprovante já tratado
+          await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+          return res.status(200).json({ ok: true, receipt: true })
+        }
+      }
+    } catch (e) {
+      await savelog(db, 'receipt_auto_err', e?.message)
+      // Não interrompe o fluxo se falhar — continua normalmente
+    }
+  }
+
   // ── DETECÇÃO DE LOOP: mais de 10 mensagens trocadas em 30 segundos = bot ──
   const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString()
   const { count: recentCount } = await db
