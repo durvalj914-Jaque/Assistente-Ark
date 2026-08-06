@@ -672,98 +672,177 @@ export default function PainelAdminPage() {
       {/* ── ABA COMPROVANTES ── */}
       {tab === 'receipts' && (
         <div>
+          {/* Sub-tabs de categoria */}
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 8 }}>
+            {[
+              { key: 'all', label: 'Todos', icon: '📋', color: '#4f8ef7' },
+              { key: 'b2c_client', label: 'Cliente → Empresa', icon: '👤', color: '#22c55e', desc: 'PIX/Link enviado ao cliente' },
+              { key: 'b2c_catalog', label: 'Catálogo WhatsApp', icon: '🛒', color: '#f59e0b', desc: 'Compra pelo catálogo B2C' },
+              { key: 'b2b_manual', label: 'Manual (Empresa)', icon: '🏢', color: '#a78bfa', desc: 'Maquininha/externo' },
+            ].map(cat => (
+              <button key={cat.key} onClick={() => { setReceiptCategory(cat.key); loadReceipts(cat.key) }}
+                style={{
+                  padding: '8px 14px', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  border: 'none', borderBottom: receiptCategory === cat.key ? `2px solid ${cat.color}` : '2px solid transparent',
+                  background: receiptCategory === cat.key ? `${cat.color}15` : 'transparent',
+                  color: receiptCategory === cat.key ? cat.color : '#64748b',
+                  display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
+                }}>
+                <span>{cat.icon}</span> {cat.label}
+              </button>
+            ))}
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>📄 Comprovantes de Pagamento</h3>
+            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
+              📄 Comprovantes{receiptCategory !== 'all' ? ` — ${receipts.length} registro(s)` : ''}
+            </h3>
             <button onClick={() => { setReceiptModal(true); loadPayments() }}
-              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              + Enviar Comprovante
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#a78bfa', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              🏢 + Comprovante Manual
             </button>
           </div>
+
+          {/* Stats por categoria */}
+          {receiptCategory === 'all' && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+              {[
+                { cat: 'b2c_client', label: '👤 Cliente → Empresa', icon: '💚', desc: 'PIX/Link' },
+                { cat: 'b2c_catalog', label: '🛒 Catálogo WhatsApp', icon: '🛍️', desc: 'Compra B2C' },
+                { cat: 'b2b_manual', label: '🏢 Manual (Empresa)', icon: '📋', desc: 'Maquininha/Externo' },
+              ].map(s => {
+                const count = receipts.filter(r => (r.category || 'b2c_client') === s.cat).length
+                const total = receipts.filter(r => (r.category || 'b2c_client') === s.cat)
+                  .reduce((sum, r) => sum + (parseFloat(r.payments?.amount) || 0), 0)
+                return (
+                  <div key={s.cat} className="ark-card" style={{ padding: 14, cursor: 'pointer' }}
+                       onClick={() => { setReceiptCategory(s.cat); loadReceipts(s.cat) }}>
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
+                    <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginTop: 4 }}>{count}</div>
+                    <div style={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>R$ {total.toFixed(2)}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {loadingReceipts ? (
             <p style={{ color: '#64748b' }}>Carregando...</p>
           ) : receipts.length === 0 ? (
             <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
-              Nenhum comprovante enviado. Clique em "Enviar Comprovante" para adicionar.
+              Nenhum comprovante nesta categoria.
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-              {receipts.map(r => (
-                <div key={r.id} className="ark-card" style={{ padding: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                    <div>
-                      <span style={{ fontSize: 18 }}>{r.file_type === 'pdf' ? '📄' : '🖼️'}</span>
-                      {r.payments && (
-                        <span style={{
-                          marginLeft: 8, padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
-                          background: r.payments.status === 'paid' ? 'rgba(34,197,94,0.15)' : 'rgba(245,158,11,0.15)',
-                          color: r.payments.status === 'paid' ? '#22c55e' : '#f59e0b'
-                        }}>
-                          {r.payments.status === 'paid' ? '✅ Confirmado' : '⏳ Pendente'}
+              {receipts.map(r => {
+                const cat = r.category || 'b2c_client'
+                const catInfo = {
+                  b2c_client: { label: '👤 Cliente', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
+                  b2c_catalog: { label: '🛒 Catálogo', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+                  b2b_manual: { label: '🏢 Manual', color: '#a78bfa', bg: 'rgba(167,139,246,0.12)' },
+                }[cat] || { label: '📄', color: '#64748b', bg: 'rgba(100,116,139,0.12)' }
+
+                return (
+                  <div key={r.id} className="ark-card" style={{ padding: 14, borderLeft: `3px solid ${catInfo.color}` }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 18 }}>
+                          {r.file_type === 'pdf' ? '📄' : r.file_type === 'catalog_order' ? '🛒' : r.file_type === 'mp_confirmation' ? '💳' : '🖼️'}
                         </span>
-                      )}
+                        <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: catInfo.bg, color: catInfo.color }}>
+                          {catInfo.label}
+                        </span>
+                        {r.payments && r.payments.status === 'paid' && (
+                          <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>✅ Pago</span>
+                        )}
+                        {r.metadata?.avulso && (
+                          <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700, background: 'rgba(139,92,246,0.15)', color: '#a78bfa' }}>Avulso</span>
+                        )}
+                      </div>
+                      <button onClick={() => deleteReceipt(r.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
                     </div>
-                    <button onClick={() => deleteReceipt(r.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
+
+                    {r.payments && parseFloat(r.payments.amount) > 0 && (
+                      <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+                        R$ {parseFloat(r.payments.amount).toFixed(2)} — {r.payments.description || 'Pagamento'}
+                      </div>
+                    )}
+                    {(!r.payments || parseFloat(r.payments.amount) === 0) && (
+                      <div style={{ color: cat === 'b2b_manual' ? '#a78bfa' : '#94a3b8', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                        {r.notes || 'Sem valor informado'}
+                      </div>
+                    )}
+
+                    {r.file_type === 'pdf' && r.file_url && (
+                      <a href={r.file_url} target="_blank" rel="noopener" style={{ color: '#4f8ef7', fontSize: 12, textDecoration: 'none' }}>📎 Ver comprovante (PDF)</a>
+                    )}
+                    {r.file_type === 'image' && r.file_url && !r.file_url.startsWith('__media__') && (
+                      <a href={r.file_url} target="_blank" rel="noopener">
+                        <img src={r.file_url} alt="Comprovante" style={{ width: '100%', borderRadius: 8, maxHeight: 200, objectFit: 'cover', cursor: 'pointer', marginTop: 4 }} />
+                      </a>
+                    )}
+                    {r.file_type === 'catalog_order' && r.metadata?.items && (
+                      <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+                        {r.metadata.items.length} item(ns) — R$ {parseFloat(r.metadata.total || 0).toFixed(2)}
+                      </div>
+                    )}
+                    {r.file_type === 'mp_confirmation' && (
+                      <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>Confirmado automaticamente via Mercado Pago</div>
+                    )}
+
+                    {/* Editar valor de avulso */}
+                    {(cat === 'b2b_manual' || r.metadata?.avulso) && (!r.payments || parseFloat(r.payments.amount) === 0) && editingReceipt !== r.id && (
+                      <button onClick={() => setEditingReceipt(r.id)}
+                        style={{ marginTop: 6, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(167,139,246,0.3)', background: 'transparent', color: '#a78bfa', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
+                        ✏️ Definir valor
+                      </button>
+                    )}
+                    {editingReceipt === r.id && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                        <input type="number" step="0.01" placeholder="Valor R$" defaultValue=""
+                          id={`edit-val-${r.id}`}
+                          style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13 }} />
+                        <button onClick={() => { const v = document.getElementById(`edit-val-${r.id}`).value; if (v) updateReceipt(r.id, v, r.notes) }}
+                          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓</button>
+                        <button onClick={() => setEditingReceipt(null)}
+                          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                      </div>
+                    )}
+
+                    <div style={{ color: '#334155', fontSize: 10, marginTop: 6 }}>
+                      {r.uploaded_by} • {new Date(r.created_at).toLocaleString('pt-BR')}
+                    </div>
                   </div>
-                  {r.payments && parseFloat(r.payments.amount) > 0 && (
-                    <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
-                      R$ {parseFloat(r.payments.amount).toFixed(2)} — {r.payments.description || 'Pagamento'}
-                    </div>
-                  )}
-                  {r.payments && parseFloat(r.payments.amount) === 0 && r.metadata?.avulso && (
-                    <div style={{ color: '#a78bfa', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
-                      {r.notes || 'Comprovante avulso'}
-                    </div>
-                  )}
-                  {r.file_type === 'pdf' ? (
-                    <a href={r.file_url} target="_blank" rel="noopener" style={{ color: '#4f8ef7', fontSize: 12, textDecoration: 'none' }}>📎 Ver comprovante (PDF)</a>
-                  ) : (
-                    <a href={r.file_url} target="_blank" rel="noopener">
-                      <img src={r.file_url} alt="Comprovante" style={{ width: '100%', borderRadius: 8, maxHeight: 200, objectFit: 'cover', cursor: 'pointer' }} />
-                    </a>
-                  )}
-                  {r.notes && <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 8 }}>📝 {r.notes}</div>}
-                  <div style={{ color: '#334155', fontSize: 10, marginTop: 6 }}>
-                    {r.uploaded_by} • {new Date(r.created_at).toLocaleString('pt-BR')}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
-          {/* Modal de upload de comprovante */}
+          {/* Modal de upload de comprovante manual (B2B) */}
           {receiptModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
                  onClick={() => setReceiptModal(null)}>
-              <div onClick={e => e.stopPropagation()} style={{ background: '#0d0d1e', borderRadius: 16, padding: 24, maxWidth: 420, width: '90%', border: '1px solid rgba(79,142,247,0.25)' }}>
-                <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>📄 Enviar Comprovante</h3>
+              <div onClick={e => e.stopPropagation()} style={{ background: '#0d0d1e', borderRadius: 16, padding: 24, maxWidth: 440, width: '90%', border: '1px solid rgba(167,139,246,0.25)' }}>
+                <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>🏢 Comprovante Manual</h3>
+                <p style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>Para pagamentos recebidos fora do WhatsApp (maquininha, dinheiro, transferência externa)</p>
 
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Associar a pagamento (opcional)</label>
-                <select value={receiptPaymentId} onChange={e => setReceiptPaymentId(e.target.value)}
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 12 }}>
-                  <option value="">Sem vínculo</option>
-                  {payments.filter(p => p.status === 'pending').map(p => (
-                    <option key={p.id} value={p.id}>R$ {parseFloat(p.amount).toFixed(2)} — {p.description || 'Pagamento'} ({p.method})</option>
-                  ))}
-                </select>
-                {receiptPaymentId && (
-                  <p style={{ color: '#22c55e', fontSize: 11, marginBottom: 12 }}>
-                    ✓ O pagamento selecionado será marcado como "Pago" automaticamente.
-                  </p>
-                )}
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Valor (R$) *</label>
+                <input type="number" step="0.01" min="0.01" value={receiptAmount} onChange={e => setReceiptAmount(e.target.value)} placeholder="Ex: 50.00"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 12 }} />
 
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Observações (opcional)</label>
-                <input value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} placeholder="Ex: PIX pago em 06/08"
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição</label>
+                <input value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} placeholder="Ex: Maquininha — Venda presencial"
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 16 }} />
 
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Arquivo (imagem ou PDF)</label>
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Comprovante (imagem ou PDF)</label>
                 <input type="file" accept="image/*,application/pdf" id="receipt-file" style={{ width: '100%', color: '#94a3b8', fontSize: 13, marginBottom: 16 }} />
 
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setReceiptModal(null)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
-                  <button onClick={() => { const f = document.getElementById('receipt-file').files[0]; if (f) uploadReceipt(f); else alert('Selecione um arquivo') }}
-                    style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Enviar</button>
+                  <button onClick={() => { const f = document.getElementById('receipt-file').files[0]; if (f) uploadReceipt(f); else alert('Selecione um arquivo'); if (!receiptAmount) { alert('Informe o valor'); return } }}
+                    style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#a78bfa', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Registrar</button>
                 </div>
               </div>
             </div>
@@ -771,7 +850,7 @@ export default function PainelAdminPage() {
         </div>
       )}
 
-    </AdminLayout>
+        </AdminLayout>
   )
 }
 

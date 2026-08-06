@@ -44,11 +44,27 @@ async function handleOrder(db, msg, from, phoneNumberId) {
     note: order.text || null, status: 'new',
   })
 
+  // Criar comprovante automático de pedido do catálogo (B2C Catálogo)
+  if (total > 0) {
+    await safeInsert(db, 'payment_receipts', {
+      tenant_id: bot.tenant_id,
+      conversation_id: null,
+      contact_id: contact?.id || null,
+      file_url: null,
+      file_type: 'catalog_order',
+      file_name: `Pedido Catálogo - ${new Date().toLocaleString('pt-BR')}`,
+      uploaded_by: contact?.phone || from,
+      notes: `Pedido via catálogo WhatsApp — ${order.product_items?.length || 0} item(ns) — Total: R$ ${total.toFixed(2)}`,
+      metadata: { catalog_id: order.catalog_id, items: order.product_items, total, currency, auto: true },
+      category: 'b2c_catalog',
+    })
+  }
+
   try {
     const pushPayload = {
       title: '🛒 Novo pedido recebido!',
       body: `${contact?.name || from} enviou um carrinho de R$ ${total.toFixed(2)} pelo ${bot.name}`,
-      url: '/painel',
+      url: '/painel?tab=receipts',
       tag: `ark-order-${from}-${Date.now()}`,
     }
     await Promise.all([sendPushToTenant(bot.tenant_id, pushPayload), sendFcmToTenant(bot.tenant_id, pushPayload)])
@@ -270,6 +286,7 @@ async function processWebhook(body) {
             uploaded_by: contact.phone || 'customer',
             notes: `Comprovante automático — R$ ${parseFloat(payment.amount).toFixed(2)} (${payment.method})`,
             metadata: { media_id: mediaId, auto: true, payment_amount: payment.amount },
+            category: 'b2c_client',
           })
           // Marcar como pago
           await db.from('payments').update({
@@ -321,6 +338,7 @@ Obrigado! 🎉`)
             uploaded_by: contact.phone || 'customer',
             notes: captionVal ? `Comprovante avulso — R$ ${captionVal.toFixed(2)}` : 'Comprovante avulso (valor não identificado)',
             metadata: { media_id: mediaId, auto: true, avulso: true, caption: mediaCaption },
+            category: 'b2c_client',
           })
 
           await sendText(phoneNumberId, tkn, from, `✅ *Comprovante recebido!*
