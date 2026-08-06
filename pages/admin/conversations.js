@@ -493,7 +493,7 @@ export default function ConversationsPage() {
                           {selected.status !== 'closed' && (
                             <button onClick={async () => { setChatMenuOpen(false); await supabase.from('conversations').update({ status: 'closed' }).eq('id', selected.id); loadConversations(); setSelected(p => ({ ...p, status: 'closed' })) }}
                               style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ fontSize: 15 }}>✖️</span> Encerrar conversa
+                              <span style={{ fontSize: 15 }}>✖️</span> Fechar conversa
                             </button>
                           )}
                           {selected.status === 'closed' && (
