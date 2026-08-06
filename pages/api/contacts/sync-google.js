@@ -2,30 +2,25 @@
  * POST /api/contacts/sync-google
  * Sincroniza contatos do Google People API usando tokens salvos.
  * Body: { tenant_id: string }
- * Usa os tokens armazenados em google_contacts_auth (fluxo OAuth próprio).
+ * Funciona para: platform admin (qualquer tenant) OU usuário autenticado dono do tenant.
  */
-import { requirePlatformAdmin } from '../../../lib/adminAuth'
-import { supabaseAdmin } from '../../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 async function refreshAccessToken(tenant_id, db) {
-  // Buscar o refresh token
   const { data: auth } = await db
     .from('google_contacts_auth')
     .select('refresh_token, access_token, expires_at')
     .eq('tenant_id', tenant_id)
-    .single()
+    .maybeSingle()
 
   if (!auth) return null
 
-  // Se o token ainda é válido (com margem de 60s), usar direto
   if (auth.expires_at && new Date(auth.expires_at) > new Date(Date.now() + 60000)) {
     return auth.access_token
   }
 
-  // Renovar com refresh token
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
-
   if (!auth.refresh_token || !clientSecret) return null
 
   const resp = await fetch('https://oauth2.googleapis.com/token', {
@@ -42,14 +37,9 @@ async function refreshAccessToken(tenant_id, db) {
   const tokens = await resp.json()
   if (!resp.ok || !tokens.access_token) return null
 
-  // Atualizar no banco
   const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()
   await db.from('google_contacts_auth')
-    .update({
-      access_token: tokens.access_token,
-      expires_at: expiresAt,
-      updated_at: new Date().toISOString(),
-    })
+    .update({ access_token: tokens.access_token, expires_at: expiresAt, updated_at: new Date().toISOString() })
     .eq('tenant_id', tenant_id)
 
   return tokens.access_token
@@ -58,25 +48,48 @@ async function refreshAccessToken(tenant_id, db) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const ctx = await requirePlatformAdmin(req, res)
-  if (!ctx) return
-  const { db, user } = ctx
-
   const { tenant_id } = req.body
   if (!tenant_id) return res.status(400).json({ error: 'tenant_id é obrigatório' })
 
-  // Pegar token do fluxo OAuth próprio
-  const accessToken = await refreshAccessToken(tenant_id, db)
+  // Verificar autenticação — usuário autenticado OU platform admin
+  const authHeader = req.headers.authorization
+  let userId = null
+  let isPlatformAdmin = false
+  let db = supabaseAdmin() // default to admin
 
+  if (authHeader) {
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user } } = await supabase.auth.getUser(token)
+    if (user) {
+      userId = user.id
+      // Verificar se é platform admin
+      const { data: profile } = await supabaseAdmin()
+        .from('profiles').select('is_platform_admin').eq('id', user.id).maybeSingle()
+      isPlatformAdmin = profile?.is_platform_admin || false
+
+      // Se não é platform admin, verificar se é dono do tenant
+      if (!isPlatformAdmin) {
+        const { data: member } = await supabaseAdmin()
+          .from('tenant_members').select('tenant_id, role')
+          .eq('user_id', user.id).eq('tenant_id', tenant_id).maybeSingle()
+        if (!member) return res.status(403).json({ error: 'Sem permissão para este tenant' })
+      }
+    } else {
+      return res.status(401).json({ error: 'Sessão inválida' })
+    }
+  } else {
+    return res.status(401).json({ error: 'Não autenticado' })
+  }
+
+  const accessToken = await refreshAccessToken(tenant_id, supabaseAdmin())
   if (!accessToken) {
-    return res.status(401).json({ 
-      error: 'Google não conectado. Clique em "Conectar Google" para autorizar o acesso aos contatos.',
-      needsAuth: true 
+    return res.status(401).json({
+      error: 'Google não conectado. Clique em "Conectar Google" para autorizar.',
+      needsAuth: true
     })
   }
 
   try {
-    // Buscar contatos do Google People API
     let allContacts = []
     let pageToken = null
     let hasMore = true
@@ -89,18 +102,10 @@ export default async function handler(req, res) {
       url += '&sortOrder=FIRST_NAME_ASCENDING'
       if (pageToken) url += `&pageToken=${pageToken}`
 
-      const resp = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${accessToken}` }
-      })
-
+      const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } })
       if (!resp.ok) {
+        if (resp.status === 401) return res.status(401).json({ error: 'Token expirado. Reconecte o Google.', needsAuth: true })
         const errBody = await resp.text()
-        if (resp.status === 401) {
-          return res.status(401).json({ 
-            error: 'Token expirado. Reconecte o Google.',
-            needsAuth: true 
-          })
-        }
         return res.status(resp.status).json({ error: 'Erro ao buscar contatos', detail: errBody })
       }
 
@@ -111,7 +116,6 @@ export default async function handler(req, res) {
       pageCount++
     }
 
-    // Processar contatos
     const contactsData = allContacts.map(person => {
       const name = person.names?.[0]?.displayName || ''
       const email = person.emailAddresses?.[0]?.value || ''
@@ -135,53 +139,33 @@ export default async function handler(req, res) {
         notes,
         raw_data: person,
         synced_at: new Date().toISOString(),
-        created_by: user.id,
       }
     }).filter(c => c.full_name || c.email || c.phone)
 
-    // Garantir que a tabela contacts existe
-    const { error: checkErr } = await db.from('contacts').select('id').limit(1)
-    if (checkErr) {
-      // Criar tabela via admin client
-      const adminDb = supabaseAdmin()
-      // Tentar criar via RPC (pode falhar se exec_sql não existe)
-      await adminDb.rpc('exec_sql', { query_text: `
-        CREATE TABLE IF NOT EXISTS contacts (
-          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-          tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
-          google_resource_name TEXT UNIQUE,
-          full_name TEXT, email TEXT, phone TEXT, phone_e164 TEXT,
-          photo_url TEXT, organization TEXT, job_title TEXT, notes TEXT,
-          raw_data JSONB, synced_at TIMESTAMPTZ DEFAULT now(),
-          created_at TIMESTAMPTZ DEFAULT now(), created_by UUID
-        );
-        ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
-        CREATE POLICY IF NOT EXISTS "contacts_read" ON contacts FOR SELECT USING (true);
-        CREATE POLICY IF NOT EXISTS "contacts_insert" ON contacts FOR INSERT WITH CHECK (true);
-        CREATE POLICY IF NOT EXISTS "contacts_update" ON contacts FOR UPDATE USING (true);
-        CREATE POLICY IF NOT EXISTS "contacts_delete" ON contacts FOR DELETE USING (true);
-        CREATE INDEX IF NOT EXISTS idx_contacts_tenant ON contacts(tenant_id);
-      `}).then(() => {})
+    // Upsert contatos
+    let synced = 0
+    let errors = 0
+    for (const contact of contactsData) {
+      const { error } = await supabaseAdmin()
+        .from('contacts')
+        .upsert(contact, { onConflict: 'tenant_id,google_resource_name' })
+      if (error) errors++
+      else synced++
     }
 
-    // Upsert
-    const { data: upserted, error: upsertErr } = await db
-      .from('contacts')
-      .upsert(contactsData, { onConflict: 'google_resource_name' })
-
-    if (upsertErr) {
-      return res.status(500).json({ error: 'Erro ao salvar contatos', detail: upsertErr.message })
-    }
-
-    const { count } = await db.from('contacts').select('id', { count: 'exact' }).eq('tenant_id', tenant_id)
+    // Contar total no banco
+    const { count } = await supabaseAdmin()
+      .from('contacts').select('*', { count: 'exact', head: true })
+      .eq('tenant_id', tenant_id)
 
     return res.status(200).json({
       ok: true,
-      synced: contactsData.length,
-      total_in_google: allContacts.length,
-      total_in_db: count,
+      synced,
+      errors,
+      total_in_db: count || 0,
+      total_from_google: contactsData.length,
     })
   } catch (e) {
-    return res.status(500).json({ error: 'Erro interno', detail: e.message })
+    return res.status(500).json({ error: 'Erro inesperado', detail: e.message })
   }
 }
