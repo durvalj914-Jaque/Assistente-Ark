@@ -338,6 +338,7 @@ export default function ConversationsPage() {
               const active = selected?.id === conv.id
               return (
                 <div key={conv.id} onClick={() => selectConversation(conv)}
+                  className={conv.status === 'human' && !active ? 'ark-pulse-human' : ''}
                   style={{
                     padding: '12px 16px', cursor: 'pointer',
                     borderBottom: '1px solid var(--border-white)',
@@ -346,13 +347,27 @@ export default function ConversationsPage() {
                     transition: 'background 0.1s',
                   }}>
                   {/* Avatar */}
-                  <div style={{
-                    width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-                    background: 'linear-gradient(135deg, rgba(79,142,247,0.15), rgba(139,92,246,0.1))',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 18, fontWeight: 700, color: '#4f8ef7',
-                  }}>
-                    {(conv.contacts?.name || conv.contacts?.phone || '?')[0].toUpperCase()}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '50%',
+                      background: conv.status === 'human' && !active
+                        ? 'linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.08))'
+                        : 'linear-gradient(135deg, rgba(79,142,247,0.15), rgba(139,92,246,0.1))',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 18, fontWeight: 700,
+                      color: conv.status === 'human' && !active ? '#f59e0b' : '#4f8ef7',
+                      border: conv.status === 'human' && !active ? '2px solid rgba(245,158,11,0.4)' : 'none',
+                    }}>
+                      {(conv.contacts?.name || conv.contacts?.phone || '?')[0].toUpperCase()}
+                    </div>
+                    {conv.status === 'human' && !active && (
+                      <div style={{
+                        position: 'absolute', top: -2, right: -2,
+                        width: 12, height: 12, borderRadius: '50%',
+                        background: '#f59e0b', border: '2px solid var(--bg-sidebar)',
+                        animation: 'ark-pulse-human 1.5s ease-in-out infinite',
+                      }} />
+                    )}
                   </div>
                   {/* Info */}
                   <div style={{ flex: 1, minWidth: 0 }}>

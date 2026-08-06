@@ -232,6 +232,20 @@ select.ark-input {
 [data-theme="light"] .ark-layout-sidebar { background: var(--bg-sidebar) !important; }
 [data-theme="light"] .ark-layout-topbar { background: var(--bg-topbar) !important; border-color: var(--border-soft) !important; }
 
+
+/* ── Pulse para conversas com atendimento humano pendente ── */
+@keyframes ark-pulse-human {
+  0%, 100% { background: rgba(245,158,11,0.04); }
+  50% { background: rgba(245,158,11,0.18); }
+}
+.ark-pulse-human {
+  animation: ark-pulse-human 1.5s ease-in-out infinite;
+}
+.ark-pulse-human:hover {
+  animation: none;
+  background: rgba(245,158,11,0.22);
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .ark-hide-mobile { display: none !important; }
