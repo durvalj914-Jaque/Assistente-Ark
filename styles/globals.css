@@ -2,42 +2,95 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme Variables ── */
+:root,
+[data-theme="dark"] {
+  --bg-main: #080810;
+  --bg-sidebar: #0a0a14;
+  --bg-card: #0a0a14;
+  --bg-input: #12121f;
+  --bg-secondary: #0d0d1e;
+  --bg-hover: #12121f;
+  --bg-topbar: rgba(8,8,16,0.8);
+  --text-primary: #fff;
+  --text-secondary: #e2e8f0;
+  --text-muted: #64748b;
+  --text-dim: #475569;
+  --text-faint: #334155;
+  --border-soft: rgba(79,142,247,0.08);
+  --border-medium: rgba(79,142,247,0.12);
+  --border-strong: rgba(79,142,247,0.18);
+  --border-white: rgba(255,255,255,0.04);
+  --scrollbar-track: #080810;
+  --scrollbar-thumb: #1e2a40;
+  --scrollbar-hover: #2d3f5c;
+  --shadow-card: none;
+  --blue-tint: rgba(79,142,247,0.12);
+  --blue-border: rgba(79,142,247,0.2);
+}
+
+[data-theme="light"] {
+  --bg-main: #f0f4f8;
+  --bg-sidebar: #ffffff;
+  --bg-card: #ffffff;
+  --bg-input: #f1f5f9;
+  --bg-secondary: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-topbar: rgba(255,255,255,0.85);
+  --text-primary: #1e293b;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  --text-faint: #cbd5e1;
+  --border-soft: rgba(0,0,0,0.06);
+  --border-medium: rgba(0,0,0,0.08);
+  --border-strong: rgba(79,142,247,0.25);
+  --border-white: rgba(0,0,0,0.04);
+  --scrollbar-track: #f0f4f8;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-hover: #94a3b8;
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.08);
+  --blue-tint: rgba(79,142,247,0.08);
+  --blue-border: rgba(79,142,247,0.2);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  background: #080810;
-  color: #fff;
+  background: var(--bg-main);
+  color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #080810; }
-::-webkit-scrollbar-thumb { background: #1e2a40; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #2d3f5c; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
 a { text-decoration: none; color: inherit; }
 
 /* ── Inputs ── */
 .ark-input {
-  background: #12121f;
-  border: 1px solid rgba(79,142,247,0.18);
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 9px 12px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 13px;
   width: 100%;
   outline: none;
   font-family: inherit;
-  transition: border 0.2s, box-shadow 0.2s;
+  transition: border 0.2s, box-shadow 0.2s, background 0.2s;
 }
 .ark-input:focus {
   border-color: #4f8ef7;
   box-shadow: 0 0 0 3px rgba(79,142,247,0.1);
 }
-.ark-input::placeholder { color: #334155; }
+.ark-input::placeholder { color: var(--text-faint); }
 .ark-input:disabled { opacity: 0.45; cursor: not-allowed; }
 
 select.ark-input {
@@ -106,16 +159,17 @@ select.ark-input {
 
 /* ── Cards ── */
 .ark-card {
-  background: #0a0a14;
-  border: 1px solid rgba(79,142,247,0.12);
+  background: var(--bg-card);
+  border: 1px solid var(--border-medium);
   border-radius: 14px;
   padding: 20px;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-shadow: var(--shadow-card);
 }
-.ark-card:hover { border-color: rgba(79,142,247,0.22); }
+.ark-card:hover { border-color: var(--border-strong); }
 .ark-card-flat {
-  background: #0a0a14;
-  border: 1px solid rgba(79,142,247,0.08);
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
   border-radius: 10px;
   padding: 16px;
 }
@@ -140,14 +194,14 @@ select.ark-input {
 
 /* ── Tables ── */
 .ark-table { width: 100%; border-collapse: collapse; }
-.ark-table thead tr { border-bottom: 1px solid rgba(79,142,247,0.1); }
-.ark-table th { padding: 11px 16px; text-align: left; color: #475569; font-size: 11px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
-.ark-table tbody tr { border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.1s; }
+.ark-table thead tr { border-bottom: 1px solid var(--border-soft); }
+.ark-table th { padding: 11px 16px; text-align: left; color: var(--text-dim); font-size: 11px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.ark-table tbody tr { border-bottom: 1px solid var(--border-white); transition: background 0.1s; }
 .ark-table tbody tr:hover { background: rgba(79,142,247,0.04); }
-.ark-table td { padding: 12px 16px; color: #e2e8f0; font-size: 13px; }
+.ark-table td { padding: 12px 16px; color: var(--text-secondary); font-size: 13px; }
 
 /* ── Divider ── */
-.ark-divider { border: none; border-top: 1px solid rgba(79,142,247,0.08); margin: 20px 0; }
+.ark-divider { border: none; border-top: 1px solid var(--border-soft); margin: 20px 0; }
 
 /* ── Loading spinner ── */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -166,11 +220,17 @@ select.ark-input {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #080810;
+  background: var(--bg-main);
   color: #4f8ef7;
   gap: 12px;
   font-size: 14px;
 }
+
+/* ── Theme Override: Light mode inline-style fallbacks ── */
+/* Targets common hardcoded color patterns used in inline styles */
+[data-theme="light"] .ark-layout-main { background: var(--bg-main) !important; }
+[data-theme="light"] .ark-layout-sidebar { background: var(--bg-sidebar) !important; }
+[data-theme="light"] .ark-layout-topbar { background: var(--bg-topbar) !important; border-color: var(--border-soft) !important; }
 
 /* ── Responsive ── */
 @media (max-width: 768px) {

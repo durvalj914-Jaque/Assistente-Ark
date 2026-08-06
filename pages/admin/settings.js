@@ -16,8 +16,20 @@ export default function SettingsPage() {
   const [inviteMsg, setInviteMsg] = useState('')
   const [inviting, setInviting] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [theme, setTheme] = useState('dark')
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+
+  useEffect(() => {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'dark' : 'dark'
+    setTheme(saved)
+  }, [])
+
+  function toggleTheme(next) {
+    setTheme(next)
+    document.documentElement.setAttribute('data-theme', next)
+    if (typeof localStorage !== 'undefined') localStorage.setItem('ark-theme', next)
+  }
 
   function loadMembers() {
     if (!tenant) return
@@ -59,14 +71,14 @@ export default function SettingsPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
-      <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 20, marginBottom: 24 }}>⚙️ Configurações</h1>
+      <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20, marginBottom: 24 }}>⚙️ Configurações</h1>
 
       <NotificationsCard />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Empresa */}
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>🏢 Sua Empresa</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>🏢 Sua Empresa</h3>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 6 }}>NOME DA EMPRESA</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="ark-input" />
@@ -81,7 +93,7 @@ export default function SettingsPage() {
 
         {/* Plano */}
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>💎 Plano Atual</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>💎 Plano Atual</h3>
           <div style={{ background: 'linear-gradient(135deg, rgba(79,142,247,0.1), rgba(6,182,212,0.05))', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#4f8ef7', marginBottom: 4 }}>{plan.label}</div>
             <div style={{ color: '#64748b', fontSize: 13 }}>
@@ -104,7 +116,7 @@ export default function SettingsPage() {
 
         {/* Membros */}
         <div className="ark-card" style={{ gridColumn: '1 / -1' }}>
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>👥 Membros da equipe</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>👥 Membros da equipe</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
             {members.map(m => (
               <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#12121f', borderRadius: 8, padding: '10px 14px' }}>
@@ -138,9 +150,65 @@ export default function SettingsPage() {
           ) : null}
         </div>
 
+        {/* Aparência */}
+        <div className="ark-card">
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>🎨 Aparência</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 18 }}>Escolha o tema da interface. A preferência é salva neste navegador.</p>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {/* Escuro */}
+            <button onClick={() => toggleTheme('dark')}
+              style={{
+                flex: 1, padding: 16, borderRadius: 12, cursor: 'pointer',
+                background: theme === 'dark' ? 'rgba(79,142,247,0.12)' : 'var(--bg-secondary)',
+                border: theme === 'dark' ? '2px solid #4f8ef7' : '2px solid var(--border-soft)',
+                transition: 'all 0.2s', textAlign: 'center',
+              }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🌙</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Escuro</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Tema padrão</div>
+            </button>
+            {/* Claro */}
+            <button onClick={() => toggleTheme('light')}
+              style={{
+                flex: 1, padding: 16, borderRadius: 12, cursor: 'pointer',
+                background: theme === 'light' ? 'rgba(79,142,247,0.12)' : 'var(--bg-secondary)',
+                border: theme === 'light' ? '2px solid #4f8ef7' : '2px solid var(--border-soft)',
+                transition: 'all 0.2s', textAlign: 'center',
+              }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>☀️</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Claro</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Melhor para o dia</div>
+            </button>
+          </div>
+          {/* Switch compacto */}
+          <div style={{
+            marginTop: 16, padding: '12px 14px', background: 'var(--bg-secondary)', borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>{theme === 'dark' ? '🌙' : '☀️'}</span>
+              <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                Tema {theme === 'dark' ? 'Escuro' : 'Claro'}
+              </span>
+            </div>
+            <div onClick={() => toggleTheme(theme === 'dark' ? 'light' : 'dark')}
+              style={{
+                width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
+                background: theme === 'dark' ? '#4f8ef7' : 'rgba(0,0,0,0.15)',
+                position: 'relative', transition: 'background 0.2s',
+              }}>
+              <div style={{
+                position: 'absolute', top: 3, left: theme === 'dark' ? 23 : 3,
+                width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </div>
+          </div>
+        </div>
+
         {/* Conta */}
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>👤 Minha Conta</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>👤 Minha Conta</h3>
           <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>E-mail: <b style={{ color: '#e2e8f0' }}>{user.email}</b></div>
           <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Cargo: <b style={{ color: '#e2e8f0' }}>{role}</b></div>
           <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }}

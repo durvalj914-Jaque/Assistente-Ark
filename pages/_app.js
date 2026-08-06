@@ -38,6 +38,12 @@ export default function App({ Component, pageProps }) {
     }
   }, [])
 
+  // Aplicar tema salvo
+  useEffect(() => {
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'dark' : 'dark'
+    document.documentElement.setAttribute('data-theme', saved)
+  }, [])
+
   const canonicalUrl = 'https://arkiel.com.br' + router.pathname
 
   return (

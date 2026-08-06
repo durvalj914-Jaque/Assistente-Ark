@@ -133,7 +133,7 @@ export default function AdminLayout({ children, tenant, user, role, profile }) {
   )
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#080810', fontFamily: 'Inter, sans-serif' }}>
+    <div className="ark-layout-main" style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-main)', fontFamily: 'Inter, sans-serif' }}>
       {/* Mobile overlay */}
       {mobileOpen && (
         <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 19, display: 'none' }}
@@ -141,10 +141,10 @@ export default function AdminLayout({ children, tenant, user, role, profile }) {
       )}
 
       {/* Sidebar */}
-      <aside style={{
+      <aside className="ark-layout-sidebar" style={{
         width: sideW,
-        background: '#0a0a14',
-        borderRight: '1px solid rgba(79,142,247,0.12)',
+        background: 'var(--bg-sidebar)',
+        borderRight: '1px solid var(--border-medium)',
         position: 'fixed', top: 0, left: 0, height: '100vh',
         zIndex: 20,
         transition: 'width 0.2s ease',
@@ -163,13 +163,13 @@ export default function AdminLayout({ children, tenant, user, role, profile }) {
         flexDirection: 'column',
       }}>
         {/* Top bar */}
-        <div style={{
-          height: 56, background: 'rgba(8,8,16,0.8)', backdropFilter: 'blur(12px)',
-          borderBottom: '1px solid rgba(79,142,247,0.08)',
+        <div className="ark-layout-topbar" style={{
+          height: 56, background: 'var(--bg-topbar)', backdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--border-soft)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '0 28px', position: 'sticky', top: 0, zIndex: 10,
         }}>
-          <div style={{ fontSize: 13, color: '#475569' }}>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
             {[...NAV, PLATFORM_NAV].find(n => n.exact ? router.pathname === n.href : router.pathname.startsWith(n.href))?.label || 'Painel'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
