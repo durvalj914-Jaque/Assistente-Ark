@@ -143,16 +143,23 @@ export default function ConversationsPage() {
     if (!selected || deleting) return
     setDeleting(true)
     try {
-      // Deletar mensagens primeiro (FK)
-      await supabase.from('messages').delete().eq('conversation_id', selected.id)
-      // Deletar a conversa
-      await supabase.from('conversations').delete().eq('id', selected.id)
-      setDeleteConfirm(false)
-      setSelected(null)
-      setMessages([])
-      loadConversations()
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/conversations/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ conversation_id: selected.id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setDeleteConfirm(false)
+        setSelected(null)
+        setMessages([])
+        loadConversations()
+      } else {
+        alert('Erro ao deletar: ' + (data.error || 'desconhecido'))
+      }
     } catch (e) {
-      console.error('Erro ao deletar:', e)
+      alert('Erro ao deletar: ' + e.message)
     } finally { setDeleting(false) }
   }
 
