@@ -225,56 +225,45 @@ async function processWebhook(body) {
   })
 
   // ── DETECÇÃO AUTOMÁTICA DE COMPROVANTE ──
-  // Se o cliente manda imagem ou documento PDF e há pagamento pendente na conversa,
-  // baixar a mídia do WhatsApp e salvar como comprovante automático
+  // Toda imagem ou PDF recebido = potencial comprovante de pagamento
   if (mediaId && (msg.type === 'image' || msg.type === 'document')) {
     try {
-      // Verificar se há pagamento pendente nesta conversa
-      const { data: pendingPayments } = await db.from('payments')
-        .select('id, amount, description, method')
-        .eq('conversation_id', conv.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(1)
+      // 1) Baixar a mídia do WhatsApp
+      const metaResp = await fetch(`https://graph.facebook.com/v25.0/${mediaId}`, {
+        headers: { Authorization: `Bearer ${tkn}` }
+      })
+      const mediaData = await metaResp.json()
 
-      // Mesmo sem pagamento pendente, se a conversa veio de um nó de pagamento, registrar
-      const hasPending = pendingPayments?.length > 0
+      if (mediaData?.url) {
+        const fileResp = await fetch(mediaData.url, { headers: { Authorization: `Bearer ${tkn}` } })
+        const buffer = Buffer.from(await fileResp.arrayBuffer())
+        const mimeType = mediaData.mime_type || (msg.type === 'image' ? 'image/jpeg' : 'application/pdf')
+        const ext = mimeType.includes('pdf') ? '.pdf' : mimeType.includes('png') ? '.png' : '.jpg'
+        const fileName = `receipts/${tenantId}/${Date.now()}-${mediaId}${ext}`
 
-      if (hasPending) {
-        // Baixar a mídia do WhatsApp
-        const metaResp = await fetch(`https://graph.facebook.com/v25.0/${mediaId}`, {
-          headers: { Authorization: `Bearer ${tkn}` }
-        })
-        const mediaData = await metaResp.json()
+        // Upload para Storage
+        const { error: upErr } = await db.storage.from('payment-receipts').upload(fileName, buffer, { contentType: mimeType })
+        let fileUrl = null
+        if (!upErr) {
+          const { data: urlData } = db.storage.from('payment-receipts').getPublicUrl(fileName)
+          fileUrl = urlData.publicUrl
+        }
 
-        if (mediaData?.url) {
-          // Baixar o arquivo
-          const fileResp = await fetch(mediaData.url, {
-            headers: { Authorization: `Bearer ${tkn}` }
-          })
-          const buffer = Buffer.from(await fileResp.arrayBuffer())
-          const mimeType = mediaData.mime_type || (msg.type === 'image' ? 'image/jpeg' : 'application/pdf')
-          const ext = mimeType.includes('pdf') ? '.pdf' : mimeType.includes('png') ? '.png' : '.jpg'
-          const fileName = `receipts/${tenantId}/${Date.now()}-${mediaId}${ext}`
+        // 2) Verificar se há pagamento pendente nesta conversa
+        const { data: pendingPayments } = await db.from('payments')
+          .select('id, amount, description, method')
+          .eq('conversation_id', conv.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(1)
 
-          // Upload para o Supabase Storage
-          const { data: upData, error: upErr } = await db.storage
-            .from('payment-receipts')
-            .upload(fileName, buffer, { contentType: mimeType })
+        const hasPending = pendingPayments?.length > 0
 
-          let fileUrl = null
-          if (!upErr) {
-            const { data: urlData } = db.storage.from('payment-receipts').getPublicUrl(fileName)
-            fileUrl = urlData.publicUrl
-          }
-
-          // Criar registro de comprovante
+        if (hasPending) {
+          // ── CASO A: pagamento pendente → vincula e confirma ──
           const payment = pendingPayments[0]
           await db.from('payment_receipts').insert({
-            payment_id: payment.id,
-            tenant_id: tenantId,
-            conversation_id: conv.id,
-            contact_id: contact.id,
+            payment_id: payment.id, tenant_id: tenantId, conversation_id: conv.id, contact_id: contact.id,
             file_url: fileUrl || `__media__:${msg.type}:${mediaId}__`,
             file_type: msg.type === 'image' ? 'image' : 'pdf',
             file_name: mediaFilename || `comprovante-${Date.now()}`,
@@ -282,37 +271,78 @@ async function processWebhook(body) {
             notes: `Comprovante automático — R$ ${parseFloat(payment.amount).toFixed(2)} (${payment.method})`,
             metadata: { media_id: mediaId, auto: true, payment_amount: payment.amount },
           })
-
-          // Marcar pagamento como pago (comprovação automática)
+          // Marcar como pago
           await db.from('payments').update({
-            status: 'paid',
-            paid_at: new Date().toISOString(),
+            status: 'paid', paid_at: new Date().toISOString(),
             metadata: { receipt_auto: true, media_id: mediaId, manual_confirmation: false }
           }).eq('id', payment.id)
-
-          // Notificar o cliente
+          // Avisar cliente
           await sendText(phoneNumberId, tkn, from, `✅ *Comprovante recebido!*
 
 Pagamento de R$ ${parseFloat(payment.amount).toFixed(2)} confirmado.
 
 Obrigado! 🎉`)
-
           await savelog(db, 'receipt_auto', null, { payment_id: payment.id, media_id: mediaId })
-
-          // Push notification pro atendente
+          // Push
           try {
             const pushPayload = {
               title: '📄 Comprovante recebido',
               body: `${contact.name || contact.phone} enviou comprovante de R$ ${parseFloat(payment.amount).toFixed(2)}`,
-              url: '/painel?tab=receipts',
-              tag: `ark-receipt-${payment.id}`,
+              url: '/painel?tab=receipts', tag: `ark-receipt-${payment.id}`,
+            }
+            await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
+          } catch (_) {}
+          await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+          return res.status(200).json({ ok: true, receipt: true })
+
+        } else {
+          // ── CASO B: sem pagamento pendente → registra avulso ──
+          // Tenta extrair valor do caption/legenda
+          let captionVal = null
+          if (mediaCaption) {
+            const match = mediaCaption.match(/r\$\s*([0-9]+[.,]?[0-9]*)/i)
+            if (match) captionVal = parseFloat(match[1].replace(',', '.'))
+          }
+
+          // Cria pagamento avulso (status: paid, sem cobrança prévia)
+          const { data: avulsoPay } = await db.from('payments').insert({
+            tenant_id: tenantId, bot_id: bot.id, conversation_id: conv.id, contact_id: contact.id,
+            amount: captionVal || 0, description: mediaCaption || 'Pagamento avulso (comprovante)',
+            status: 'paid', method: 'pix', payment_ref: `AVULSO-${Date.now().toString(36).toUpperCase()}`,
+            paid_at: new Date().toISOString(),
+            metadata: { avulso: true, receipt_auto: true },
+          }).select().single()
+
+          await db.from('payment_receipts').insert({
+            payment_id: avulsoPay?.id || null, tenant_id: tenantId, conversation_id: conv.id, contact_id: contact.id,
+            file_url: fileUrl || `__media__:${msg.type}:${mediaId}__`,
+            file_type: msg.type === 'image' ? 'image' : 'pdf',
+            file_name: mediaFilename || `comprovante-${Date.now()}`,
+            uploaded_by: contact.phone || 'customer',
+            notes: captionVal ? `Comprovante avulso — R$ ${captionVal.toFixed(2)}` : 'Comprovante avulso (valor não identificado)',
+            metadata: { media_id: mediaId, auto: true, avulso: true, caption: mediaCaption },
+          })
+
+          await sendText(phoneNumberId, tkn, from, `✅ *Comprovante recebido!*
+
+${captionVal ? `Valor identificado: R$ ${captionVal.toFixed(2)}\n` : ''}Seu comprovante foi registrado com sucesso.
+
+Obrigado! 🎉`)
+
+          await savelog(db, 'receipt_auto_avulso', null, { media_id: mediaId, amount: captionVal })
+
+          // Push
+          try {
+            const pushPayload = {
+              title: '📄 Comprovante recebido (avulso)',
+              body: `${contact.name || contact.phone} enviou um comprovante${captionVal ? ` de R$ ${captionVal.toFixed(2)}` : ''}`,
+              url: '/painel?tab=receipts', tag: `ark-receipt-avulso-${Date.now()}`,
             }
             await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
           } catch (_) {}
 
-          // Não processar fluxo — comprovante já tratado
           await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
-          return res.status(200).json({ ok: true, receipt: true })
+          return res.status(200).json({ ok: true, receipt: true, avulso: true })
         }
       }
     } catch (e) {

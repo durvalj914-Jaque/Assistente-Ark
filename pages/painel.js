@@ -706,9 +706,14 @@ export default function PainelAdminPage() {
                     </div>
                     <button onClick={() => deleteReceipt(r.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16 }}>×</button>
                   </div>
-                  {r.payments && (
+                  {r.payments && parseFloat(r.payments.amount) > 0 && (
                     <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
                       R$ {parseFloat(r.payments.amount).toFixed(2)} — {r.payments.description || 'Pagamento'}
+                    </div>
+                  )}
+                  {r.payments && parseFloat(r.payments.amount) === 0 && r.metadata?.avulso && (
+                    <div style={{ color: '#a78bfa', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                      {r.notes || 'Comprovante avulso'}
                     </div>
                   )}
                   {r.file_type === 'pdf' ? (
