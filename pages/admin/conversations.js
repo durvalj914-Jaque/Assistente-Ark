@@ -109,6 +109,11 @@ export default function ConversationsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [togglingNoBot, setTogglingNoBot] = useState(false)
+  const [showPayModal, setShowPayModal] = useState(false)
+  const [payAmount, setPayAmount] = useState('')
+  const [payDesc, setPayDesc] = useState('')
+  const [payMethod, setPayMethod] = useState('pix')
+  const [sendingPayment, setSendingPayment] = useState(false)
   const endRef = useRef(null)
   const listEndRef = useRef(null)
 
@@ -213,6 +218,26 @@ export default function ConversationsPage() {
     } catch (e) {
       alert('Erro ao deletar: ' + e.message)
     } finally { setDeleting(false) }
+  }
+
+  async function sendPayment() {
+    if (!selected || !payAmount || sendingPayment) return
+    setSendingPayment(true)
+    try {
+      const headers = await authHeaders()
+      const res = await fetch('/api/payments/create', {
+        method: 'POST', headers,
+        body: JSON.stringify({ conversation_id: selected.id, amount: parseFloat(payAmount), description: payDesc, method: payMethod })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Falha ao criar pagamento')
+      setShowPayModal(false)
+      setPayAmount('')
+      setPayDesc('')
+      // Recarregar mensagens (o endpoint já insere a mensagem no chat)
+      selectConversation(selected)
+    } catch (e) { alert(e.message) }
+    finally { setSendingPayment(false) }
   }
 
   async function toggleNoBot() {
@@ -549,6 +574,18 @@ export default function ConversationsPage() {
                       </span>
                     </button>
                   )}
+                  {/* Botão de pagamento */}
+                  <button onClick={() => setShowPayModal(o => !o)} title="Enviar cobrança"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
+                      border: '1px solid transparent', background: 'transparent',
+                      fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                      transition: 'all .15s',
+                    }}>
+                    💰 Cobrar
+                  </button>
+
                   {/* Checkbox "Sem bot" */}
                   <label
                     title="Quando marcado, o bot não responde automaticamente a este contato"

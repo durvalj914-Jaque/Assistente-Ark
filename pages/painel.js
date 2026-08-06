@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/router'
 import AdminLayout from '../components/Layout/AdminLayout'
 import { useTenant } from '../hooks/useTenant'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAdmin } from '../lib/supabase'
 import Head from 'next/head'
 import NewClientModal from '../components/PlatformAdmin/NewClientModal'
 import ClientCard from '../components/PlatformAdmin/ClientCard'
@@ -201,6 +201,7 @@ export default function PainelAdminPage() {
     { key: 'clients',   icon: '\uD83C\uDFE2', label: 'Clientes' },
     { key: 'bots',      icon: '\uD83E\uDD16', label: 'Bots' },
     { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
+    { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'activity',  icon: '\uD83D\uDCE0', label: 'Atividade' },
     { key: 'logs',      icon: '\uD83D\uDCCB', label: 'Logs do Servidor' },
   ]
@@ -580,6 +581,93 @@ export default function PainelAdminPage() {
           )}
         </div>
       )}
+      {/* ── ABA PAGAMENTOS ── */}
+      {tab === 'payments' && (
+        <div>
+          <div className="ark-card" style={{ padding: 20, marginBottom: 20 }}>
+            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 16 }}>💰 Configuração de Pagamentos</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+              <div>
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Chave PIX</label>
+                <input value={payConfig.pix_key} onChange={e => setPayConfig(c => ({ ...c, pix_key: e.target.value }))} placeholder="ex: arkieltech@gmail.com"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+              </div>
+              <div>
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Nome do Recebedor</label>
+                <input value={payConfig.merchant_name} onChange={e => setPayConfig(c => ({ ...c, merchant_name: e.target.value }))} placeholder="ex: Arkiel Tech"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+              </div>
+              <div>
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Cidade</label>
+                <input value={payConfig.merchant_city} onChange={e => setPayConfig(c => ({ ...c, merchant_city: e.target.value }))} placeholder="ex: SAO PAULO"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+              </div>
+              <div>
+                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Token Mercado Pago (opcional)</label>
+                <input value={payConfig.mp_access_token} onChange={e => setPayConfig(c => ({ ...c, mp_access_token: e.target.value }))} placeholder="APP_USR-..." type="password"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+              </div>
+            </div>
+            <button onClick={savePayConfig} disabled={savingPayConfig}
+              style={{ marginTop: 16, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingPayConfig ? 0.5 : 1 }}>
+              {savingPayConfig ? 'Salvando...' : '💾 Salvar Configuração'}
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <StatTile label="Total Recebido" value={'R$ ' + (payments.filter(p => p.status === 'paid').reduce((s, p) => s + parseFloat(p.amount), 0)).toFixed(2)} icon="✅" />
+            <StatTile label="Pendentes" value={'R$ ' + (payments.filter(p => p.status === 'pending').reduce((s, p) => s + parseFloat(p.amount), 0)).toFixed(2)} icon="⏳" />
+            <StatTile label="Pagamentos" value={payments.length} icon="📊" />
+          </div>
+
+          <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Histórico de Pagamentos</h3>
+          {loadingPayments ? (
+            <p style={{ color: '#64748b' }}>Carregando...</p>
+          ) : payments.length === 0 ? (
+            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>💸</div>
+              Nenhum pagamento ainda. Quando você enviar um PIX ou link de pagamento pelo chat, ele aparece aqui.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {payments.map(p => (
+                <div key={p.id} className="ark-card" style={{ padding: '12px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 16 }}>{p.method === 'pix' ? '💠' : '💳'}</span>
+                      <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>R$ {parseFloat(p.amount).toFixed(2)}</span>
+                      <span style={{
+                        padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                        background: p.status === 'paid' ? 'rgba(34,197,94,0.15)' : p.status === 'pending' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: p.status === 'paid' ? '#22c55e' : p.status === 'pending' ? '#f59e0b' : '#ef4444'
+                      }}>
+                        {p.status === 'paid' ? '✅ Pago' : p.status === 'pending' ? '⏳ Pendente' : '❌ ' + p.status}
+                      </span>
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+                      {p.description || 'Pagamento'} • {new Date(p.created_at).toLocaleString('pt-BR')}
+                      {p.paid_at && ' • Pago em ' + new Date(p.paid_at).toLocaleString('pt-BR')}
+                    </div>
+                  </div>
+                  {p.pix_code && (
+                    <button onClick={() => navigator.clipboard.writeText(p.pix_code)} title="Copiar código PIX"
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#4f8ef7', fontSize: 11, cursor: 'pointer' }}>
+                      📋 Copiar PIX
+                    </button>
+                  )}
+                  {p.mp_checkout_url && (
+                    <a href={p.mp_checkout_url} target="_blank" rel="noopener"
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#4f8ef7', fontSize: 11, textDecoration: 'none' }}>
+                      🔗 Ver link
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
     </AdminLayout>
   )
 }
