@@ -246,9 +246,9 @@ export default function ConversationsPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile} hideTopBar>
-      <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div className="ark-wa-container" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
         {/* ─── PAINEL ESQUERDO: Header próprio + Lista de conversas ─── */}
-        <div style={{
+        <div className={`ark-wa-list${selected ? ' ark-wa-hidden' : ''}`} style={{
           width: 380, minWidth: 320, maxWidth: 420,
           borderRight: '1px solid var(--border-soft)',
           display: 'flex', flexDirection: 'column',
@@ -398,17 +398,27 @@ export default function ConversationsPage() {
         </div>
 
         {/* ─── PAINEL DIREITO: Conversa ─── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
+        <div className={`ark-wa-chat${!selected ? ' ark-wa-hidden' : ''}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'var(--bg-main)' }}>
           {selected ? (
             <>
               {/* Header da conversa */}
               <div style={{
-                height: 60, padding: '0 20px',
+                height: 60, padding: '0 12px',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 background: 'var(--bg-sidebar)',
                 borderBottom: '1px solid var(--border-soft)',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {/* Botão voltar — só aparece no mobile */}
+                  <button onClick={() => setSelected(null)}
+                    className="ark-wa-back"
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      display: 'none', alignItems: 'center', justifyContent: 'center',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      fontSize: 20, color: 'var(--text-secondary)',
+                    }}>←</button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%',
                     background: 'linear-gradient(135deg, rgba(79,142,247,0.15), rgba(139,92,246,0.1))',
@@ -421,6 +431,7 @@ export default function ConversationsPage() {
                     <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{selected.contacts?.name || selected.contacts?.phone}</div>
                     <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>{selected.contacts?.phone}</div>
                   </div>
+                </div>
                 </div>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   {!isClosed && (
@@ -521,7 +532,7 @@ export default function ConversationsPage() {
             </>
           ) : (
             /* Estado vazio — igual WhatsApp Web quando não tem conversa selecionada */
-            <div style={{
+            <div className="ark-wa-empty-mobile" style={{
               flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
               color: 'var(--text-faint)', gap: 12, padding: 40,
             }}>

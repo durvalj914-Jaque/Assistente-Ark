@@ -246,6 +246,54 @@ select.ark-input {
   background: rgba(245,158,11,0.22);
 }
 
+
+/* ── Mobile: conversas estilo WhatsApp smartphone ── */
+@media (max-width: 768px) {
+  /* Container principal: coluna em vez de linha */
+  .ark-wa-container { flex-direction: column !important; }
+
+  /* Painel esquerdo (lista): full width, some quando chat aberto */
+  .ark-wa-list {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: 1;
+    display: flex !important;
+    flex-direction: column;
+  }
+  .ark-wa-list.ark-wa-hidden { display: none !important; }
+
+  /* Painel direito (conversa): full width, some quando sem chat selecionado */
+  .ark-wa-chat {
+    width: 100% !important;
+    flex: 1;
+    display: flex !important;
+    flex-direction: column;
+  }
+  .ark-wa-chat.ark-wa-hidden { display: none !important; }
+
+  /* Botão voltar: visível só no mobile */
+  .ark-wa-back { display: flex !important; }
+
+  /* Estado vazio: escondido no mobile */
+  .ark-wa-empty-mobile { display: none !important; }
+
+  /* Mensagens: maxWidth maior no mobile */
+  .ark-wa-chat .ark-wa-msg-bubble { max-width: 85% !important; }
+
+  /* Composer: padding menor no mobile */
+  .ark-wa-chat > div:has(.ark-wa-composer) { padding: 8px 10px !important; }
+
+  /* Header do chat: padding menor no mobile */
+  .ark-wa-chat > div:first-child { padding: 0 10px !important; }
+
+  /* Lista de conversas: items com padding menor */
+  .ark-wa-list .ark-wa-conv-item { padding: 10px 12px !important; }
+
+}
+/* Desktop: botão voltar escondido */
+.ark-wa-back { display: none; }
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .ark-hide-mobile { display: none !important; }
