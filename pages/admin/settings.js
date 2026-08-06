@@ -8,7 +8,7 @@ import NotificationsCard from '../../components/NotificationsCard'
 
 export default function SettingsPage() {
   const router = useRouter()
-  const { user, tenant, role, profile, loading } = useTenant()
+  const { user, tenant, role, profile, bots, loading } = useTenant()
   const [form, setForm] = useState({ name: '', slug: '' })
   const [members, setMembers] = useState([])
   const [invites, setInvites] = useState([])
@@ -17,6 +17,10 @@ export default function SettingsPage() {
   const [inviting, setInviting] = useState(false)
   const [saved, setSaved] = useState(false)
   const [theme, setTheme] = useState('dark')
+  const [showDisconnect, setShowDisconnect] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [disconnectResult, setDisconnectResult] = useState(null)
+  const [disconnectConfirm, setDisconnectConfirm] = useState('')
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
 
@@ -43,6 +47,31 @@ export default function SettingsPage() {
       loadMembers()
     }
   }, [tenant])
+
+  async function handleDisconnect() {
+    if (!bots || bots.length === 0) return
+    const bot = bots[0]
+    setDisconnecting(true)
+    setDisconnectResult(null)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ bot_id: bot.id }),
+      })
+      const json = await res.json()
+      setDisconnectResult(json)
+      if (json.ok) {
+        setShowDisconnect(false)
+        setDisconnectConfirm('')
+        // Atualizar a página após 2s
+        setTimeout(() => router.reload(), 2000)
+      }
+    } catch (e) {
+      setDisconnectResult({ ok: false, error: e.message })
+    } finally { setDisconnecting(false) }
+  }
 
   async function saveTenant() {
     await supabase.from('tenants').update({ name: form.name }).eq('id', tenant.id)
@@ -209,12 +238,99 @@ export default function SettingsPage() {
         {/* Conta */}
         <div className="ark-card">
           <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>👤 Minha Conta</h3>
-          <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 6 }}>E-mail: <b style={{ color: '#e2e8f0' }}>{user.email}</b></div>
-          <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Cargo: <b style={{ color: '#e2e8f0' }}>{role}</b></div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 6 }}>E-mail: <b style={{ color: 'var(--text-primary)' }}>{user.email}</b></div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 6 }}>Cargo: <b style={{ color: 'var(--text-primary)' }}>{role}</b></div>
+          <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
+            WhatsApp: <b style={{ color: bots?.[0]?.status === 'active' ? '#10b981' : 'var(--text-muted)' }}>
+              {bots?.[0]?.status === 'active' ? '✅ Conectado' : '⛔ Desconectado'}
+            </b>
+          </div>
+
+          {/* Botão Sair */}
           <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }}
-            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, color: '#ef4444', padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, color: '#ef4444', padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 600, marginRight: 8 }}>
             Sair da conta
           </button>
+
+          {/* Botão Descadastro WhatsApp */}
+          {bots?.[0]?.status === 'active' && !showDisconnect && (
+            <button onClick={() => setShowDisconnect(true)}
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, color: '#ef4444', padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+              🗑️ Descadastrar WhatsApp
+            </button>
+          )}
+
+          {/* Modal de confirmação de descadastro */}
+          {showDisconnect && (
+            <div style={{
+              marginTop: 16, padding: 20, borderRadius: 12,
+              background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+            }}>
+              <h4 style={{ color: '#ef4444', fontSize: 14, fontWeight: 700, marginBottom: 10 }}>⚠️ Confirmar descadastro do WhatsApp</h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+                Ao descadastrar, seu número será <b>removido da plataforma Arkiel</b> e não receberá mais mensagens do bot.
+                As conversas existentes serão <b>encerradas</b> (não deletadas — você pode reativar depois reconectando).
+              </p>
+              <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>O que acontece:</div>
+                <ul style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.8, margin: 0, paddingLeft: 18 }}>
+                  <li>Número desvinculado da Meta (WhatsApp Business)</li>
+                  <li>Bot fica inativo</li>
+                  <li>Conversas ativas são encerradas</li>
+                  <li>Seus dados de conta permanecem intactos</li>
+                </ul>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 8 }}>
+                Para confirmar, digite <b style={{ color: 'var(--text-primary)' }}>DESCADASTRAR</b> abaixo:
+              </p>
+              <input
+                value={disconnectConfirm}
+                onChange={e => setDisconnectConfirm(e.target.value)}
+                placeholder="DESCADASTRAR"
+                className="ark-input"
+                style={{ marginBottom: 12, borderColor: disconnectConfirm === 'DESCADASTRAR' ? '#ef4444' : 'var(--border-soft)' }}
+              />
+              {disconnectResult && (
+                <div style={{
+                  marginBottom: 12, padding: 10, borderRadius: 8, fontSize: 12,
+                  background: disconnectResult.ok ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+                  color: disconnectResult.ok ? '#10b981' : '#ef4444',
+                }}>
+                  {disconnectResult.ok ? '✅ ' + disconnectResult.message : '❌ ' + (disconnectResult.error || 'Erro ao descadastrar')}
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={handleDisconnect}
+                  disabled={disconnecting || disconnectConfirm !== 'DESCADASTRAR'}
+                  style={{
+                    background: disconnectConfirm === 'DESCADASTRAR' ? '#ef4444' : 'rgba(239,68,68,0.3)',
+                    border: 'none', borderRadius: 8, color: '#fff',
+                    padding: '8px 16px', cursor: (disconnecting || disconnectConfirm !== 'DESCADASTRAR') ? 'not-allowed' : 'pointer',
+                    fontSize: 12, fontWeight: 600, opacity: (disconnecting || disconnectConfirm !== 'DESCADASTRAR') ? 0.5 : 1,
+                  }}>
+                  {disconnecting ? 'Descadastrando…' : 'Confirmar descadastro'}
+                </button>
+                <button onClick={() => { setShowDisconnect(false); setDisconnectConfirm(''); setDisconnectResult(null) }}
+                  style={{
+                    background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', borderRadius: 8,
+                    color: 'var(--text-secondary)', padding: '8px 16px', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                  }}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Mensagem quando WhatsApp já está desconectado */}
+          {bots?.[0]?.status !== 'active' && (
+            <div style={{
+              marginTop: 12, padding: 12, borderRadius: 10,
+              background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)',
+              fontSize: 12, color: 'var(--text-muted)',
+            }}>
+              📱 Seu WhatsApp está desconectado. Para reconectar, vá em <b style={{ color: 'var(--text-primary)' }}>Conectar WhatsApp</b> no menu.
+            </div>
+          )}
         </div>
       </div>
     </AdminLayout>
