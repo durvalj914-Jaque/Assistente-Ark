@@ -22,6 +22,9 @@ export default function ContactsPage() {
   const [googleConnected, setGoogleConnected] = useState(false)
   const [showSyncMenu, setShowSyncMenu] = useState(false)
   const fileInputRef = useRef(null)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [savingName, setSavingName] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
 
@@ -180,6 +183,24 @@ export default function ContactsPage() {
     } catch (e) {
       setSyncMsg('❌ Erro: ' + e.message)
     } finally { setSyncing(null) }
+  }
+
+  async function saveName() {
+    if (!selected || !nameDraft.trim()) return
+    setSavingName(true)
+    const newName = nameDraft.trim()
+    // Salvar no campo correto (name ou full_name dependendo da origem)
+    const field = selected.full_name !== undefined ? 'full_name' : 'name'
+    await supabase.from('contacts').update({ [field]: newName }).eq('id', selected.id)
+    setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, [field]: newName } : c))
+    setSelected(c => ({ ...c, [field]: newName }))
+    setEditingName(false)
+    setSavingName(false)
+  }
+
+  function startEditName() {
+    setNameDraft(selected.name || selected.full_name || '')
+    setEditingName(true)
   }
 
   async function toggleOptIn(contact) {
@@ -375,7 +396,38 @@ export default function ContactsPage() {
                     {(selected.name || selected.full_name || selected.phone || '?')[0].toUpperCase()}
                   </div>
                 )}
-                <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>{selected.name || selected.full_name || 'Sem nome'}</div>
+                {editingName ? (
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 4 }}>
+                    <input
+                      autoFocus
+                      value={nameDraft}
+                      onChange={e => setNameDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditingName(false) }}
+                      placeholder="Nome do contato"
+                      className="ark-input"
+                      style={{ fontSize: 14, padding: '6px 10px', width: 180, textAlign: 'center' }}
+                    />
+                    <button onClick={saveName} disabled={savingName || !nameDraft.trim()}
+                      style={{ background: '#4f8ef7', border: 'none', borderRadius: 8, color: '#fff', padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+                      {savingName ? '…' : '✓ Salvar'}
+                    </button>
+                    <button onClick={() => setEditingName(false)}
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', borderRadius: 8, color: 'var(--text-muted)', padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}>
+                      ✕
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 0 }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
+                      {selected.name || selected.full_name || 'Sem nome'}
+                    </span>
+                    <button onClick={startEditName}
+                      title="Editar nome"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px', fontSize: 14, color: 'var(--text-muted)', opacity: 0.6, display: 'flex', alignItems: 'center' }}>
+                      ✏️
+                    </button>
+                  </div>
+                )}
                 {selected.organization && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{selected.organization}{selected.job_title ? ' · ' + selected.job_title : ''}</div>}
               </div>
               {[
