@@ -30,6 +30,9 @@ export default function PainelAdminPage() {
 
   const [allBots, setAllBots] = useState([])
   const [editingBot, setEditingBot] = useState(null)
+  const [deregisterTarget, setDeregisterTarget] = useState(null)
+  const [deregistering, setDeregistering] = useState(false)
+  const [deregisterMsg, setDeregisterMsg] = useState('')
   const [contacts, setContacts] = useState([])
   const [contactSearch, setContactSearch] = useState('')
   const [selectedTenantContacts, setSelectedTenantContacts] = useState('')
@@ -126,6 +129,31 @@ export default function PainelAdminPage() {
       setContactsMsg('❌ ' + e.message)
     }
     setSyncingContacts(false)
+  }
+
+  async function handleDeregister(bot) {
+    setDeregistering(true)
+    setDeregisterMsg('')
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/deregister-bot', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bot_id: bot.id })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setDeregisterMsg('✅ ' + (data.message || 'Descadastro concluído'))
+        setDeregisterTarget(null)
+        loadAll()
+      } else {
+        setDeregisterMsg('❌ ' + (data.error || 'Erro no descadastro'))
+      }
+    } catch (e) {
+      setDeregisterMsg('❌ ' + e.message)
+    }
+    setDeregistering(false)
+    setTimeout(() => setDeregisterMsg(''), 5000)
   }
 
   function connectGoogle() {
@@ -310,11 +338,67 @@ export default function PainelAdminPage() {
                     >
                       ⚡ Editar fluxo
                     </button>
+                    <button
+                      onClick={() => { setDeregisterTarget(bot); setDeregisterMsg('') }}
+                      className="ark-btn-ghost"
+                      style={{ fontSize: 12, padding: '8px 14px', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+                    >
+                      🗑️ Descadastrar
+                    </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {deregisterTarget && (
+        <div onClick={() => !deregistering && setDeregisterTarget(null)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: '#12121f', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12,
+            padding: 24, maxWidth: 440, width: '100%'
+          }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>⚠️ Confirmar descadastro</h3>
+            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>
+              Isso vai remover <strong style={{ color: '#fff' }}>{deregisterTarget.name}</strong> completamente:
+            </p>
+            <ul style={{ color: '#64748b', fontSize: 13, margin: '0 0 16px', paddingLeft: 20 }}>
+              <li>Desvincula o número da WhatsApp Cloud API (Meta)</li>
+              <li>Deleta o bot, conversas e mensagens</li>
+              <li>Remove o cliente (tenant) e dados sincronizados</li>
+              <li>O número fica livre pra usar no WhatsApp normal</li>
+            </ul>
+            <p style={{ color: '#f59e0b', fontSize: 12, marginBottom: 16 }}>
+              ⚠️ Esta ação é irreversível.
+            </p>
+            {deregisterMsg && (
+              <p style={{ fontSize: 13, marginBottom: 12, color: deregisterMsg.startsWith('✅') ? '#22c55e' : '#ef4444' }}>
+                {deregisterMsg}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setDeregisterTarget(null)}
+                disabled={deregistering}
+                className="ark-btn-ghost"
+                style={{ fontSize: 13, padding: '10px 18px', flex: 1 }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleDeregister(deregisterTarget)}
+                disabled={deregistering}
+                className="ark-btn"
+                style={{ fontSize: 13, padding: '10px 18px', flex: 1, background: '#dc2626' }}
+              >
+                {deregistering ? '⏳ Descadastrando...' : '🗑️ Confirmar descadastro'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
