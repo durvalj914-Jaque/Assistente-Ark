@@ -115,6 +115,34 @@ async function processWebhook(body) {
   const tenantId = bot.tenant_id
   const tkn      = bot.access_token || WA_TOKEN
 
+  // ── AUTO-VERIFICAÇÃO: o remetente é um bot do Arkiel? ──
+  // Se o número de origem é um phone_number_id cadastrado como bot ativo,
+  // não responde (evita loop de bot falando com bot)
+  const { data: senderBots } = await db
+    .from('bots')
+    .select('id, name')
+    .eq('status', 'active')
+    .eq('phone_number_id', from)
+    .limit(1)
+
+  if (senderBots?.length) {
+    await savelog(db, 'bot_vs_bot_blocked', null, { sender: from, bot: senderBots[0].name })
+    return // Não responde — é outro bot
+  }
+
+  // Verificar também pelo phone_number cadastrado nos bots (campo separado)
+  const { data: senderBotsByPhone } = await db
+    .from('bots')
+    .select('id, name')
+    .eq('status', 'active')
+    .eq('phone_number', from)
+    .limit(1)
+
+  if (senderBotsByPhone?.length) {
+    await savelog(db, 'bot_vs_bot_blocked', null, { sender: from, bot: senderBotsByPhone[0].name })
+    return
+  }
+
   // Incrementar uso
   try {
     await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) })
@@ -196,8 +224,40 @@ async function processWebhook(body) {
     content: displayContent, meta_message_id: wamId
   })
 
-  // Human mode
-  if (conv.status === 'human') { await savelog(db, 'human_mode'); return }
+  // ── DETECÇÃO DE LOOP: mais de 10 mensagens trocadas em 30 segundos = bot ──
+  const thirtySecondsAgo = new Date(Date.now() - 30 * 1000).toISOString()
+  const { count: recentCount } = await db
+    .from('messages')
+    .select('*', { count: 'exact', head: true })
+    .eq('conversation_id', conv.id)
+    .gte('created_at', thirtySecondsAgo)
+
+  if (recentCount && recentCount >= 10) {
+    // Pausar o bot e notificar o humano
+    await db.from('conversations').update({ status: 'no_bot' }).eq('id', conv.id)
+    await savelog(db, 'loop_detected', null, { count: recentCount, conversation_id: conv.id })
+    try {
+      const loopReply = '⏸️ Detectei muitas mensagens em pouco tempo. Vou pausar as respostas automáticas para evitar loops. Um atendente humano vai responder em breve.'
+      await sendText(phoneNumberId, tkn, from, loopReply)
+      await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: loopReply, sent_by: 'bot' })
+      const pushPayload = {
+        title: '⏸️ Loop detectado — bot pausado',
+        body: `Possível bot conversando com ${contact.name || contact.phone}. Bot pausado automaticamente.`,
+        url: '/admin/conversations',
+        tag: `ark-loop-${conv.id}`,
+      }
+      await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
+    } catch (_) {}
+    return
+  }
+
+  // Human mode ou Sem bot (checkbox do painel)
+  if (conv.status === 'human' || conv.status === 'no_bot') {
+    // Ainda salva a mensagem (já salvou acima), mas não responde com bot
+    await db.from('conversations').update({ last_message: userText || '[mídia]', last_message_at: new Date().toISOString() }).eq('id', conv.id)
+    await savelog(db, conv.status === 'human' ? 'human_mode' : 'no_bot_mode')
+    return
+  }
 
   // Human takeover keyword (atalho direto, sem depender do fluxo)
   if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {

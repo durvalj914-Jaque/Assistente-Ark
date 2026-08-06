@@ -104,6 +104,7 @@ export default function ConversationsPage() {
   const [chatMenuOpen, setChatMenuOpen] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [togglingNoBot, setTogglingNoBot] = useState(false)
   const endRef = useRef(null)
   const listEndRef = useRef(null)
 
@@ -161,6 +162,25 @@ export default function ConversationsPage() {
     } catch (e) {
       alert('Erro ao deletar: ' + e.message)
     } finally { setDeleting(false) }
+  }
+
+  async function toggleNoBot() {
+    if (!selected || togglingNoBot) return
+    setTogglingNoBot(true)
+    const newNoBot = selected.status !== 'no_bot'
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/conversations/toggle-bot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ conversation_id: selected.id, no_bot: newNoBot }),
+      })
+      const newStatus = newNoBot ? 'no_bot' : 'bot'
+      setSelected(c => ({ ...c, status: newStatus }))
+      setConversations(prev => prev.map(c => c.id === selected.id ? { ...c, status: newStatus } : c))
+    } catch (e) {
+      console.error('Erro:', e)
+    } finally { setTogglingNoBot(false) }
   }
 
   async function selectConversation(conv) {
@@ -226,7 +246,7 @@ export default function ConversationsPage() {
       const headers = await authHeaders()
       const res = await fetch('/api/send-message', { method: 'POST', headers, body: JSON.stringify({ conversation_id: selected.id, text }) })
       if (!res.ok) throw new Error('Falha ao enviar')
-      if (selected.status !== 'human') { setSelected(p => ({ ...p, status: 'human' })); loadConversations() }
+      if (selected.status === 'bot') { setSelected(p => ({ ...p, status: 'human' })); loadConversations() }
     } catch (e) {
       alert(e.message); setMessages(m => m.filter(msg => msg.id !== optimistic.id)); setDraft(text)
     } finally { setSending(false) }
@@ -253,7 +273,7 @@ export default function ConversationsPage() {
       const optimistic = { id: `tmp-${Date.now()}`, conversation_id: selected.id, direction: 'outbound', type: mType, content: `__media__:${mType}:${json.media_id}__ ${icon} ${draft.trim() || file.name}`, sent_by: 'human', created_at: new Date().toISOString() }
       setMessages(m => [...m, optimistic])
       setDraft('')
-      if (selected.status !== 'human') { setSelected(p => ({ ...p, status: 'human' })); loadConversations() }
+      if (selected.status === 'bot') { setSelected(p => ({ ...p, status: 'human' })); loadConversations() }
     } catch (e) { alert(e.message) } finally {
       if (previewUrl) URL.revokeObjectURL(previewUrl)
       setMediaUploading(false); setMediaPreview(null)
@@ -477,6 +497,30 @@ export default function ConversationsPage() {
                       </span>
                     </button>
                   )}
+                  {/* Checkbox "Sem bot" */}
+                  <label
+                    title="Quando marcado, o bot não responde automaticamente a este contato"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
+                      background: selected.status === 'no_bot' ? 'rgba(107,114,128,0.15)' : 'transparent',
+                      border: `1px solid ${selected.status === 'no_bot' ? 'rgba(107,114,128,0.3)' : 'transparent'}`,
+                      fontSize: 11, fontWeight: 600,
+                      color: selected.status === 'no_bot' ? '#6b7280' : 'var(--text-muted)',
+                      transition: 'all .15s',
+                      opacity: togglingNoBot ? 0.5 : 1,
+                      userSelect: 'none',
+                    }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.status === 'no_bot'}
+                      onChange={toggleNoBot}
+                      disabled={togglingNoBot}
+                      style={{ width: 14, height: 14, cursor: 'pointer', accentColor: '#6b7280' }}
+                    />
+                    🔇 Sem bot
+                  </label>
+
                   {/* Menu de ações da conversa (⋮) — igual WhatsApp */}
                   <div style={{ position: 'relative' }}>
                     <button onClick={() => setChatMenuOpen(o => !o)}
@@ -563,6 +607,33 @@ export default function ConversationsPage() {
                   <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 12, padding: '8px 0' }}>
                     Conversa encerrada. Altere o status para reabrir.
                   </div>
+                ) : selected.status === 'no_bot' ? (
+                  <>
+                    <div style={{ textAlign: 'center', color: '#6b7280', fontSize: 11, marginBottom: 6, padding: '4px 0' }}>
+                      🔇 Bot pausado — você está no controle manual
+                    </div>
+                    {mediaPreview && (
+                      <div style={{ marginBottom: 8, padding: '8px 12px', background: 'var(--blue-tint)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {mediaPreview.url ? <img src={mediaPreview.url} alt="preview" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : <span style={{ fontSize: 20 }}>{mediaPreview.type?.startsWith('video/') ? '🎬' : mediaPreview.type?.startsWith('audio/') ? '🎵' : '📎'}</span>}
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mediaPreview.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{mediaUploading ? 'Enviando…' : `${(mediaPreview.size / 1024 / 1024).toFixed(1)}MB`}</div>
+                        </div>
+                        <span style={{ fontSize: 11, color: '#4f8ef7' }}>⏳</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" onChange={handleSendMedia} style={{ display: 'none' }} />
+                      <button onClick={() => fileInputRef.current?.click()} disabled={mediaUploading} title="Enviar arquivo"
+                        style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-dim)', cursor: mediaUploading ? 'wait' : 'pointer', fontSize: 18, minWidth: 42, minHeight: 42 }}>📎</button>
+                      <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={handleKeyDown} placeholder="Digite uma mensagem..." rows={1}
+                        style={{ flex: 1, resize: 'none', background: 'var(--bg-input)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: '10px 12px', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit', maxHeight: 120, outline: 'none' }} />
+                      <button onClick={handleSend} disabled={sending || !draft.trim()}
+                        style={{ padding: '10px 18px', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: 13, background: '#4f8ef7', color: '#fff', cursor: (sending || !draft.trim()) ? 'not-allowed' : 'pointer', opacity: (sending || !draft.trim()) ? 0.5 : 1 }}>
+                        {sending ? '...' : 'Enviar'}
+                      </button>
+                    </div>
+                  </>
                 ) : (
                   <>
                     {!isHuman && <div style={{ color: '#8b5cf6', fontSize: 11, marginBottom: 8 }}>🤖 O bot está atendendo. Envie uma mensagem para assumir.</div>}
