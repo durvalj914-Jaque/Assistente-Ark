@@ -41,6 +41,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
     { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰' },
     { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
     { href: '/admin/api', label: 'API', icon: '🔌' },
   ]
