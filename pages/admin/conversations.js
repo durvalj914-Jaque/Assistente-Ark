@@ -370,7 +370,7 @@ export default function ConversationsPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile} hideTopBar>
-      <div className="ark-wa-container" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+      <div className="ark-wa-container" style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
         {/* ─── PAINEL ESQUERDO: Header próprio + Lista de conversas ─── */}
         <div className={`ark-wa-list${selected ? ' ark-wa-hidden' : ''}`} style={{
           width: 380, minWidth: 320, maxWidth: 420,

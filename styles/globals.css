@@ -284,8 +284,25 @@ select.ark-input {
   /* Composer: padding menor no mobile */
   .ark-wa-chat > div:has(.ark-wa-composer) { padding: 8px 10px !important; }
 
-  /* Header do chat: padding menor no mobile */
-  .ark-wa-chat > div:first-child { padding: 0 10px !important; }
+  /* Header do chat: padding menor no mobile + safe-area iPhone */
+  .ark-wa-chat > div:first-child {
+    padding: 0 10px !important;
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    flex-shrink: 0 !important;
+    min-height: 56px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 10 !important;
+  }
+
+  /* Header da lista também precisa de safe-area */
+  .ark-wa-list > div:first-child {
+    padding-top: env(safe-area-inset-top, 0px) !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Container: usar dvh no mobile também */
+  .ark-wa-container { height: 100dvh !important; }
 
   /* Lista de conversas: items com padding menor */
   .ark-wa-list .ark-wa-conv-item { padding: 10px 12px !important; }
