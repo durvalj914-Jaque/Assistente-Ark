@@ -528,6 +528,7 @@ export default function ConversationsPage() {
               {/* Header da conversa */}
               <div style={{
                 height: 60, padding: '0 12px',
+                flexShrink: 0,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 background: 'var(--bg-sidebar)',
                 borderBottom: '1px solid var(--border-soft)',
@@ -655,7 +656,8 @@ export default function ConversationsPage() {
 
               {/* Mensagens */}
               <div style={{
-                flex: 1, padding: '20px 28px', overflowY: 'auto',
+                flex: 1, minHeight: 0, padding: '20px 28px', overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
                 display: 'flex', flexDirection: 'column', gap: 8,
                 backgroundImage: 'var(--bg-main)',
               }}>
@@ -691,7 +693,7 @@ export default function ConversationsPage() {
               </div>
 
               {/* Composer */}
-              <div style={{ padding: '10px 20px', background: 'var(--bg-sidebar)', borderTop: '1px solid var(--border-soft)' }}>
+              <div style={{ padding: '10px 20px', flexShrink: 0, background: 'var(--bg-sidebar)', borderTop: '1px solid var(--border-soft)' }}>
                 {isClosed ? (
                   <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 12, padding: '8px 0' }}>
                     Conversa encerrada. Altere o status para reabrir.

@@ -304,6 +304,16 @@ select.ark-input {
   /* Container: usar dvh no mobile também */
   .ark-wa-container { height: 100dvh !important; }
 
+  /* Área de mensagens: scroll fluido no mobile */
+  .ark-wa-chat > div:nth-child(2) {
+    -webkit-overflow-scrolling: touch !important;
+    overscroll-behavior: contain !important;
+    padding: '16px 14px' !important;
+  }
+
+  /* Composer: não encolher no mobile */
+  .ark-wa-chat > div:last-child { flex-shrink: 0 !important; }
+
   /* Lista de conversas: items com padding menor */
   .ark-wa-list .ark-wa-conv-item { padding: 10px 12px !important; }
 
