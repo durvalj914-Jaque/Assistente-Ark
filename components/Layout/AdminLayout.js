@@ -12,6 +12,7 @@ import { PLANS } from '../../lib/plans'
 export default function AdminLayout({ children, tenant, user, role, profile, hideTopBar }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [finOpen, setFinOpen] = useState(false)
   const menuRef = useRef(null)
 
   async function handleLogout() {
@@ -41,7 +42,11 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
     { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
-    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰' },
+    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', expandable: true, children: [
+      { href: '/admin/financeiro?tab=payment_methods', label: 'Formas de Pagamentos', icon: '💳' },
+      { href: '/admin/financeiro?tab=billing_methods', label: 'Formas de Cobranças', icon: '📥' },
+      { href: '/admin/financeiro?tab=receipts', label: 'Comprovantes', icon: '📄' },
+    ]},
     { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
     { href: '/admin/api', label: 'API', icon: '🔌' },
   ]
@@ -55,7 +60,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
   )
 
   if (hideTopBar) {
-    return <div className="ark-layout-main" style={{ minHeight: '100vh', background: 'var(--bg-main)' }}>{children}</div>
+    return <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}>{children}</div>
   }
 
   return (
@@ -146,6 +151,43 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
 
                 {/* Items de navegação */}
                 {MENU_ITEMS.map(item => {
+                  if (item.expandable) {
+                    const isFinActive = router.pathname === '/admin/financeiro'
+                    return (
+                      <div key={item.href}>
+                        <button onClick={() => setFinOpen(o => !o)}
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            width: '100%', padding: '9px 12px', borderRadius: 8, border: 'none',
+                            background: isFinActive ? 'var(--blue-tint)' : 'transparent',
+                            cursor: 'pointer', fontSize: 13,
+                            color: isFinActive ? '#4f8ef7' : 'var(--text-secondary)',
+                            fontWeight: isFinActive ? 600 : 400,
+                            transition: 'background 0.1s',
+                          }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 16 }}>{item.icon}</span>
+                            <span>{item.label}</span>
+                          </span>
+                          <span style={{ fontSize: 11, transition: 'transform 0.2s', transform: finOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+                        </button>
+                        {finOpen && item.children.map(child => (
+                          <Link key={child.href} href={child.href}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10,
+                              padding: '7px 12px 7px 36px', borderRadius: 8, textDecoration: 'none',
+                              color: router.asPath === child.href ? '#4f8ef7' : 'var(--text-muted)',
+                              background: router.asPath === child.href ? 'var(--blue-tint)' : 'transparent',
+                              fontSize: 12, fontWeight: router.asPath === child.href ? 600 : 400,
+                              transition: 'background 0.1s',
+                            }}>
+                            <span style={{ fontSize: 14 }}>{child.icon}</span>
+                            <span>{child.label}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    )
+                  }
                   const active = router.pathname === item.href || router.pathname.startsWith(item.href + '/')
                   return (
                     <Link key={item.href} href={item.href}

@@ -405,7 +405,7 @@ export default function ConversationsPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile} hideTopBar>
-      <div className="ark-wa-container" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
+      <div className="ark-wa-container" style={{ display: 'flex', flex: 1, height: '100%', overflow: 'hidden' }}>
         {/* ─── PAINEL ESQUERDO: Header próprio + Lista de conversas ─── */}
         <div className={`ark-wa-list${selected ? ' ark-wa-hidden' : ''}`} style={{
           width: 380, minWidth: 320, maxWidth: 420,
@@ -847,6 +847,7 @@ import Link from 'next/link'
 
 function ThreeDotsMenu({ tenant, user, role, profile }) {
   const [open, setOpen] = useState(false)
+  const [finOpen, setFinOpen] = useState(false)
   const router = useRouter()
   const ref = useRef(null)
   const [_, setTheme] = useState('dark')
@@ -883,7 +884,11 @@ function ThreeDotsMenu({ tenant, user, role, profile }) {
     { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
     { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
-    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰' },
+    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', expandable: true, children: [
+      { href: '/admin/financeiro?tab=payment_methods', label: 'Formas de Pagamentos', icon: '💳' },
+      { href: '/admin/financeiro?tab=billing_methods', label: 'Formas de Cobranças', icon: '📥' },
+      { href: '/admin/financeiro?tab=receipts', label: 'Comprovantes', icon: '📄' },
+    ]},
     { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
     { href: '/admin/api', label: 'API', icon: '🔌' },
   ]
@@ -942,19 +947,57 @@ function ThreeDotsMenu({ tenant, user, role, profile }) {
           </button>
 
           {/* Items de navegação */}
-          {MENU_ITEMS.map(item => (
-            <Link key={item.href} href={item.href}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '9px 12px', borderRadius: 8, textDecoration: 'none',
-                color: router.pathname === item.href ? '#4f8ef7' : 'var(--text-secondary)',
-                background: router.pathname === item.href ? 'var(--blue-tint)' : 'transparent',
-                fontSize: 13, fontWeight: router.pathname === item.href ? 600 : 400,
-              }}>
-              <span style={{ fontSize: 16 }}>{item.icon}</span>
-              <span>{item.label}</span>
-            </Link>
-          ))}
+          {MENU_ITEMS.map(item => {
+            if (item.expandable) {
+              const isFinActive = router.pathname === '/admin/financeiro'
+              return (
+                <div key={item.href}>
+                  <button onClick={() => setFinOpen(o => !o)}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      width: '100%', padding: '9px 12px', borderRadius: 8, border: 'none',
+                      background: isFinActive ? 'var(--blue-tint)' : 'transparent',
+                      cursor: 'pointer', fontSize: 13,
+                      color: isFinActive ? '#4f8ef7' : 'var(--text-secondary)',
+                      fontWeight: isFinActive ? 600 : 400,
+                    }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 16 }}>{item.icon}</span>
+                      <span>{item.label}</span>
+                    </span>
+                    <span style={{ fontSize: 11, transition: 'transform 0.2s', transform: finOpen ? 'rotate(180deg)' : 'none' }}>▼</span>
+                  </button>
+                  {finOpen && item.children.map(child => (
+                    <Link key={child.href} href={child.href}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '7px 12px 7px 36px', borderRadius: 8, textDecoration: 'none',
+                        color: router.asPath === child.href ? '#4f8ef7' : 'var(--text-muted)',
+                        background: router.asPath === child.href ? 'var(--blue-tint)' : 'transparent',
+                        fontSize: 12, fontWeight: router.asPath === child.href ? 600 : 400,
+                      }}>
+                      <span style={{ fontSize: 14 }}>{child.icon}</span>
+                      <span>{child.label}</span>
+                    </Link>
+                  ))}
+                </div>
+              )
+            }
+            const active = router.pathname === item.href
+            return (
+              <Link key={item.href} href={item.href}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 12px', borderRadius: 8, textDecoration: 'none',
+                  color: active ? '#4f8ef7' : 'var(--text-secondary)',
+                  background: active ? 'var(--blue-tint)' : 'transparent',
+                  fontSize: 13, fontWeight: active ? 600 : 400,
+                }}>
+                <span style={{ fontSize: 16 }}>{item.icon}</span>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
 
           {/* Sair */}
           <div style={{ borderTop: '1px solid var(--border-soft)', marginTop: 4, paddingTop: 4 }}>

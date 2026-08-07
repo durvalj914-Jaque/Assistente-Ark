@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 
 export default function FinanceiroPage() {
   const { user, tenant, role, profile, loading } = useTenant()
-  const [subTab, setSubTab] = useState('payments')
+  const router = useRouter()
+  const [subTab, setSubTab] = useState(router.query.tab || 'payment_methods')
 
   // Formas de pagamento
   const [paymentMethods, setPaymentMethods] = useState([])
@@ -159,6 +161,11 @@ export default function FinanceiroPage() {
       alert('✅ Comprovante registrado!')
     } catch (e) { alert('Erro: ' + e.message) }
   }
+
+  // Sync subTab with URL query
+  useEffect(() => {
+    if (router.query.tab) setSubTab(router.query.tab)
+  }, [router.query.tab])
 
   // ── LOAD ON MOUNT ──
   useEffect(() => {

@@ -260,7 +260,7 @@ select.ark-input {
     flex: 1;
     display: flex !important;
     flex-direction: column;
-    height: 100% !important;
+    height: 100dvh !important;
     overflow: hidden !important;
   }
   .ark-wa-list.ark-wa-hidden { display: none !important; }
@@ -273,7 +273,7 @@ select.ark-input {
     flex-direction: column;
     min-height: 0 !important;
     overflow: hidden !important;
-    height: 100% !important;
+    height: 100dvh !important;
   }
   .ark-wa-chat.ark-wa-hidden { display: none !important; }
 
