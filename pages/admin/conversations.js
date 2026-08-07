@@ -119,6 +119,21 @@ export default function ConversationsPage() {
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
 
+  // Remover padding do layout container pra chat ocupar tela cheia
+  useEffect(() => {
+    const content = document.querySelector('.ark-layout-content')
+    if (content) {
+      content.style.padding = '0'
+      content.style.overflowY = 'hidden'
+    }
+    return () => {
+      if (content) {
+        content.style.padding = '24px 28px'
+        content.style.overflowY = 'auto'
+      }
+    }
+  }, [])
+
   // Carregar conversas
   async function loadConversations() {
     if (!tenant) return
@@ -390,7 +405,7 @@ export default function ConversationsPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile} hideTopBar>
-      <div className="ark-wa-container" style={{ display: 'flex', height: '100dvh', overflow: 'hidden' }}>
+      <div className="ark-wa-container" style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
         {/* ─── PAINEL ESQUERDO: Header próprio + Lista de conversas ─── */}
         <div className={`ark-wa-list${selected ? ' ark-wa-hidden' : ''}`} style={{
           width: 380, minWidth: 320, maxWidth: 420,

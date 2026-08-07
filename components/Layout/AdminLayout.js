@@ -59,13 +59,14 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
   }
 
   return (
-    <div className="ark-layout-main" style={{ minHeight: '100vh', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
+    <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif' }}>
       {/* Top bar estilo WhatsApp */}
       <header className="ark-layout-topbar" style={{
         height: 60, background: 'var(--bg-topbar)', backdropFilter: 'blur(12px)',
         borderBottom: '1px solid var(--border-soft)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 16px', position: 'sticky', top: 0, zIndex: 100,
+        padding: '0 16px', paddingTop: 'env(safe-area-inset-top, 0px)',
+        flexShrink: 0, position: 'sticky', top: 0, zIndex: 100,
       }}>
         {/* Esquerda: ícone do bot + nome */}
         <Link href="/admin/conversations" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none' }}>
@@ -182,7 +183,13 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
       </header>
 
       {/* Conteúdo da página */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+      <div className="ark-layout-content" style={{ 
+        flex: 1, 
+        overflowY: 'auto',
+        padding: '24px 28px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
         {children}
       </div>
     </div>
