@@ -146,14 +146,20 @@ export default function ConversationsPage() {
         setSelected(prev => {
           if (prev && payload.new.conversation_id === prev.id) {
             setMessages(m => {
-              // Evita duplicatas (se já existe com mesmo id ou meta_message_id)
+              // Evita duplicatas por id
               if (m.some(msg => msg.id === payload.new.id)) return m
-              return [...m, payload.new]
+              // Remove otimista (tmp-*) se content + direction + sent_by batem
+              const filtered = m.filter(msg => 
+                !(String(msg.id).startsWith('tmp-') && 
+                  msg.direction === payload.new.direction && 
+                  msg.content === payload.new.content &&
+                  msg.sent_by === payload.new.sent_by)
+              )
+              return [...filtered, payload.new]
             })
           }
           return prev
         })
-        // Atualiza lista de conversas também
         loadConversations()
       })
       .subscribe()
@@ -172,13 +178,27 @@ export default function ConversationsPage() {
 
           if (freshMsgs) {
             setMessages(prev => {
-              const existingIds = new Set(prev.map(m => m.id))
-              const newOnes = freshMsgs.filter(m => !existingIds.has(m.id))
-              if (newOnes.length > 0) {
-                return [...prev, ...newOnes]
+              // Remove optimistic msgs (tmp-*) se a msg real já chegou do banco
+              const realMsgs = freshMsgs
+              const optimisticMsgs = prev.filter(m => String(m.id).startsWith('tmp-'))
+              const realMsgsFromPrev = prev.filter(m => !String(m.id).startsWith('tmp-'))
+              
+              // Dedup: se uma otimista tem mesmo content + direction=outbound que uma real, remove
+              const optimisticToKeep = optimisticMsgs.filter(opt => 
+                !realMsgs.some(real => 
+                  real.direction === opt.direction && 
+                  real.content === opt.content &&
+                  real.sent_by === opt.sent_by
+                )
+              )
+              
+              const existingIds = new Set([...realMsgsFromPrev, ...optimisticToKeep].map(m => m.id))
+              const newOnes = realMsgs.filter(m => !existingIds.has(m.id))
+              
+              if (newOnes.length > 0 || optimisticMsgs.length !== optimisticToKeep.length) {
+                return [...realMsgsFromPrev, ...optimisticToKeep, ...newOnes]
               }
-              // Se não há novas, mas a lista está vazia ou desynced, substitui
-              if (prev.length === 0 && freshMsgs.length > 0) return freshMsgs
+              if (prev.length === 0 && realMsgs.length > 0) return realMsgs
               return prev
             })
           }

@@ -260,6 +260,8 @@ select.ark-input {
     flex: 1;
     display: flex !important;
     flex-direction: column;
+    height: 100dvh !important;
+    overflow: hidden !important;
   }
   .ark-wa-list.ark-wa-hidden { display: none !important; }
 
@@ -269,6 +271,9 @@ select.ark-input {
     flex: 1;
     display: flex !important;
     flex-direction: column;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    height: 100dvh !important;
   }
   .ark-wa-chat.ark-wa-hidden { display: none !important; }
 
@@ -308,11 +313,18 @@ select.ark-input {
   .ark-wa-chat > div:nth-child(2) {
     -webkit-overflow-scrolling: touch !important;
     overscroll-behavior: contain !important;
-    padding: '16px 14px' !important;
+    flex: 1 !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
   }
 
   /* Composer: não encolher no mobile */
   .ark-wa-chat > div:last-child { flex-shrink: 0 !important; }
+
+  /* Header: fixo no topo */
+  .ark-wa-chat > div:first-child {
+    flex-shrink: 0 !important;
+  }
 
   /* Lista de conversas: items com padding menor */
   .ark-wa-list .ark-wa-conv-item { padding: 10px 12px !important; }
