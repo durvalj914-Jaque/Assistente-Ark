@@ -1,6 +1,6 @@
 /**
  * POST /api/payments/webhook/mercadopago
- * Recebe notificações do Mercado Pago, atualiza status e cria comprovante automático.
+ * Recebe notificações do Mercado Pago, atualiza status, confirma pedidos do catálogo e cria comprovante automático.
  */
 import { supabaseAdmin } from '../../../../lib/supabase'
 
@@ -34,13 +34,14 @@ export default async function handler(req, res) {
 
         await db.from('payments').update(updateData).eq('payment_ref', txid)
 
-        // ── CRIAR COMPROVANTE AUTOMÁTICO quando pago via Mercado Pago ──
+        // ── Confirmar pagamento ──
         if (status === 'paid') {
           const { data: payment } = await db.from('payments')
-            .select('id, tenant_id, conversation_id, contact_id, amount, description, method')
+            .select('id, tenant_id, conversation_id, contact_id, bot_id, amount, description, method, metadata')
             .eq('payment_ref', txid).maybeSingle()
 
           if (payment) {
+            // Comprovante automático
             await db.from('payment_receipts').insert({
               payment_id: payment.id,
               tenant_id: payment.tenant_id,
@@ -55,27 +56,52 @@ export default async function handler(req, res) {
               category: 'b2c_client',
             })
 
-            // Notificar cliente via WhatsApp
-            if (payment.conversation_id) {
-              const { data: bot } = await db.from('bots').select('phone_number_id, access_token').eq('id', payment.bot_id || '').maybeSingle()
-              const { data: contact } = await db.from('contacts').select('phone').eq('id', payment.contact_id).maybeSingle()
-
-              if (bot?.phone_number_id && contact?.phone) {
-                const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
-                const confirmText = `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\n${payment.description || ''}\n\nObrigado pelo pagamento! 🎉`
-
-                try {
-                  await fetch(`https://graph.facebook.com/v25.0/${bot.phone_number_id}/messages`, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
-                    body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: confirmText } }),
-                  })
-                  await db.from('messages').insert({
-                    tenant_id: payment.tenant_id, conversation_id: payment.conversation_id, bot_id: payment.bot_id,
-                    contact_id: payment.contact_id, direction: 'outbound', type: 'text', content: confirmText, sent_by: 'bot'
-                  })
-                } catch (_) {}
-              }
+            // ── Atualizar pedido do catálogo se aplicável ──
+            const orderId = payment.metadata?.order_id
+            if (orderId) {
+              await db.from('whatsapp_orders').update({
+                status: 'paid', paid_at: new Date().toISOString(),
+              }).eq('id', orderId)
             }
+
+            // ── Notificar cliente via WhatsApp ──
+            const { data: bot } = await db.from('bots').select('phone_number_id, access_token').eq('id', payment.bot_id || '').maybeSingle()
+            const { data: contact } = await db.from('contacts').select('phone').eq('id', payment.contact_id || '').maybeSingle()
+
+            if (bot?.phone_number_id && contact?.phone) {
+              const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
+              const isCatalog = !!payment.metadata?.from_catalog
+              const confirmText = isCatalog
+                ? `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\nSeu pedido do catálogo foi confirmado e está sendo processado. 🎉\n\nObrigado pela compra!`
+                : `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\n${payment.description || ''}\n\nObrigado pelo pagamento! 🎉`
+
+              try {
+                await fetch(`https://graph.facebook.com/v25.0/${bot.phone_number_id}/messages`, {
+                  method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
+                  body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: confirmText } }),
+                })
+                await db.from('messages').insert({
+                  tenant_id: payment.tenant_id, conversation_id: payment.conversation_id, bot_id: payment.bot_id,
+                  contact_id: payment.contact_id, direction: 'outbound', type: 'text', content: confirmText, sent_by: 'bot'
+                })
+              } catch (_) {}
+            }
+
+            // ── Push notification pro admin ──
+            try {
+              const { sendPushToTenant } = await import('../../../../lib/webpush')
+              const { sendFcmToTenant } = await import('../../../../lib/fcm')
+              const pushPayload = {
+                title: '✅ Pagamento confirmado!',
+                body: `R$ ${parseFloat(payment.amount).toFixed(2)}${isCatalog ? ' — Pedido do catálogo' : ''}`,
+                url: '/painel?tab=receipts',
+                tag: `ark-paid-${payment.id}`,
+              }
+              await Promise.all([
+                sendPushToTenant(payment.tenant_id, pushPayload),
+                sendFcmToTenant(payment.tenant_id, pushPayload),
+              ])
+            } catch (_) {}
           }
         }
       }

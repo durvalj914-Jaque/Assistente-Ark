@@ -29,7 +29,7 @@ async function safeInsert(db, table, data) {
 async function handleOrder(db, msg, from, phoneNumberId) {
   const order = msg.order
   if (!order) return
-  const { data: botArr } = await db.from('bots').select('id,tenant_id,name').eq('phone_number_id', phoneNumberId).eq('status', 'active').limit(1)
+  const { data: botArr } = await db.from('bots').select('id,tenant_id,name,phone_number_id,access_token').eq('phone_number_id', phoneNumberId).eq('status', 'active').limit(1)
   const bot = botArr?.[0]
   if (!bot) return
 
@@ -38,11 +38,14 @@ async function handleOrder(db, msg, from, phoneNumberId) {
   const total = (order.product_items || []).reduce((sum, it) => sum + (Number(it.item_price || 0) * Number(it.quantity || 1)), 0)
   const currency = order.product_items?.[0]?.currency || 'BRL'
 
-  await safeInsert(db, 'whatsapp_orders', {
+  // Salvar o pedido
+  const { data: orderRow } = await db.from('whatsapp_orders').insert({
     tenant_id: bot.tenant_id, bot_id: bot.id, contact_id: contact?.id || null,
     catalog_id: order.catalog_id, items: order.product_items || [], total, currency,
-    note: order.text || null, status: 'new',
-  })
+    note: order.text || null, status: total > 0 ? 'awaiting_payment' : 'new',
+  }).select().single()
+
+  const orderId = orderRow?.id
 
   // Criar comprovante automático de pedido do catálogo (B2C Catálogo)
   if (total > 0) {
@@ -55,11 +58,12 @@ async function handleOrder(db, msg, from, phoneNumberId) {
       file_name: `Pedido Catálogo - ${new Date().toLocaleString('pt-BR')}`,
       uploaded_by: contact?.phone || from,
       notes: `Pedido via catálogo WhatsApp — ${order.product_items?.length || 0} item(ns) — Total: R$ ${total.toFixed(2)}`,
-      metadata: { catalog_id: order.catalog_id, items: order.product_items, total, currency, auto: true },
+      metadata: { catalog_id: order.catalog_id, items: order.product_items, total, currency, auto: true, order_id: orderId },
       category: 'b2c_catalog',
     })
   }
 
+  // Notificar admin
   try {
     const pushPayload = {
       title: '🛒 Novo pedido recebido!',
@@ -69,6 +73,112 @@ async function handleOrder(db, msg, from, phoneNumberId) {
     }
     await Promise.all([sendPushToTenant(bot.tenant_id, pushPayload), sendFcmToTenant(bot.tenant_id, pushPayload)])
   } catch (_) {}
+
+  // ── CHECKOUT AUTOMÁTICO: enviar PIX ao cliente ──
+  if (total > 0) {
+    try {
+      const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, name, mp_access_token').eq('id', bot.tenant_id).maybeSingle()
+      const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
+      const txid = `ARK${Date.now().toString(36).toUpperCase()}`
+
+      // Criar registro de pagamento vinculado ao pedido
+      const { data: payment } = await db.from('payments').insert({
+        tenant_id: bot.tenant_id, bot_id: bot.id,
+        conversation_id: null, contact_id: contact?.id || null,
+        amount: total,
+        description: `Pedido catálogo - ${order.product_items?.length || 0} item(ns)`,
+        status: 'pending', method: 'pix', payment_ref: txid,
+        metadata: { txid, from_catalog: true, order_id: orderId, items: order.product_items },
+      }).select().single()
+
+      // Vincular payment ao pedido
+      if (orderId) {
+        await db.from('whatsapp_orders').update({ payment_id: payment?.id, status: 'awaiting_payment' }).eq('id', orderId)
+      }
+
+      const hasPix = tenant?.pix_key
+      const hasMp = tenant?.mp_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN
+
+      // Enviar confirmação do pedido
+      const itemCount = order.product_items?.length || 0
+      await sendText(phoneNumberId, waToken, from, `🛒 *Pedido recebido!*
+
+${itemCount} item(ns) — *Total: R$ ${total.toFixed(2)}*
+
+Vamos finalizar o pagamento 👇`)
+
+      if (hasPix) {
+        // ── PIX automático ──
+        const { generatePixCode } = await import('../../../lib/pix')
+        const QRCodeModule = await import('qrcode')
+
+        const pixCode = generatePixCode({
+          pixKey: tenant.pix_key,
+          merchantName: (tenant.merchant_name || tenant.name || 'Arkiel').substring(0, 25),
+          merchantCity: (tenant.merchant_city || 'SAO PAULO').substring(0, 15),
+          amount: total, txid,
+        })
+        const qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+        const blob = new Blob([qrBuffer], { type: 'image/png' })
+        const formData = new FormData()
+        formData.append('messaging_product', 'whatsapp')
+        formData.append('type', 'image/png')
+        formData.append('file', blob, 'pix_order.png')
+        const upRes = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${waToken}` }, body: formData })
+        const upJson = await upRes.json()
+
+        if (upJson.id) {
+          await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp', to: from, type: 'image',
+              image: { id: upJson.id, caption: `💰 *Pagamento do Pedido*\n\nTotal: R$ ${total.toFixed(2)}\n\n*Escaneie o QR Code ou copie: *\n\n${pixCode}` },
+            }),
+          })
+          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment?.id)
+        } else {
+          // Fallback: enviar só copia/cola
+          await sendText(phoneNumberId, waToken, from, `💠 *PIX Copia e Cola* — R$ ${total.toFixed(2)}\n\n${pixCode}`)
+          await db.from('payments').update({ pix_code: pixCode }).eq('id', payment?.id)
+        }
+
+        await sendText(phoneNumberId, waToken, from, '✅ Após o pagamento, seu pedido será confirmado automaticamente!\n\nDigite *0* para voltar ao menu.')
+
+      } else if (hasMp) {
+        // ── Mercado Pago fallback ──
+        const mpToken = tenant?.mp_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN
+        const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
+          body: JSON.stringify({
+            items: [{ title: `Pedido Catálogo - ${itemCount} item(s)`, quantity: 1, unit_price: total, currency_id: 'BRL' }],
+            back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
+            auto_return: 'approved', external_reference: txid,
+            notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+          }),
+        })
+        const mpData = await mpRes.json()
+        if (mpData.init_point) {
+          await sendText(phoneNumberId, waToken, from, `💳 *Pagamento do Pedido* — R$ ${total.toFixed(2)}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`)
+          await db.from('payments').update({ mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point }).eq('id', payment?.id)
+        }
+      } else {
+        // Sem pagamento configurado — orientar contato manual
+        await sendText(phoneNumberId, waToken, from, `📞 Seu pedido de R$ ${total.toFixed(2)} foi recebido! Em breve entraremos em contato com as instruções de pagamento.`)
+        if (orderId) await db.from('whatsapp_orders').update({ status: 'new' }).eq('id', orderId)
+      }
+
+      // Salvar mensagem no histórico
+      await safeInsert(db, 'messages', {
+        tenant_id: bot.tenant_id, bot_id: bot.id, contact_id: contact?.id || null,
+        conversation_id: null, direction: 'outbound', type: 'text',
+        content: `[Checkout automático — Pedido R$ ${total.toFixed(2)} — PIX enviado]`, sent_by: 'bot',
+      })
+
+      await savelog(db, 'catalog_checkout', null, { order_id: orderId, total, method: hasPix ? 'pix' : (hasMp ? 'mercadopago' : 'none') })
+    } catch (e) {
+      await savelog(db, 'catalog_checkout_error', String(e), { order_id: orderId, total })
+    }
+  }
 }
 
 async function sendText(phoneId, token, to, text) {
@@ -289,10 +399,26 @@ async function processWebhook(body) {
             category: 'b2c_client',
           })
           // Marcar como pago
+          const { data: fullPayment } = await db.from('payments')
+            .select('id, metadata')
+            .eq('id', payment.id).maybeSingle()
           await db.from('payments').update({
             status: 'paid', paid_at: new Date().toISOString(),
-            metadata: { receipt_auto: true, media_id: mediaId, manual_confirmation: false }
+            metadata: { receipt_auto: true, media_id: mediaId, manual_confirmation: false,
+              ...(fullPayment?.metadata || {}) }
           }).eq('id', payment.id)
+
+          // Confirmar pedido do catálogo se aplicável
+          const catOrderId = fullPayment?.metadata?.order_id
+          if (catOrderId) {
+            await db.from('whatsapp_orders').update({
+              status: 'paid', paid_at: new Date().toISOString()
+            }).eq('id', catOrderId)
+            await sendText(phoneNumberId, tkn, from, `🛒 *Pedido confirmado!*
+Seu pagamento foi confirmado e seu pedido está sendo processado.
+
+Obrigado pela compra! 🎉`)
+          }
           // Avisar cliente
           await sendText(phoneNumberId, tkn, from, `✅ *Comprovante recebido!*
 
