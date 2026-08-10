@@ -82,13 +82,11 @@ async function handleOrder(db, msg, from, phoneNumberId) {
       const txid = `ARK${Date.now().toString(36).toUpperCase()}`
 
       // Criar registro de pagamento vinculado ao pedido
+      const meta = JSON.stringify({ txid, from_catalog: true, order_id: orderId, items: order.product_items, contact_id: contact?.id || null, method: 'pix', description: `Pedido catálogo - ${order.product_items?.length || 0} item(ns)` })
       const { data: payment } = await db.from('payments').insert({
         tenant_id: bot.tenant_id, bot_id: bot.id,
-        conversation_id: null, contact_id: contact?.id || null,
         amount: total,
-        description: `Pedido catálogo - ${order.product_items?.length || 0} item(ns)`,
-        status: 'pending', method: 'pix', payment_ref: txid,
-        metadata: { txid, from_catalog: true, order_id: orderId, items: order.product_items },
+        status: 'pending', pix_code: txid, pix_qr_url: meta,
       }).select().single()
 
       // O vínculo payment→order fica em payments.metadata.order_id (não precisa de coluna extra)
@@ -132,11 +130,13 @@ Vamos finalizar o pagamento 👇`)
               image: { id: upJson.id, caption: `💰 *Pagamento do Pedido*\n\nTotal: R$ ${total.toFixed(2)}\n\n*Escaneie o QR Code ou copie: *\n\n${pixCode}` },
             }),
           })
-          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment?.id)
+          const oldMeta2 = JSON.parse(payment?.pix_qr_url || '{}')
+          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: JSON.stringify({ ...oldMeta2, qr_media_id: upJson.id }) }).eq('id', payment?.id)
         } else {
           // Fallback: enviar só copia/cola
           await sendText(phoneNumberId, waToken, from, `💠 *PIX Copia e Cola* — R$ ${total.toFixed(2)}\n\n${pixCode}`)
           await db.from('payments').update({ pix_code: pixCode }).eq('id', payment?.id)
+          // metadata em pix_qr_url já preservado do insert
         }
 
         await sendText(phoneNumberId, waToken, from, '✅ Após o pagamento, seu pedido será confirmado automaticamente!\n\nDigite *0* para voltar ao menu.')
@@ -156,7 +156,8 @@ Vamos finalizar o pagamento 👇`)
         const mpData = await mpRes.json()
         if (mpData.init_point) {
           await sendText(phoneNumberId, waToken, from, `💳 *Pagamento do Pedido* — R$ ${total.toFixed(2)}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`)
-          await db.from('payments').update({ mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point }).eq('id', payment?.id)
+          const oldMeta4 = JSON.parse(payment?.pix_qr_url || '{}')
+          await db.from('payments').update({ pix_qr_url: JSON.stringify({ ...oldMeta4, mp_pref_id: mpData.id, mp_checkout_url: mpData.init_point, method: 'mercadopago' }) }).eq('id', payment?.id)
         }
       } else {
         // Sem pagamento configurado — orientar contato manual
@@ -374,8 +375,8 @@ async function processWebhook(body) {
 
         // 2) Verificar se há pagamento pendente nesta conversa
         const { data: pendingPayments } = await db.from('payments')
-          .select('id, amount, description, method')
-          .eq('conversation_id', conv.id)
+          .select('id, amount, pix_qr_url')
+          .eq('bot_id', bot.id)
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
           .limit(1)
@@ -391,22 +392,22 @@ async function processWebhook(body) {
             file_type: msg.type === 'image' ? 'image' : 'pdf',
             file_name: mediaFilename || `comprovante-${Date.now()}`,
             uploaded_by: contact.phone || 'customer',
-            notes: `Comprovante automático — R$ ${parseFloat(payment.amount).toFixed(2)} (${payment.method})`,
+            notes: `Comprovante automático — R$ ${parseFloat(payment.amount).toFixed(2)}`,
             metadata: { media_id: mediaId, auto: true, payment_amount: payment.amount },
             category: 'b2c_client',
           })
           // Marcar como pago
           const { data: fullPayment } = await db.from('payments')
-            .select('id, metadata')
+            .select('id, pix_qr_url')
             .eq('id', payment.id).maybeSingle()
           await db.from('payments').update({
             status: 'paid', paid_at: new Date().toISOString(),
-            metadata: { receipt_auto: true, media_id: mediaId, manual_confirmation: false,
-              ...(fullPayment?.metadata || {}) }
+            pix_qr_url: JSON.stringify({ receipt_auto: true, media_id: mediaId, manual_confirmation: false,
+              ...JSON.parse(fullPayment?.pix_qr_url || '{}') })
           }).eq('id', payment.id)
 
           // Confirmar pedido do catálogo se aplicável (status column já existe)
-          const catOrderId = fullPayment?.metadata?.order_id
+          const catOrderId = JSON.parse(fullPayment?.pix_qr_url || '{}')?.order_id
           if (catOrderId) {
             await db.from('whatsapp_orders').update({
               status: 'paid'
@@ -446,11 +447,11 @@ Obrigado! 🎉`)
 
           // Cria pagamento avulso (status: paid, sem cobrança prévia)
           const { data: avulsoPay } = await db.from('payments').insert({
-            tenant_id: tenantId, bot_id: bot.id, conversation_id: conv.id, contact_id: contact.id,
-            amount: captionVal || 0, description: mediaCaption || 'Pagamento avulso (comprovante)',
-            status: 'paid', method: 'pix', payment_ref: `AVULSO-${Date.now().toString(36).toUpperCase()}`,
+            tenant_id: tenantId, bot_id: bot.id,
+            amount: captionVal || 0,
+            status: 'paid', pix_code: `AVULSO-${Date.now().toString(36).toUpperCase()}`,
             paid_at: new Date().toISOString(),
-            metadata: { avulso: true, receipt_auto: true },
+            pix_qr_url: JSON.stringify({ avulso: true, receipt_auto: true, contact_id: contact.id, conversation_id: conv.id, method: 'pix', description: mediaCaption || 'Pagamento avulso (comprovante)' }),
           }).select().single()
 
           await db.from('payment_receipts').insert({
@@ -559,8 +560,9 @@ Obrigado! 🎉`)
 
       const txid = `ARK${Date.now().toString(36).toUpperCase()}`
       const { data: payment } = await db.from('payments').insert({
-        tenant_id: tenantId, bot_id: bot.id, conversation_id: conv.id, contact_id: contact.id,
-        amount: payAmount, description: 'Pagamento via bot', status: 'pending', method: 'pix', payment_ref: txid, metadata: { txid, from_flow: true },
+        tenant_id: tenantId, bot_id: bot.id,
+        amount: payAmount, status: 'pending', pix_code: txid,
+        pix_qr_url: JSON.stringify({ txid, from_flow: true, contact_id: contact.id, conversation_id: conv.id, method: 'pix', description: 'Pagamento via bot' }),
       }).select().single()
 
       if (tenant?.pix_key) {
@@ -584,7 +586,8 @@ Obrigado! 🎉`)
             body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'image',
               image: { id: upJson.id, caption: `💰 *Pagamento PIX* - R$ ${payAmount.toFixed(2)}\n\n*Escaneie ou copie:*\n\n${pixCode}` } }),
           })
-          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment.id)
+          const flowMeta = JSON.parse(payment.pix_qr_url || '{}')
+          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: JSON.stringify({ ...flowMeta, qr_media_id: upJson.id }) }).eq('id', payment.id)
         }
         await sendText(phoneNumberId, tkn, from, '✅ PIX enviado! Após o pagamento, você receberá a confirmação. Digite *0* para voltar ao menu.')
         await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
@@ -679,11 +682,13 @@ Obrigado! 🎉`)
                 image: { id: upJson.id, caption: `💰 *Pagamento PIX* - R$ ${payAmount.toFixed(2)}\n\n*Escaneie o QR Code ou copie: *\n\n${pixCode}` },
               }),
             })
-            await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment.id)
+            const flowMeta = JSON.parse(payment.pix_qr_url || '{}')
+          await db.from('payments').update({ pix_code: pixCode, pix_qr_url: JSON.stringify({ ...flowMeta, qr_media_id: upJson.id }) }).eq('id', payment.id)
             reply = `[PIX enviado - R$ ${payAmount.toFixed(2)}]`
           } else {
             await sendText(phoneNumberId, tkn, from, `💠 *PIX Copia e Cola* - R$ ${payAmount.toFixed(2)}\n\n${pixCode}`)
             await db.from('payments').update({ pix_code: pixCode }).eq('id', payment.id)
+          // metadata em pix_qr_url já preservado
             reply = `[PIX enviado - R$ ${payAmount.toFixed(2)}]`
           }
         } else if (payMethod === 'mercadopago' && process.env.MERCADOPAGO_ACCESS_TOKEN) {
