@@ -60,7 +60,7 @@ export default async function handler(req, res) {
             const orderId = payment.metadata?.order_id
             if (orderId) {
               await db.from('whatsapp_orders').update({
-                status: 'paid', paid_at: new Date().toISOString(),
+                status: 'paid',
               }).eq('id', orderId)
             }
 

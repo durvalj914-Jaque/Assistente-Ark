@@ -91,10 +91,7 @@ async function handleOrder(db, msg, from, phoneNumberId) {
         metadata: { txid, from_catalog: true, order_id: orderId, items: order.product_items },
       }).select().single()
 
-      // Vincular payment ao pedido
-      if (orderId) {
-        await db.from('whatsapp_orders').update({ payment_id: payment?.id, status: 'awaiting_payment' }).eq('id', orderId)
-      }
+      // O vínculo payment→order fica em payments.metadata.order_id (não precisa de coluna extra)
 
       const hasPix = tenant?.pix_key
       const hasMp = tenant?.mp_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN
@@ -164,7 +161,7 @@ Vamos finalizar o pagamento 👇`)
       } else {
         // Sem pagamento configurado — orientar contato manual
         await sendText(phoneNumberId, waToken, from, `📞 Seu pedido de R$ ${total.toFixed(2)} foi recebido! Em breve entraremos em contato com as instruções de pagamento.`)
-        if (orderId) await db.from('whatsapp_orders').update({ status: 'new' }).eq('id', orderId)
+        if (orderId) await db.from('whatsapp_orders').update({ status: 'new' }).eq('id', orderId).then(() => {})
       }
 
       // Salvar mensagem no histórico
@@ -408,11 +405,11 @@ async function processWebhook(body) {
               ...(fullPayment?.metadata || {}) }
           }).eq('id', payment.id)
 
-          // Confirmar pedido do catálogo se aplicável
+          // Confirmar pedido do catálogo se aplicável (status column já existe)
           const catOrderId = fullPayment?.metadata?.order_id
           if (catOrderId) {
             await db.from('whatsapp_orders').update({
-              status: 'paid', paid_at: new Date().toISOString()
+              status: 'paid'
             }).eq('id', catOrderId)
             await sendText(phoneNumberId, tkn, from, `🛒 *Pedido confirmado!*
 Seu pagamento foi confirmado e seu pedido está sendo processado.
