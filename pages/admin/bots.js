@@ -216,6 +216,8 @@ export default function BotsPage() {
   const [showModal, setShowModal] = useState(false)
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState(null)
+  const [deleteConfirm, setDeleteConfirm] = useState(null)  // bot object being confirmed for deletion
+  const [deleteError, setDeleteError] = useState(null)
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
   useEffect(() => { setBots(initialBots) }, [initialBots])
@@ -255,24 +257,42 @@ export default function BotsPage() {
     setBots(prev => prev.map(b => b.id === bot.id ? { ...b, status: newStatus } : b))
   }
 
-  async function handleDelete(botId) {
-    if (!confirm('Tem certeza? Isso apagará o bot e todas as conversas associadas.')) return
+  // Abre modal de confirmação em vez de usar confirm() nativo
+  function requestDelete(bot) {
+    setDeleteError(null)
+    setDeleteConfirm(bot)
+  }
+
+  async function confirmDeleteBot() {
+    const botId = deleteConfirm?.id
+    if (!botId) return
     setDeleting(botId)
-    // 1) Limpa conversas e sessões relacionadas primeiro (evita FK constraint)
-    await supabase.from('messages').delete().eq('bot_id', botId)
-    await supabase.from('sessions').delete().eq('bot_id', botId)
-    // 2) Deleta o bot e VERIFICA se deu certo
-    const { error } = await supabase.from('bots').delete().eq('id', botId)
-    if (error) {
-      console.error('[handleDelete] erro ao deletar bot:', error)
-      alert('Erro ao excluir bot: ' + (error.message || 'verifique as permissões'))
+    setDeleteError(null)
+
+    // 1) Deleta messages primeiro — messages.bot_id tem FK SEM ON DELETE CASCADE
+    const { error: msgErr } = await supabase.from('messages').delete().eq('bot_id', botId)
+    if (msgErr) console.warn('[handleDelete] messages delete:', msgErr.message)
+
+    // 2) Deleta conversations — conversations.bot_id tem ON DELETE CASCADE,
+    //    mas deletar explicitamente garante que não reste nada órfão
+    const { error: convErr } = await supabase.from('conversations').delete().eq('bot_id', botId)
+    if (convErr) console.warn('[handleDelete] conversations delete:', convErr.message)
+
+    // 3) Tenta deletar o bot
+    const { error: botErr } = await supabase.from('bots').delete().eq('id', botId)
+
+    if (botErr) {
+      console.error('[handleDelete] erro ao deletar bot:', botErr)
+      setDeleteError(botErr.message || 'Erro desconhecido ao excluir')
       setDeleting(null)
-      return
+      return  // mantém modal aberto mostrando o erro
     }
-    // 3) Atualiza estado local E refaz o fetch no hook (evita fantasma ao recarregar)
+
+    // 4) Sucesso — atualiza estado local E hook
     setBots(prev => prev.filter(b => b.id !== botId))
     if (tenant?.id) refreshBots(tenant.id)
     setDeleting(null)
+    setDeleteConfirm(null)
   }
 
   if (loading) return <div className="ark-page-loading"><div className="ark-spinner" /> Carregando…</div>
@@ -376,7 +396,7 @@ export default function BotsPage() {
                       color: bot.status === 'active' ? '#ef4444' : '#10b981' }}>
                     {bot.status === 'active' ? '⏸ Pausar' : '▶ Ativar'}
                   </button>
-                  <button onClick={() => handleDelete(bot.id)}
+                  <button onClick={() => requestDelete(bot)}
                     disabled={deleting === bot.id}
                     style={{ padding: '7px 12px', fontSize: 12, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                       background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>
@@ -387,6 +407,36 @@ export default function BotsPage() {
             ))}
           </div>
         )}
+      {deleteConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={e => e.target === e.currentTarget && setDeleteConfirm(null)}>
+          <div style={{ background: '#0d0d1a', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 400, textAlign: 'center' }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🗑️</div>
+            <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 16, marginBottom: 8 }}>Excluir "{deleteConfirm.name}"?</h3>
+            <p style={{ color: '#64748b', fontSize: 13, marginBottom: 8, lineHeight: 1.5 }}>
+              O bot será removido permanentemente junto com todas as conversas e mensagens associadas.
+            </p>
+            <p style={{ color: '#475569', fontSize: 11, marginBottom: 20 }}>
+              Esta ação não pode ser desfeita.
+            </p>
+            {deleteError && (
+              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#ef4444', textAlign: 'left' }}>
+                ⚠️ {deleteError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <button onClick={() => setDeleteConfirm(null)} className="ark-btn-ghost" disabled={deleting === deleteConfirm.id}>
+                Cancelar
+              </button>
+              <button onClick={confirmDeleteBot} disabled={deleting === deleteConfirm.id}
+                style={{ background: '#ef4444', border: 'none', borderRadius: 8, color: '#fff', padding: '10px 20px', fontWeight: 700, fontSize: 13, cursor: deleting === deleteConfirm.id ? 'not-allowed' : 'pointer', opacity: deleting === deleteConfirm.id ? 0.5 : 1 }}>
+                {deleting === deleteConfirm.id ? 'Excluindo…' : 'Sim, excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       </AdminLayout>
     </>
   )
