@@ -72,7 +72,14 @@ export default function ClientPortal() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab]         = useState('conversations') // conversations | bots | usage
   const [usage, setUsage]     = useState(null)
+  const [catalogProducts, setCatalogProducts] = useState([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const endRef = useRef(null)
+
+  useEffect(() => {
+    if (tab === 'catalog') loadCatalog()
+  }, [tab, tenant])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -131,6 +138,17 @@ export default function ClientPortal() {
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 150)
   }
 
+  async function loadCatalog() {
+    if (!tenant) return
+    setCatalogLoading(true)
+    try {
+      const r = await fetch(`/api/catalog/products?tenant=${tenant.id}`)
+      const d = await r.json()
+      if (d.products) setCatalogProducts(d.products)
+    } catch (_) {}
+    setCatalogLoading(false)
+  }
+
   if (loading) return (
     <div style={styles.loadingScreen}>
       <img src="/assistente-ark-icon.png" style={{ width: 44, opacity: 0.7 }} alt="" />
@@ -177,7 +195,8 @@ export default function ClientPortal() {
             {[
               { key: 'conversations', icon: '💬', label: 'Conversas', count: convs.length },
               { key: 'bots',          icon: '🤖', label: 'Meus Bots', count: bots.length },
-              { key: 'whatsapp',       icon: '📶', label: 'WhatsApp' },
+              { key: 'catalog',       icon: '🛍️', label: 'Catálogo' },
+            { key: 'whatsapp',       icon: '📶', label: 'WhatsApp' },
             { key: 'usage',         icon: '📊', label: 'Uso & Plano' }
             ].map(n => (
               <button key={n.key} onClick={() => setTab(n.key)}
@@ -315,6 +334,86 @@ export default function ClientPortal() {
           )}
 
           {/* ── TAB: Uso ── */}
+          {tab === 'catalog' && (
+            <div style={styles.tabContent}>
+              <h2 style={styles.sectionTitle}>🛍️ Catálogo</h2>
+              <p style={styles.sectionSub}>
+                Seus produtos visíveis para clientes finais. Compartilhe o link da sua vitrine:
+              </p>
+
+              {/* Link da vitrine */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input
+                  readOnly
+                  value={`https://arkiel.com.br/catalog/${tenant?.id || ''}`}
+                  style={{ ...styles.searchInput, flex: 1, maxWidth: 400, cursor: 'pointer' }}
+                  onClick={e => e.target.select()}
+                />
+                <button
+                  onClick={() => {
+                    const link = `https://arkiel.com.br/catalog/${tenant?.id || ''}`
+                    navigator.clipboard?.writeText(link)
+                    setCopied(true)
+                    setTimeout(() => setCopied(false), 2000)
+                  }}
+                  style={{ ...styles.logoutBtn, color: '#4f8ef7', borderColor: 'rgba(79,142,247,0.25)', padding: '9px 16px', whiteSpace: 'nowrap' }}
+                >
+                  {copied ? '✓ Copiado!' : '📋 Copiar link'}
+                </button>
+                <a
+                  href={`https://arkiel.com.br/catalog/${tenant?.id || ''}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ ...styles.logoutBtn, color: '#10b981', borderColor: 'rgba(16,185,129,0.25)', padding: '9px 16px', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                >
+                  👁️ Ver vitrine
+                </a>
+              </div>
+
+              {/* Produtos */}
+              {catalogLoading ? (
+                <div style={{ textAlign: 'center', padding: 40, color: 'rgba(255,255,255,0.3)' }}>
+                  <div className="ark-spinner" style={{ margin: '0 auto' }} />
+                </div>
+              ) : catalogProducts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', background: 'rgba(255,255,255,0.02)', borderRadius: 16, border: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>📦</div>
+                  <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, marginBottom: 8 }}>Nenhum produto no catálogo ainda</p>
+                  <p style={{ color: 'rgba(255,255,255,0.2)', fontSize: 12 }}>
+                    Acesse <strong style={{ color: 'rgba(255,255,255,0.4)' }}>Admin → Catálogo</strong> para adicionar produtos.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+                  {catalogProducts.map(p => (
+                    <div key={p.id} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, overflow: 'hidden' }}>
+                      <div style={{ width: '100%', height: 140, background: 'rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                        {p.image_url ? (
+                          <img src={p.image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={e => { e.target.style.display = 'none' }} />
+                        ) : (
+                          <span style={{ fontSize: 36 }}>📦</span>
+                        )}
+                      </div>
+                      <div style={{ padding: 16 }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#fff', marginBottom: 4 }}>{p.name}</div>
+                        {p.category && <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: '#4f8ef7', background: 'rgba(79,142,247,0.1)', padding: '2px 6px', borderRadius: 100 }}>{p.category}</span>}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                          <span style={{ color: '#10b981', fontWeight: 800, fontSize: 18 }}>
+                            {Number(p.price || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </span>
+                          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }}>
+                            {p.stock !== null && p.stock !== undefined ? `${p.stock} un.` : '∞'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === 'usage' && (
             <div style={styles.tabContent}>
               <h2 style={styles.sectionTitle}>Uso & Plano</h2>
