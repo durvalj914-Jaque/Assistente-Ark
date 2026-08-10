@@ -269,26 +269,22 @@ export default function BotsPage() {
     setDeleting(botId)
     setDeleteError(null)
 
-    // 1) Deleta messages primeiro — messages.bot_id tem FK SEM ON DELETE CASCADE
-    const { error: msgErr } = await supabase.from('messages').delete().eq('bot_id', botId)
-    if (msgErr) console.warn('[handleDelete] messages delete:', msgErr.message)
+    // Chama endpoint server-side que usa service role key (bypassa RLS)
+    const res = await fetch('/api/bots/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botId })
+    })
+    const data = await res.json()
 
-    // 2) Deleta conversations — conversations.bot_id tem ON DELETE CASCADE,
-    //    mas deletar explicitamente garante que não reste nada órfão
-    const { error: convErr } = await supabase.from('conversations').delete().eq('bot_id', botId)
-    if (convErr) console.warn('[handleDelete] conversations delete:', convErr.message)
-
-    // 3) Tenta deletar o bot
-    const { error: botErr } = await supabase.from('bots').delete().eq('id', botId)
-
-    if (botErr) {
-      console.error('[handleDelete] erro ao deletar bot:', botErr)
-      setDeleteError(botErr.message || 'Erro desconhecido ao excluir')
+    if (!res.ok || !data.success) {
+      console.error('[handleDelete] erro:', data.error)
+      setDeleteError(data.error || 'Erro ao excluir bot')
       setDeleting(null)
       return  // mantém modal aberto mostrando o erro
     }
 
-    // 4) Sucesso — atualiza estado local E hook
+    // Sucesso — atualiza estado local E hook
     setBots(prev => prev.filter(b => b.id !== botId))
     if (tenant?.id) refreshBots(tenant.id)
     setDeleting(null)
