@@ -881,7 +881,6 @@ function ThreeDotsMenu({ tenant, user, role, profile }) {
   const MENU_ITEMS = [
     { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
     { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖' },
-    { href: '/admin/flow', label: 'Editor de Fluxo', icon: '⚡' },
     { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
     { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', expandable: true, children: [
