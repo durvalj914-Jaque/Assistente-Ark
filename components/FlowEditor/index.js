@@ -416,7 +416,7 @@ export default function FlowEditor({ flow, onChange }) {
   return (
     <FlowErrorBoundary key={renderKey} onReset={handleReset}>
       {editing && <EditModal node={editing} onSave={saveEdit} onClose={() => setEditing(null)} />}
-      <div style={{ overflowX: 'auto', padding: '36px 24px', minHeight: 300 }}>
+      <div style={{ overflow: 'auto', padding: '36px 24px', minHeight: 300, maxHeight: 'calc(100vh - 280px)' }}>
         <div style={{ display: 'inline-block', minWidth: '100%' }}>
           <NodeLevel
             key={`tree_${renderKey}`}

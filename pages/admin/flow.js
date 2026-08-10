@@ -111,7 +111,7 @@ export default function FlowPage() {
         </div>
       )}
 
-      <div className="ark-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="ark-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {flow ? (
           <FlowEditor flow={flow} onChange={setFlow} />
         ) : (
