@@ -258,8 +258,20 @@ export default function BotsPage() {
   async function handleDelete(botId) {
     if (!confirm('Tem certeza? Isso apagará o bot e todas as conversas associadas.')) return
     setDeleting(botId)
-    await supabase.from('bots').delete().eq('id', botId)
+    // 1) Limpa conversas e sessões relacionadas primeiro (evita FK constraint)
+    await supabase.from('messages').delete().eq('bot_id', botId)
+    await supabase.from('sessions').delete().eq('bot_id', botId)
+    // 2) Deleta o bot e VERIFICA se deu certo
+    const { error } = await supabase.from('bots').delete().eq('id', botId)
+    if (error) {
+      console.error('[handleDelete] erro ao deletar bot:', error)
+      alert('Erro ao excluir bot: ' + (error.message || 'verifique as permissões'))
+      setDeleting(null)
+      return
+    }
+    // 3) Atualiza estado local E refaz o fetch no hook (evita fantasma ao recarregar)
     setBots(prev => prev.filter(b => b.id !== botId))
+    if (tenant?.id) refreshBots(tenant.id)
     setDeleting(null)
   }
 
