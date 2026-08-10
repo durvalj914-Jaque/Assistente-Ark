@@ -6,6 +6,7 @@
  */
 import { supabaseAdmin } from '../../../lib/supabase'
 import { generatePixCode } from '../../../lib/pix'
+import { retailerIdFor } from '../../../lib/metaCatalog'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -45,20 +46,27 @@ export default async function handler(req, res) {
     }
   }
 
-  // Criar pedido
+  // Criar pedido (usando schema existente: items[], total, catalog_id)
   const orderRef = `CAT${Date.now().toString(36).toUpperCase()}`
+  const retailerId = product.meta_retailer_id || retailerIdFor(tenantId, product.id)
+  const catalogId = process.env.ARKIEL_META_CATALOG_ID || null
+
   const { data: order, error: orderErr } = await db.from('whatsapp_orders').insert({
     tenant_id: tenantId,
     bot_id: bot?.id || null,
     contact_id: contactId,
-    product_id: productId,
-    product_name: product.name,
-    amount: parseFloat(product.price),
+    catalog_id: catalogId,
+    items: [{
+      currency: 'BRL',
+      quantity: 1,
+      item_price: parseFloat(product.price),
+      product_retailer_id: retailerId,
+      product_name: product.name,
+    }],
+    total: parseFloat(product.price),
     currency: 'BRL',
     status: 'pending',
-    order_ref: orderRef,
-    customer_name: customerName || null,
-    customer_phone: customerPhone || null,
+    note: `Pedido via vitrine web — ${orderRef}${customerName ? ` — Cliente: ${customerName}` : ''}${customerPhone ? ` — Tel: ${customerPhone}` : ''}`,
   }).select().single()
 
   if (orderErr) return res.status(500).json({ error: 'Erro ao criar pedido', detail: orderErr.message })
@@ -70,7 +78,7 @@ export default async function handler(req, res) {
 
   // ── Pagamento via PIX ──
   if (method === 'pix' && pixKey) {
-    const txid = `${orderRef}`.substring(0, 25)
+    const txid = orderRef.substring(0, 25)
     const pixCode = generatePixCode({
       pixKey,
       merchantName,
@@ -93,7 +101,6 @@ export default async function handler(req, res) {
       metadata: { order_id: order.id, order_ref: orderRef, from_catalog: true, product_id: productId },
     })
 
-    // Atualizar pedido com payment_id
     return res.status(200).json({
       ok: true,
       method: 'pix',
