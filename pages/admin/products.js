@@ -25,7 +25,7 @@ function Field({ label, name, value, onChange, placeholder, type = 'text', hint,
   )
 }
 
-function ProductModal({ product, onClose, onSave }) {
+function ProductModal({ product, onClose, onSave, editingProduct }) {
   const [form, setForm] = useState({
     name:        product?.name || '',
     description: product?.description || '',
@@ -37,6 +37,7 @@ function ProductModal({ product, onClose, onSave }) {
     is_active:   product?.is_active ?? true,
   })
   const [saving, setSaving] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
 
   const setField = useCallback((name, value) => {
     setForm(f => ({ ...f, [name]: value }))
@@ -75,7 +76,64 @@ function ProductModal({ product, onClose, onSave }) {
           <Field label="SKU" name="sku" value={form.sku} onChange={setField} placeholder="Código interno" hint="Opcional — código só pra seu controle interno." />
         </div>
 
-        <Field label="URL DA IMAGEM" name="image_url" value={form.image_url} onChange={setField} placeholder="https://..." hint="Usada nas mensagens de catálogo do bot" />
+        <div style={{ marginBottom: 14 }}>
+          <label style={labelStyle}>IMAGEM DO PRODUTO</label>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            {form.image_url ? (
+              <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+                <img src={form.image_url} alt="Preview" style={{ width: 80, height: 80, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+                <button
+                  type="button"
+                  onClick={() => setField('image_url', '')}
+                  style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >✕</button>
+              </div>
+            ) : (
+              <div style={{ width: 80, height: 80, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🖼️</div>
+            )}
+            <div style={{ flex: 1 }}>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  setUploadingImg(true)
+                  try {
+                    const fd = new FormData()
+                    fd.append('file', file)
+                    if (editingProduct?.id) fd.append('productId', editingProduct.id)
+                    const r = await fetch('/api/products/upload-image', {
+                      method: 'POST',
+                      headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+                      body: fd,
+                    })
+                    const d = await r.json()
+                    if (d.imageUrl) setField('image_url', d.imageUrl)
+                    else alert(d.error || 'Erro no upload')
+                  } catch (err) {
+                    alert('Falha no upload da imagem')
+                  }
+                  setUploadingImg(false)
+                }}
+                style={{ display: 'none' }}
+                id="product-img-upload"
+              />
+              <label htmlFor="product-img-upload" className="ark-btn-ghost" style={{ cursor: 'pointer', padding: '8px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', background: 'rgba(255,255,255,0.03)' }}>
+                {uploadingImg ? '⏳ Enviando…' : '📤 Enviar imagem'}
+              </label>
+              <input
+                type="text"
+                value={form.image_url}
+                onChange={e => setField('image_url', e.target.value)}
+                placeholder="ou cole uma URL…"
+                className="ark-input"
+                style={{ marginTop: 8, fontSize: 12 }}
+              />
+              <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>PNG, JPG ou WebP até 5MB. Aparece no catálogo do WhatsApp.</p>
+            </div>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 }}>
           <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
@@ -207,6 +265,7 @@ export default function ProductsPage() {
       {showModal && (
         <ProductModal
           product={editingProduct}
+          editingProduct={editingProduct}
           onClose={() => { setShowModal(false); setEditingProduct(null) }}
           onSave={handleSave}
         />
