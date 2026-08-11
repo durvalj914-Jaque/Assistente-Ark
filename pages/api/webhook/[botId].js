@@ -55,6 +55,8 @@ export default async function handler(req, res) {
 
     const tenantId = bot.tenant_id
     const tenant = bot.tenants
+    const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
+    const phoneId = bot.phone_number_id
     const month = new Date().toISOString().slice(0, 7)
 
     // Controle de uso
@@ -160,9 +162,6 @@ export default async function handler(req, res) {
       supabase: db,
       sendFn: (text) => sendText(bot.phone_number_id, bot.access_token, from, text)
     })
-
-    const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
-    const phoneId = bot.phone_number_id
 
     // ── AÇÃO: CATÁLOGO — envia catálogo nativo ou fallback rico ──
     if (result.action === 'catalog') {
