@@ -4,23 +4,6 @@ import { getRootNode, getNextNode, processMessage } from '../../../lib/flowEngin
 import { sendProductList, sendSingleProduct, sendProductRich, sendProductListFallback, retailerIdFor } from '../../../lib/metaCatalog'
 
 
-// Helper: upload base64 QR code to WhatsApp as media
-async function uploadQrToWhatsApp(phoneId, token, base64Data) {
-  const buffer = Buffer.from(base64Data, 'base64')
-  const formData = new FormData()
-  formData.append('file', new Blob([buffer], { type: 'image/png' }), 'qr_code.png')
-  formData.append('messaging_product', 'whatsapp')
-  formData.append('type', 'image/png')
-
-  const res = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/media`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData
-  })
-  const data = await res.json()
-  return data.id
-}
-
 export default async function handler(req, res) {
   const { botId } = req.query
   const db = supabaseAdmin()
@@ -335,16 +318,18 @@ async function handleCatalogOrder(db, botId, order, from) {
   const orderId = savedOrder?.id?.substring(0, 8) || 'N/A'
   const totalFmt = Number(total).toFixed(2).replace('.', ',')
 
-  // Gerar PIX dinâmico via Mercado Pago
+  // Gerar PIX dinâmico + link de checkout via Mercado Pago
   const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_2
   let pixCreated = false
-  let pixQrCode = null
   let pixCopyPaste = null
+  let pixQrBase64 = null
+  let checkoutUrl = null
 
   if (mpToken && savedOrder) {
     try {
+      // 1. Criar PIX dinâmico
       const idempotencyKey = `arkiel-${savedOrder.id}`
-      const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+      const pixRes = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${mpToken}`,
@@ -356,88 +341,131 @@ async function handleCatalogOrder(db, botId, order, from) {
           description: `Pedido Arkiel #${orderId}`,
           payment_method_id: 'pix',
           payer: { email: `cliente${from.slice(-4)}@arkiel.com.br` },
-          metadata: {
-            order_id: savedOrder.id,
-            tenant_id: tenantId
-          }
+          metadata: { order_id: savedOrder.id, tenant_id: tenantId }
         })
       })
-      const mpData = await mpRes.json()
+      const pixData = await pixRes.json()
 
-      if (mpData.id && mpData.point_of_interaction?.transaction_data?.qr_code) {
+      if (pixData.id && pixData.point_of_interaction?.transaction_data?.qr_code) {
         pixCreated = true
-        pixQrCode = mpData.point_of_interaction.transaction_data.qr_code_base64
-        pixCopyPaste = mpData.point_of_interaction.transaction_data.qr_code
+        pixCopyPaste = pixData.point_of_interaction.transaction_data.qr_code
+        pixQrBase64 = pixData.point_of_interaction.transaction_data.qr_code_base64
 
-        // Salvar payment_id no pedido
+        // Salvar payment_id no campo note (JSON)
         await db.from('whatsapp_orders').update({
           status: 'pending_payment',
-          payment_id: String(mpData.id),
-          payment_method: 'pix_mercadopago'
+          note: JSON.stringify({ payment_id: String(pixData.id), payment_method: 'pix_mercadopago' })
         }).eq('id', savedOrder.id)
       }
+
+      // 2. Criar link de checkout (cartão, boleto, etc)
+      const prefRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${mpToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          items: [{
+            id: savedOrder.id,
+            title: `Pedido Arkiel #${orderId}`,
+            quantity: 1,
+            unit_price: Number(total),
+            currency_id: 'BRL'
+          }],
+          metadata: { order_id: savedOrder.id, tenant_id: tenantId },
+          back_urls: {
+            success: 'https://arkiel.com.br/payment/success',
+            failure: 'https://arkiel.com.br/payment/failure'
+          },
+          auto_return: 'approved'
+        })
+      })
+      const prefData = await prefRes.json()
+      if (prefData.init_point) {
+        checkoutUrl = prefData.init_point
+      }
     } catch (mpErr) {
-      console.error('[catalog] Erro Mercado Pago PIX:', mpErr.message?.substring(0, 100))
+      console.error('[catalog] Erro Mercado Pago:', mpErr.message?.substring(0, 100))
     }
   }
 
-  // Enviar confirmação
+  // Enviar confirmação do pedido
   const confirmText = `✅ *Pedido recebido!*
 
 📋 Nº: ${orderId}
 💰 Total: R$ ${totalFmt}`
-
   await sendText(phoneId, waToken, from, confirmText)
 
   if (pixCreated && pixCopyPaste) {
     // Enviar QR Code como imagem
-    if (pixQrCode) {
+    if (pixQrBase64) {
       try {
-        const imgRes = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+        const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/media`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: from,
-            type: 'image',
-            image: {
-              id: await uploadQrToWhatsApp(phoneId, waToken, pixQrCode)
-            }
-          })
+          headers: { Authorization: `Bearer ${waToken}` },
+          body: (() => {
+            const fd = new FormData()
+            const buf = Buffer.from(pixQrBase64, 'base64')
+            fd.append('file', new Blob([buf], { type: 'image/png' }), 'qrcode.png')
+            fd.append('messaging_product', 'whatsapp')
+            fd.append('type', 'image/png')
+            return fd
+          })()
         })
-        await imgRes.json()
+        const mediaData = await mediaRes.json()
+        if (mediaData.id) {
+          await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: from,
+              type: 'image',
+              image: { id: mediaData.id }
+            })
+          })
+        }
       } catch (imgErr) {
-        console.error('[catalog] Erro enviando QR:', imgErr.message?.substring(0, 80))
+        console.error('[catalog] Erro QR:', imgErr.message?.substring(0, 80))
       }
     }
 
-    // Enviar PIX copia e cola
-    const pixText = `💳 *Pague via PIX para confirmar*
+    // Montar mensagem com PIX + link de checkout
+    let payText = `💳 *Escolha como pagar:*
 
-📎 *Copia e Cola:*
+🟢 *PIX (Copia e Cola):*
 ${pixCopyPaste}
 
 💰 Valor: R$ ${totalFmt}
+✅ Confirmação automática após pagamento`
 
-✅ O pagamento é confirmado automaticamente. Não precisa enviar comprovante!`
+    if (checkoutUrl) {
+      payText += `
 
-    await sendText(phoneId, waToken, from, pixText)
+📱 *Cartão / Boleto:*
+${checkoutUrl}
+
+Aceitamos crédito, débito e boleto pelo link seguro.`
+    }
+
+    payText += `
+
+❓ Dúvidas? Digite *humano*`
+
+    await sendText(phoneId, waToken, from, payText)
   } else {
-    // Fallback: chave PIX manual do tenant
+    // Fallback: chave PIX manual
     const { data: tenant } = await db.from('tenants').select('pix_key').eq('id', tenantId).maybeSingle()
     if (tenant?.pix_key) {
-      const fallbackText = `Para pagar agora:
+      await sendText(phoneId, waToken, from, `Para pagar:
 
-1️⃣ *PIX:*
-${tenant.pix_key}
-
+1️⃣ PIX: ${tenant.pix_key}
 2️⃣ Valor: R$ ${totalFmt}
-
-3️⃣ Envie o comprovante aqui mesmo`
-      await sendText(phoneId, waToken, from, fallbackText)
+3️⃣ Envie o comprovante aqui`)
       await db.from('whatsapp_orders').update({ status: 'pending_payment' }).eq('id', savedOrder.id)
     } else {
-      await sendText(phoneId, waToken, from, 'Recebemos seu pedido e em breve entraremos em contato. Obrigado! 🎉')
+      await sendText(phoneId, waToken, from, 'Recebemos seu pedido! Em breve entraremos em contato. 🎉')
     }
   }
 
