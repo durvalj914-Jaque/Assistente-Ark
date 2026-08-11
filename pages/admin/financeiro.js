@@ -18,6 +18,9 @@ export default function FinanceiroPage() {
   // Pagamentos / histórico
   const [payConfig, setPayConfig] = useState({ pix_key: '', merchant_name: '', merchant_city: '', mp_access_token: '' })
   const [savingPayConfig, setSavingPayConfig] = useState(false)
+  const [mpConnected, setMpConnected] = useState(false)
+  const [mpConnecting, setMpConnecting] = useState(false)
+  const [mpUser, setMpUser] = useState('')
   const [payments, setPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
 
@@ -97,8 +100,36 @@ export default function FinanceiroPage() {
       const h = await authHeader()
       const res = await fetch('/api/payments/config', { headers: h })
       const json = await res.json()
-      if (json.config) setPayConfig({ pix_key: json.config.pix_key || '', merchant_name: json.config.merchant_name || '', merchant_city: json.config.merchant_city || '', mp_access_token: json.config.mp_access_token || '' })
+      if (json.config) {
+        setPayConfig({ pix_key: json.config.pix_key || '', merchant_name: json.config.merchant_name || '', merchant_city: json.config.merchant_city || '', mp_access_token: json.config.mp_access_token || '' })
+        setMpConnected(!!json.config.mp_access_token)
+        if (json.config.mp_access_token) {
+          try { const parsed = JSON.parse(json.config.mp_access_token); setMpUser(parsed.user_nickname || '') } catch {}
+        }
+      }
     } catch (e) {}
+  }
+
+  async function connectMP() {
+    setMpConnecting(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/mercadopago/oauth/init', { headers: h })
+      const json = await res.json()
+      if (json.authUrl) window.location.href = json.authUrl
+      else alert('Erro ao iniciar conexão: ' + (json.error || ''))
+    } catch (e) { alert('Erro: ' + e.message) }
+    finally { setMpConnecting(false) }
+  }
+
+  async function disconnectMP() {
+    if (!confirm('Desconectar o Mercado Pago?')) return
+    try {
+      const h = await authHeader()
+      await fetch('/api/payments/config', { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payConfig, mp_access_token: '' }) })
+      setMpConnected(false)
+      setMpUser('')
+    } catch (e) { alert('Erro: ' + e.message) }
   }
 
   async function savePayConfig() {
@@ -171,10 +202,24 @@ export default function FinanceiroPage() {
   useEffect(() => {
     if (!user) return
     if (subTab === 'payment_methods') loadPaymentMethods('payment')
-    else if (subTab === 'billing_methods') loadPaymentMethods('billing')
+    else if (subTab === 'billing_methods') { loadPaymentMethods('billing'); loadPayConfig() }
     else if (subTab === 'receipts') { loadReceipts('all'); loadPayments() }
     else if (subTab === 'history') { loadPayments(); loadPayConfig() }
   }, [user, subTab])
+
+  // Handle Mercado Pago OAuth callback redirect
+  useEffect(() => {
+    if (router.query.mp_success) {
+      setMpConnected(true)
+      setMpUser(router.query.mp_user || '')
+      alert('✅ Mercado Pago conectado com sucesso!')
+      router.replace('/admin/financeiro?tab=billing_methods', undefined, { shallow: true })
+    }
+    if (router.query.mp_error) {
+      alert('❌ Erro ao conectar Mercado Pago: ' + router.query.mp_error)
+      router.replace('/admin/financeiro?tab=billing_methods', undefined, { shallow: true })
+    }
+  }, [router.query.mp_success, router.query.mp_error])
 
   if (loading || !user) return <AdminLayout tenant={tenant} user={user} role={role} profile={profile}><div style={{ padding: 40, color: '#64748b' }}>Carregando...</div></AdminLayout>
 
@@ -248,6 +293,42 @@ export default function FinanceiroPage() {
               + Adicionar
             </button>
           </div>
+
+          {/* Conectar Mercado Pago via OAuth (só na aba Formas de Cobrança) */}
+          {subTab === 'billing_methods' && (
+            <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: mpConnected ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(0,158,227,0.25)' }}>
+              {mpConnected ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 26 }}>✅</span>
+                    <div>
+                      <div style={{ color: '#22c55e', fontSize: 14, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` (${mpUser})` : ''}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Pagamentos automáticos via PIX e cartão ativos — a Arkiel cobra 2% por transação</div>
+                    </div>
+                  </div>
+                  <button onClick={disconnectMP}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
+                    Desconectar
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🟡 Conecte seu Mercado Pago</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5 }}>
+                      Receba PIX e pagamentos de cartão dos pedidos do catálogo direto na sua conta.<br />
+                      A Arkiel cobra apenas 2% por transação — sem mensalidade extra.
+                    </div>
+                  </div>
+                  <button onClick={connectMP} disabled={mpConnecting}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: mpConnecting ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 18 }}>🔗</span>
+                    {mpConnecting ? 'Conectando...' : 'Conectar Mercado Pago'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Presets rápidos */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
