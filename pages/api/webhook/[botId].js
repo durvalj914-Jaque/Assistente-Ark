@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../../../lib/supabase'
 import { sendText } from '../../../lib/meta'
 import { getRootNode, getNextNode, processMessage } from '../../../lib/flowEngine'
-import { sendProductList, sendSingleProduct, retailerIdFor } from '../../../lib/metaCatalog'
+import { sendProductList, sendSingleProduct, sendProductRich, sendProductListFallback, retailerIdFor } from '../../../lib/metaCatalog'
 
 export default async function handler(req, res) {
   const { botId } = req.query
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
 
     // Busca bot + tenant
     const { data: bot } = await db.from('bots')
-      .select('*, tenants(id, plan, status)')
+      .select('*, tenants(id, plan, status, pix_key, merchant_name, merchant_city)')
       .eq('id', botId)
       .single()
 
@@ -54,6 +54,7 @@ export default async function handler(req, res) {
     }
 
     const tenantId = bot.tenant_id
+    const tenant = bot.tenants
     const month = new Date().toISOString().slice(0, 7)
 
     // Controle de uso
@@ -111,6 +112,42 @@ export default async function handler(req, res) {
       meta_message_id: msg.id
     })
 
+    // ── Botão "Comprar" do catálogo (fallback rico) ──
+    const buttonId = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || ''
+    if (buttonId.startsWith('buy_') || buttonId.startsWith('prod_')) {
+      const productShortId = buttonId.replace('buy_', '').replace('prod_', '')
+      const { data: product } = await db.from('products')
+        .select('*').ilike('id', productShortId + '%').eq('tenant_id', tenantId).maybeSingle()
+
+      if (product) {
+        const price = Number(product.price || 0).toFixed(2).replace('.', ',')
+        const pixInfo = tenant?.pix_key ? `1️⃣ Pague via PIX: *${tenant.pix_key}*` : '1️⃣ Entre em contato para pagamento'
+        const buyText = `🛒 *${product.name}* — R$ ${price}\n\n${product.description || ''}\n\nPara finalizar sua compra:\n\n${pixInfo}\n2️⃣ Envie o comprovante aqui mesmo\n\nOu fale com um atendente: digite *humano*`
+
+        await sendText(phoneId, waToken, from, buyText)
+        await db.from('messages').insert({
+          tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+          contact_id: contact.id, direction: 'outbound', type: 'text', content: buyText
+        })
+
+        // Salvar pedido
+        await db.from('whatsapp_orders').insert({
+          tenant_id: tenantId, bot_id: botId, contact_id: contact.id,
+          conversation_id: conv.id,
+          items: [{ product_retailer_id: retailerIdFor(tenantId, product.id), quantity: 1, item_price: parseFloat(product.price), currency: 'BRL', product_name: product.name }],
+          total: parseFloat(product.price),
+          currency: 'BRL',
+          status: 'new',
+        })
+
+        await db.from('bots').update({
+          total_messages: (bot.total_messages || 0) + 2,
+          updated_at: new Date().toISOString()
+        }).eq('id', botId)
+        return res.status(200).end()
+      }
+    }
+
     // Transferência para humano?
     if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
       await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
@@ -127,7 +164,7 @@ export default async function handler(req, res) {
     const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
     const phoneId = bot.phone_number_id
 
-    // ── AÇÃO: CATÁLOGO — envia product_list nativa do WhatsApp ──
+    // ── AÇÃO: CATÁLOGO — envia catálogo nativo ou fallback rico ──
     if (result.action === 'catalog') {
       // Buscar produtos ativos do tenant
       const { data: products } = await db.from('products')
@@ -138,39 +175,53 @@ export default async function handler(req, res) {
         .limit(30)
 
       if (products?.length) {
+        // Texto introdutório (se houver)
+        if (result.reply) {
+          await sendText(phoneId, waToken, from, result.reply)
+          await db.from('messages').insert({
+            tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+            contact_id: contact.id, direction: 'outbound', type: 'text', content: result.reply
+          })
+        }
+
+        let sentNative = false
+        // Tenta catálogo nativo primeiro
         try {
-          // Enviar texto introdutório (se houver)
-          if (result.reply) {
-            await sendText(phoneId, waToken, from, result.reply)
-            await db.from('messages').insert({
-              tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
-              contact_id: contact.id, direction: 'outbound', type: 'text', content: result.reply
-            })
-          }
-          // Enviar product_list nativa
           await sendProductList({
             phoneNumberId: phoneId, token: waToken, to: from,
             headerText: '🛍️ Catálogo',
             bodyText: 'Toque num produto para ver detalhes e comprar 👇',
             products, tenantId
           })
+          sentNative = true
           await db.from('messages').insert({
             tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
             contact_id: contact.id, direction: 'outbound', type: 'interactive',
-            content: `🛍️ Catálogo enviado — ${products.length} produtos`
+            content: `🛍️ Catálogo nativo enviado — ${products.length} produtos`
           })
         } catch (catErr) {
-          console.error('[catalog] sendProductList failed:', catErr.message)
-          // Fallback: envia lista em texto
-          let fallback = '📦 *Catálogo de Produtos*\n\n'
-          for (const p of products) {
-            fallback += `*${p.name}*\n${p.description || ''}\n💰 R$ ${Number(p.price).toFixed(2)}\n\n`
+          console.error('[catalog] Nativo falhou, usando fallback rico:', catErr.message?.substring(0, 100))
+        }
+
+        // Fallback: envia cada produto como imagem + botão de compra
+        if (!sentNative) {
+          for (let i = 0; i < Math.min(products.length, 5); i++) {
+            try {
+              await sendProductRich({
+                phoneNumberId: phoneId, token: waToken, to: from,
+                product: products[i], index: i, total: Math.min(products.length, 5)
+              })
+            } catch (_) {}
+            // Pequeno delay entre produtos
+            await new Promise(r => setTimeout(r, 300))
           }
-          fallback += 'Para comprar, fale com nosso atendente digitando "humano".'
-          await sendText(phoneId, waToken, from, fallback)
+          if (products.length > 5) {
+            await sendText(phoneId, waToken, from, `📱 Mais ${products.length - 5} produtos disponíveis. Acesse: arkiel.com.br/catalog/${tenantId}`)
+          }
           await db.from('messages').insert({
             tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
-            contact_id: contact.id, direction: 'outbound', type: 'text', content: fallback
+            contact_id: contact.id, direction: 'outbound', type: 'interactive',
+            content: `🛍️ Catálogo enviado (fallback rico) — ${Math.min(products.length, 5)} produtos`
           })
         }
       } else {
