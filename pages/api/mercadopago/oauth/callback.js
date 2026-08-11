@@ -1,6 +1,6 @@
 /**
  * /api/mercadopago/oauth/callback
- * Recebe o code, troca por tokens (com PKCE code_verifier), salva no tenant
+ * Recebe o code do OAuth, troca por tokens, salva no tenant
  */
 import { createClient } from '@supabase/supabase-js'
 
@@ -21,19 +21,7 @@ export default async function handler(req, res) {
   
   const tenantId = state
   
-  // Get code_verifier from cookie (PKCE)
-  const codeVerifier = req.headers.cookie
-    ?.split(';').map(c => c.trim())
-    .find(c => c.startsWith('mp_code_verifier='))
-    ?.split('=')[1] || null
-  
-  if (!codeVerifier) {
-    console.error('[mp-oauth] Missing code_verifier cookie')
-    return res.redirect(302, `/admin/financeiro?tab=billing_methods&mp_error=${encodeURIComponent('Sessão PKCE expirada, tente novamente')}`)
-  }
-  
   try {
-    // Exchange code for tokens WITH PKCE code_verifier
     const tokenRes = await fetch('https://api.mercadopago.com/oauth/token', {
       method: 'POST',
       headers: { 
@@ -45,8 +33,7 @@ export default async function handler(req, res) {
         client_id: MP_CLIENT_ID,
         client_secret: MP_CLIENT_SECRET,
         code,
-        redirect_uri: REDIRECT_URI,
-        code_verifier: codeVerifier
+        redirect_uri: REDIRECT_URI
       })
     })
     
@@ -57,13 +44,11 @@ export default async function handler(req, res) {
       return res.redirect(302, `/admin/financeiro?tab=billing_methods&mp_error=${encodeURIComponent(tokenData.message || 'Falha na troca de token')}`)
     }
     
-    // Get user info
     const userRes = await fetch('https://api.mercadopago.com/users/me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` }
     })
     const userData = await userRes.json()
     
-    // Save tokens as JSON in mp_access_token
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
@@ -86,9 +71,6 @@ export default async function handler(req, res) {
       console.error('[mp-oauth] Save error:', updateError)
       return res.redirect(302, `/admin/financeiro?tab=billing_methods&mp_error=${encodeURIComponent('Erro ao salvar credenciais')}`)
     }
-    
-    // Clear PKCE cookie
-    res.setHeader('Set-Cookie', 'mp_code_verifier=; Path=/; HttpOnly; Secure; Max-Age=0')
     
     return res.redirect(302, `/admin/financeiro?tab=billing_methods&mp_success=1&mp_user=${encodeURIComponent(userData.nickname || '')}`)
     
