@@ -312,10 +312,43 @@ async function handleCatalogOrder(db, botId, order, from) {
     note: order.text || null,
   }).select().single()
 
-  // Notificar B2C que o pedido foi recebido
+  // Buscar tenant para chave PIX
+  const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city').eq('id', tenantId).maybeSingle()
+
   const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
   const phoneId = bot.phone_number_id
-  const confirmText = `✅ *Pedido recebido!*\n\n📋 Nº: ${savedOrder?.id?.substring(0, 8) || 'N/A'}\n💰 Total: R$ ${Number(total).toFixed(2)}\n\nRecebemos seu pedido e em breve entraremos em contato para confirmar o pagamento. Obrigado! 🎉`
+  const orderId = savedOrder?.id?.substring(0, 8) || 'N/A'
+  const totalFmt = Number(total).toFixed(2).replace('.', ',')
+
+  // Confirmação do pedido + instruções de pagamento na mesma mensagem
+  let confirmText = `✅ *Pedido recebido!*
+
+📋 Nº: ${orderId}
+💰 Total: R$ ${totalFmt}
+
+`
+
+  if (tenant?.pix_key) {
+    confirmText += `Para pagar agora:
+
+1️⃣ *PIX Copia e Cola:*
+${tenant.pix_key}
+
+2️⃣ Valor: R$ ${totalFmt}
+
+3️⃣ Envie o comprovante aqui mesmo
+
+Ou fale com um atendente: digite *humano*`
+
+    // Atualizar status do pedido para aguardando pagamento
+    if (savedOrder) {
+      await db.from('whatsapp_orders').update({ status: 'pending_payment' }).eq('id', savedOrder.id)
+    }
+  } else {
+    confirmText += `Recebemos seu pedido e em breve entraremos em contato para confirmar o pagamento. Obrigado! 🎉
+
+Ou fale com um atendente: digite *humano*`
+  }
 
   await sendText(phoneId, waToken, from, confirmText)
 
@@ -326,7 +359,9 @@ async function handleCatalogOrder(db, botId, order, from) {
   })
 
   // Salvar mensagem do pedido recebido
-  const orderText = `🛒 *Novo pedido do catálogo*\nTotal: R$ ${Number(total).toFixed(2)}\nItens: ${orderItems.length}`
+  const orderText = `🛒 *Novo pedido do catálogo*
+Total: R$ ${totalFmt}
+Itens: ${orderItems.length}`
   await db.from('messages').insert({
     tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
     contact_id: contact.id, direction: 'inbound', type: 'order', content: orderText
