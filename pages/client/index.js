@@ -77,6 +77,9 @@ export default function ClientPortal() {
   const [copied, setCopied] = useState(false)
   const endRef = useRef(null)
   const [payConfig, setPayConfig] = useState({ pix_key: '', merchant_name: '', merchant_city: '', mp_access_token: '' })
+  const [mpConnected, setMpConnected] = useState(false)
+  const [mpConnecting, setMpConnecting] = useState(false)
+  const [mpUser, setMpUser] = useState('')
   const [savingPay, setSavingPay] = useState(false)
   const [payHistory, setPayHistory] = useState([])
   const [payLoading, setPayLoading] = useState(false)
@@ -93,18 +96,47 @@ export default function ClientPortal() {
       const { data: { session } } = await supabase.auth.getSession()
       const r = await fetch('/api/payments/config', { headers: { Authorization: `Bearer ${session.access_token}` } })
       const d = await r.json()
-      if (d.config) setPayConfig({
-        pix_key: d.config.pix_key || '',
-        merchant_name: d.config.merchant_name || '',
-        merchant_city: d.config.merchant_city || '',
-        mp_access_token: d.config.mp_access_token || ''
-      })
+      if (d.config) {
+        setPayConfig({
+          pix_key: d.config.pix_key || '',
+          merchant_name: d.config.merchant_name || '',
+          merchant_city: d.config.merchant_city || '',
+          mp_access_token: d.config.mp_access_token || ''
+        })
+        setMpConnected(!!d.config.mp_access_token)
+      }
+      // Check URL for MP OAuth callback
+      if (router.query.mp_success) {
+        setMpConnected(true)
+        setMpUser(router.query.mp_user || '')
+        alert('✅ Mercado Pago conectado com sucesso!')
+        router.replace('/client', undefined, { shallow: true })
+      }
+      if (router.query.mp_error) {
+        alert('❌ Erro ao conectar Mercado Pago: ' + router.query.mp_error)
+        router.replace('/client', undefined, { shallow: true })
+      }
       // Load payment history
       const r2 = await fetch('/api/payments/history', { headers: { Authorization: `Bearer ${session.access_token}` } })
       const d2 = await r2.json()
       if (d2.payments) setPayHistory(d2.payments)
     } catch (e) { console.error('pay config load:', e) }
     setPayLoading(false)
+  }
+
+  async function connectMP() {
+    setMpConnecting(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/mercadopago/oauth/init', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const d = await r.json()
+      if (d.authUrl) {
+        window.location.href = d.authUrl
+      } else {
+        alert('Erro ao iniciar conexão')
+      }
+    } catch (e) { alert('Erro: ' + e.message) }
+    setMpConnecting(false)
   }
 
   async function savePayConfig() {
@@ -465,31 +497,39 @@ export default function ClientPortal() {
                 <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🏦 Mercado Pago</h3>
                 <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
                   Conecte sua conta do Mercado Pago para receber pagamentos automaticamente no WhatsApp.
-                  Os PIX gerados vão cair direto na sua conta.
+                  Os PIX e pagamentos no cartão caem direto na sua conta — a Arkiel cobra apenas uma pequena taxa por transação.
                 </p>
-                <div style={{ marginBottom: 12 }}>
-                  <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>Access Token do Mercado Pago</label>
-                  <input
-                    value={payConfig.mp_access_token}
-                    onChange={e => setPayConfig(c => ({ ...c, mp_access_token: e.target.value }))}
-                    placeholder="APP_USR-..."
-                    type="password"
-                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 13, marginTop: 6, fontFamily: 'monospace' }}
-                  />
-                </div>
-                <div style={{ background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10, padding: 14, fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 12 }}>
-                  <strong style={{ color: '#4f8ef7' }}>Como pegar seu token:</strong><br />
-                  1. Acesse <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer" style={{ color: '#4f8ef7', textDecoration: 'underline' }}>mercado pago developers</a><br />
-                  2. Clique na sua aplicação (ou crie uma)<br />
-                  3. Vá em "Credenciais de produção"<br />
-                  4. Copie o <strong style={{ color: '#fff' }}>Access Token</strong> (começa com APP_USR-)<br />
-                  5. Cole aqui e clique em Salvar
-                </div>
-                {payConfig.mp_access_token && (
-                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e', fontWeight: 600 }}>
-                    ✓ Mercado Pago conectado
+                
+                {mpConnected ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 24 }}>✅</span>
+                      <div>
+                        <div style={{ color: '#22c55e', fontSize: 14, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` (${mpUser})` : ''}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, marginTop: 2 }}>Pagamentos automáticos ativos</div>
+                      </div>
+                    </div>
+                    <button onClick={() => { setMpConnected(false); setPayConfig(c => ({ ...c, mp_access_token: '' })); savePayConfig(); }}
+                      style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'none', color: 'rgba(255,255,255,0.4)', fontSize: 12, cursor: 'pointer' }}>
+                      Desconectar
+                    </button>
                   </div>
+                ) : (
+                  <button onClick={connectMP} disabled={mpConnecting}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', opacity: mpConnecting ? 0.6 : 1, transition: 'all 0.2s' }}>
+                    <span style={{ fontSize: 22 }}>🔗</span>
+                    {mpConnecting ? 'Conectando...' : 'Conectar Mercado Pago'}
+                  </button>
                 )}
+                
+                <div style={{ marginTop: 16, padding: 14, background: 'rgba(255,255,255,0.03)', borderRadius: 10, fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.6 }}>
+                  <strong style={{ color: 'rgba(255,255,255,0.5)' }}>Como funciona:</strong><br />
+                  • Clique no botão e autorize na página do Mercado Pago<br />
+                  • Seus clientes pagam via PIX ou cartão no WhatsApp<br />
+                  • O dinheiro cai direto na sua conta MP<br />
+                  • A Arkiel cobra apenas uma taxa de 2% por transação<br />
+                  • Você acompanha tudo na aba de histórico abaixo
+                </div>
               </div>
 
               {/* PIX Manual Fallback */}
