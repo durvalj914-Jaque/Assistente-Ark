@@ -400,40 +400,7 @@ async function handleCatalogOrder(db, botId, order, from) {
   await sendText(phoneId, waToken, from, confirmText)
 
   if (pixCreated && pixCopyPaste) {
-    // Enviar QR Code como imagem
-    if (pixQrBase64) {
-      try {
-        const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/media`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${waToken}` },
-          body: (() => {
-            const fd = new FormData()
-            const buf = Buffer.from(pixQrBase64, 'base64')
-            fd.append('file', new Blob([buf], { type: 'image/png' }), 'qrcode.png')
-            fd.append('messaging_product', 'whatsapp')
-            fd.append('type', 'image/png')
-            return fd
-          })()
-        })
-        const mediaData = await mediaRes.json()
-        if (mediaData.id) {
-          await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: from,
-              type: 'image',
-              image: { id: mediaData.id }
-            })
-          })
-        }
-      } catch (imgErr) {
-        console.error('[catalog] Erro QR:', imgErr.message?.substring(0, 80))
-      }
-    }
-
-    // Montar mensagem com PIX + link de checkout
+    // Montar mensagem com PIX + link de checkout (enviar primeiro!)
     let payText = `💳 *Escolha como pagar:*
 
 🟢 *PIX (Copia e Cola):*
@@ -456,6 +423,44 @@ Aceitamos crédito, débito e boleto pelo link seguro.`
 ❓ Dúvidas? Digite *humano*`
 
     await sendText(phoneId, waToken, from, payText)
+
+    // Salvar mensagem de pagamento
+    await db.from('messages').insert({
+      tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+      contact_id: contact.id, direction: 'outbound', type: 'text', content: payText
+    })
+
+    // Tentar enviar QR Code como imagem (opcional, nao bloqueia)
+    if (pixQrBase64) {
+      try {
+        const buf = Buffer.from(pixQrBase64, 'base64')
+        const fd = new FormData()
+        fd.append('file', new Blob([buf], { type: 'image/png' }), 'qrcode.png')
+        fd.append('messaging_product', 'whatsapp')
+        fd.append('type', 'image/png')
+
+        const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/media`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${waToken}` },
+          body: fd
+        })
+        const mediaData = await mediaRes.json()
+        if (mediaData.id) {
+          await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messaging_product: 'whatsapp',
+              to: from,
+              type: 'image',
+              image: { id: mediaData.id, caption: 'Escaneie o QR Code para pagar via PIX' }
+            })
+          })
+        }
+      } catch (imgErr) {
+        console.error('[catalog] Erro QR (nao critico):', imgErr.message?.substring(0, 80))
+      }
+    }
   } else {
     // Fallback: chave PIX manual
     const { data: tenant } = await db.from('tenants').select('pix_key').eq('id', tenantId).maybeSingle()
