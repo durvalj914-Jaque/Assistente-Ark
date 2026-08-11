@@ -115,9 +115,9 @@ export default async function handler(req, res) {
     // ── Botão "Comprar" do catálogo (fallback rico) ──
     const buttonId = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || ''
     if (buttonId.startsWith('buy_') || buttonId.startsWith('prod_')) {
-      const productShortId = buttonId.replace('buy_', '').replace('prod_', '')
+      const productId = buttonId.replace('buy_', '').replace('prod_', '')
       const { data: product } = await db.from('products')
-        .select('*').ilike('id', productShortId + '%').eq('tenant_id', tenantId).maybeSingle()
+        .select('*').eq('id', productId).eq('tenant_id', tenantId).maybeSingle()
 
       if (product) {
         const price = Number(product.price || 0).toFixed(2).replace('.', ',')
