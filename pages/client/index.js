@@ -479,7 +479,7 @@ export default function ClientPortal() {
                 </div>
                 <div style={{ background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10, padding: 14, fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 12 }}>
                   <strong style={{ color: '#4f8ef7' }}>Como pegar seu token:</strong><br />
-                  1. Acesse <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer" style={{ color: '#4f8ef7', textDecoration: 'underline''>mercado pago developers</a><br />
+                  1. Acesse <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer" style={{ color: '#4f8ef7', textDecoration: 'underline' }}>mercado pago developers</a><br />
                   2. Clique na sua aplicação (ou crie uma)<br />
                   3. Vá em "Credenciais de produção"<br />
                   4. Copie o <strong style={{ color: '#fff' }}>Access Token</strong> (começa com APP_USR-)<br />
