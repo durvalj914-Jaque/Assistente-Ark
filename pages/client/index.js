@@ -76,10 +76,50 @@ export default function ClientPortal() {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const endRef = useRef(null)
+  const [payConfig, setPayConfig] = useState({ pix_key: '', merchant_name: '', merchant_city: '', mp_access_token: '' })
+  const [savingPay, setSavingPay] = useState(false)
+  const [payHistory, setPayHistory] = useState([])
+  const [payLoading, setPayLoading] = useState(false)
 
   useEffect(() => {
     if (tab === 'catalog') loadCatalog()
+    if (tab === 'finance') loadPayConfig()
   }, [tab, tenant])
+
+  async function loadPayConfig() {
+    if (!tenant) return
+    setPayLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/payments/config', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const d = await r.json()
+      if (d.config) setPayConfig({
+        pix_key: d.config.pix_key || '',
+        merchant_name: d.config.merchant_name || '',
+        merchant_city: d.config.merchant_city || '',
+        mp_access_token: d.config.mp_access_token || ''
+      })
+      // Load payment history
+      const r2 = await fetch('/api/payments/history', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const d2 = await r2.json()
+      if (d2.payments) setPayHistory(d2.payments)
+    } catch (e) { console.error('pay config load:', e) }
+    setPayLoading(false)
+  }
+
+  async function savePayConfig() {
+    setSavingPay(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      await fetch('/api/payments/config', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payConfig)
+      })
+      alert('Configuração salva!')
+    } catch (e) { alert('Erro ao salvar') }
+    setSavingPay(false)
+  }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -197,6 +237,7 @@ export default function ClientPortal() {
               { key: 'bots',          icon: '🤖', label: 'Meus Bots', count: bots.length },
               { key: 'catalog',       icon: '🛍️', label: 'Catálogo' },
             { key: 'whatsapp',       icon: '📶', label: 'WhatsApp' },
+            { key: 'finance',       icon: '💰', label: 'Financeiro' },
             { key: 'usage',         icon: '📊', label: 'Uso & Plano' }
             ].map(n => (
               <button key={n.key} onClick={() => setTab(n.key)}
@@ -414,6 +455,105 @@ export default function ClientPortal() {
             </div>
           )}
 
+          {tab === 'finance' && (
+            <div style={styles.tabContent}>
+              <h2 style={styles.sectionTitle}>💰 Financeiro</h2>
+              <p style={styles.sectionSub}>Configure como você recebe dos seus clientes via PIX e cartão.</p>
+
+              {/* Mercado Pago Connection */}
+              <div style={{ ...styles.usageCard, marginBottom: 20, padding: 24 }}>
+                <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🏦 Mercado Pago</h3>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
+                  Conecte sua conta do Mercado Pago para receber pagamentos automaticamente no WhatsApp.
+                  Os PIX gerados vão cair direto na sua conta.
+                </p>
+                <div style={{ marginBottom: 12 }}>
+                  <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>Access Token do Mercado Pago</label>
+                  <input
+                    value={payConfig.mp_access_token}
+                    onChange={e => setPayConfig(c => ({ ...c, mp_access_token: e.target.value }))}
+                    placeholder="APP_USR-..."
+                    type="password"
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 13, marginTop: 6, fontFamily: 'monospace' }}
+                  />
+                </div>
+                <div style={{ background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 10, padding: 14, fontSize: 12, color: 'rgba(255,255,255,0.5)', lineHeight: 1.6, marginBottom: 12 }}>
+                  <strong style={{ color: '#4f8ef7' }}>Como pegar seu token:</strong><br />
+                  1. Acesse <a href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer" style={{ color: '#4f8ef7', textDecoration: 'underline''>mercado pago developers</a><br />
+                  2. Clique na sua aplicação (ou crie uma)<br />
+                  3. Vá em "Credenciais de produção"<br />
+                  4. Copie o <strong style={{ color: '#fff' }}>Access Token</strong> (começa com APP_USR-)<br />
+                  5. Cole aqui e clique em Salvar
+                </div>
+                {payConfig.mp_access_token && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#22c55e', fontWeight: 600 }}>
+                    ✓ Mercado Pago conectado
+                  </div>
+                )}
+              </div>
+
+              {/* PIX Manual Fallback */}
+              <div style={{ ...styles.usageCard, marginBottom: 20, padding: 24 }}>
+                <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 16 }}>🟢 PIX Manual (Backup)</h3>
+                <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13, marginBottom: 16 }}>
+                  Usado como reserva caso o Mercado Pago falhe. O cliente recebe a chave e paga manualmente.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>Chave PIX</label>
+                    <input value={payConfig.pix_key} onChange={e => setPayConfig(c => ({ ...c, pix_key: e.target.value }))}
+                      placeholder="email, CPF, telefone..."
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 13, marginTop: 6 }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>Nome do Recebedor</label>
+                    <input value={payConfig.merchant_name} onChange={e => setPayConfig(c => ({ ...c, merchant_name: e.target.value }))}
+                      placeholder="Ex: João Silva"
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 13, marginTop: 6 }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: 600 }}>Cidade</label>
+                    <input value={payConfig.merchant_city} onChange={e => setPayConfig(c => ({ ...c, merchant_city: e.target.value }))}
+                      placeholder="Ex: SAO PAULO"
+                      style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)', color: '#fff', fontSize: 13, marginTop: 6 }} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button onClick={savePayConfig} disabled={savingPay}
+                style={{ padding: '12px 28px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: savingPay ? 0.5 : 1, marginBottom: 32 }}>
+                {savingPay ? 'Salvando...' : '💾 Salvar Configuração'}
+              </button>
+
+              {/* Payment History */}
+              <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 700, marginBottom: 16 }}>📋 Histórico de Pagamentos</h3>
+              {payLoading ? (
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Carregando...</p>
+              ) : payHistory.length === 0 ? (
+                <div style={{ ...styles.usageCard, padding: 32, textAlign: 'center' }}>
+                  <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>Nenhum pagamento recebido ainda</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {payHistory.map(p => (
+                    <div key={p.id} style={{ ...styles.usageCard, padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <div style={{ color: '#fff', fontSize: 13, fontWeight: 600 }}>{p.description || 'Pagamento'}</div>
+                        <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11 }}>{new Date(p.created_at).toLocaleString('pt-BR')}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>R$ {Number(p.amount).toFixed(2)}</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: p.status === 'paid' ? '#22c55e' : p.status === 'pending' ? '#f59e0b' : '#ef4444' }}>
+                          {p.status === 'paid' ? '✓ Confirmado' : p.status === 'pending' ? '⏳ Pendente' : '✕ Falhou'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           {tab === 'usage' && (
             <div style={styles.tabContent}>
               <h2 style={styles.sectionTitle}>Uso & Plano</h2>

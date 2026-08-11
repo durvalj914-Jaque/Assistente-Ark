@@ -319,7 +319,9 @@ async function handleCatalogOrder(db, botId, order, from) {
   const totalFmt = Number(total).toFixed(2).replace('.', ',')
 
   // Gerar PIX dinâmico + link de checkout via Mercado Pago
-  const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_2
+  // Prioriza token do tenant, fallback para token da plataforma
+  const { data: tenantPay } = await db.from('tenants').select('mp_access_token').eq('id', tenantId).maybeSingle()
+  const mpToken = tenantPay?.mp_access_token || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
   let pixCreated = false
   let pixCopyPaste = null
   let checkoutUrl = null
