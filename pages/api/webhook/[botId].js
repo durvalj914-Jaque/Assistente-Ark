@@ -321,7 +321,21 @@ async function handleCatalogOrder(db, botId, order, from) {
   // Gerar PIX dinâmico + link de checkout via Mercado Pago
   // Prioriza token do tenant, fallback para token da plataforma
   const { data: tenantPay } = await db.from('tenants').select('mp_access_token').eq('id', tenantId).maybeSingle()
-  const mpToken = tenantPay?.mp_access_token || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
+  let mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_2
+  let usingTenantToken = false
+  if (tenantPay?.mp_access_token) {
+    try {
+      const parsed = JSON.parse(tenantPay.mp_access_token)
+      if (parsed.access_token) {
+        mpToken = parsed.access_token
+        usingTenantToken = true
+      }
+    } catch {
+      // Not JSON, use as plain token
+      mpToken = tenantPay.mp_access_token
+      usingTenantToken = true
+    }
+  }
   let pixCreated = false
   let pixCopyPaste = null
   let checkoutUrl = null
@@ -344,8 +358,7 @@ async function handleCatalogOrder(db, botId, order, from) {
           payer: { email: `cliente${from.slice(-4)}@arkiel.com.br` },
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          market_place: 'ARKIEL',
-          marketplace_fee: Number((orderTotal * 0.02).toFixed(2))
+          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: Number((orderTotal * 0.02).toFixed(2)) } : {})
         })
       })
       const pixData = await pixRes.json()
@@ -378,8 +391,7 @@ async function handleCatalogOrder(db, botId, order, from) {
           }],
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          marketplace: 'ARKIEL',
-          marketplace_fee: Number((orderTotal * 0.02).toFixed(2)),
+          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: Number((orderTotal * 0.02).toFixed(2)) } : {}),
           back_urls: {
             success: 'https://arkiel.com.br/payment/success',
             failure: 'https://arkiel.com.br/payment/failure'

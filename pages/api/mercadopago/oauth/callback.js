@@ -1,6 +1,7 @@
 /**
  * /api/mercadopago/oauth/callback
  * Recebe o code do OAuth do Mercado Pago, troca por tokens, salva no tenant
+ * Armazena tudo como JSON no campo mp_access_token (sem migracao)
  */
 import { createClient } from '@supabase/supabase-js'
 
@@ -48,22 +49,23 @@ export default async function handler(req, res) {
     })
     const userData = await userRes.json()
     
-    // Save tokens to tenant
+    // Save tokens as JSON in mp_access_token column (no migration needed)
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabase = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } })
     
-    const expiresAt = new Date(Date.now() + (tokenData.expires_in || 21600) * 1000).toISOString()
+    const tokenBundle = JSON.stringify({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token || null,
+      public_key: tokenData.public_key || null,
+      user_id: userData.id || null,
+      user_nickname: userData.nickname || null,
+      expires_at: new Date(Date.now() + (tokenData.expires_in || 21600) * 1000).toISOString()
+    })
     
     const { error: updateError } = await supabase
       .from('tenants')
-      .update({
-        mp_access_token: tokenData.access_token,
-        mp_refresh_token: tokenData.refresh_token || null,
-        mp_public_key: tokenData.public_key || null,
-        mp_user_id: userData.id || null,
-        mp_expires_at: expiresAt
-      })
+      .update({ mp_access_token: tokenBundle })
       .eq('id', tenantId)
     
     if (updateError) {
