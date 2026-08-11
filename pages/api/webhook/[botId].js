@@ -341,7 +341,8 @@ async function handleCatalogOrder(db, botId, order, from) {
           description: `Pedido Arkiel #${orderId}`,
           payment_method_id: 'pix',
           payer: { email: `cliente${from.slice(-4)}@arkiel.com.br` },
-          metadata: { order_id: savedOrder.id, tenant_id: tenantId }
+          metadata: { order_id: savedOrder.id, tenant_id: tenantId },
+          notification_url: 'https://arkiel.com.br/api/mercadopago/webhook'
         })
       })
       const pixData = await pixRes.json()
@@ -374,6 +375,7 @@ async function handleCatalogOrder(db, botId, order, from) {
             currency_id: 'BRL'
           }],
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
+          notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
           back_urls: {
             success: 'https://arkiel.com.br/payment/success',
             failure: 'https://arkiel.com.br/payment/failure'
