@@ -150,7 +150,7 @@ Vamos finalizar o pagamento 👇`)
             items: [{ title: `Pedido Catálogo - ${itemCount} item(s)`, quantity: 1, unit_price: total, currency_id: 'BRL' }],
             back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
             auto_return: 'approved', external_reference: txid,
-            notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+            notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
           }),
         })
         const mpData = await mpRes.json()
@@ -698,7 +698,7 @@ Obrigado! 🎉`)
               items: [{ title: reply?.substring(0, 50) || 'Pagamento', quantity: 1, unit_price: payAmount, currency_id: 'BRL' }],
               back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
               auto_return: 'approved', external_reference: txid,
-              notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+              notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
             }),
           })
           const mpData = await mpRes.json()

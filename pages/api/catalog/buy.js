@@ -129,7 +129,7 @@ export default async function handler(req, res) {
         },
         auto_return: 'approved',
         external_reference: orderRef,
-        notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+        notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
       }),
     })
     const mpData = await mpRes.json()

@@ -88,7 +88,7 @@ export default async function handler(req, res) {
         items: [{ title: description || 'Pagamento', quantity: 1, unit_price: parseFloat(amount), currency_id: 'BRL' }],
         back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
         auto_return: 'approved', external_reference: txid, statement_descriptor: finalName.substring(0, 12),
-        notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+        notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
       }),
     })
     const mpData = await mpRes.json()

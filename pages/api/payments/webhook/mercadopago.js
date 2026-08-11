@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     const { type, data } = req.body || {}
 
     if (type === 'payment' && data?.id) {
-      const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN
+      const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
       if (!mpToken) return res.status(200).json({ ok: true })
 
       const payRes = await fetch(`https://api.mercadopago.com/v1/payments/${data.id}`, {
