@@ -1,10 +1,10 @@
 /**
  * /api/mercadopago/oauth/init
- * Inicia OAuth do Mercado Pago (sem PKCE, com platform_id)
+ * Inicia OAuth do Mercado Pago (um clique) — PKCE desativado no painel
  */
 import { createClient } from '@supabase/supabase-js'
 
-const MP_CLIENT_ID = '4905810356503706'
+const MP_CLIENT_ID = '3158906703766924'
 const REDIRECT_URI = 'https://arkiel.com.br/api/mercadopago/oauth/callback'
 
 export default async function handler(req, res) {
@@ -28,7 +28,6 @@ export default async function handler(req, res) {
   
   if (!member) return res.status(400).json({ error: 'Tenant não encontrado' })
   
-  // Non-PKCE URL format per MP docs (with platform_id, no code_challenge)
   const authUrl = `https://auth.mercadopago.com/authorization?client_id=${MP_CLIENT_ID}&response_type=code&platform_id=mp&state=${member.tenant_id}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`
   
   return res.status(200).json({ authUrl })

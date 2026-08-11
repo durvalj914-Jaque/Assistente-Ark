@@ -1,11 +1,11 @@
 /**
  * /api/mercadopago/oauth/callback
- * Recebe o code do OAuth, troca por tokens, salva no tenant
+ * Recebe o code, troca por tokens, salva no tenant
  */
 import { createClient } from '@supabase/supabase-js'
 
-const MP_CLIENT_ID = '4905810356503706'
-const MP_CLIENT_SECRET = process.env.MERCADO_PAGO_CLIENT_SECRET
+const MP_CLIENT_ID = '3158906703766924'
+const MP_CLIENT_SECRET = process.env.MERCADO_PAGO_CLIENT_SECRET_3
 const REDIRECT_URI = 'https://arkiel.com.br/api/mercadopago/oauth/callback'
 
 export default async function handler(req, res) {
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     
     if (!tokenData.access_token) {
       console.error('[mp-oauth] Token exchange failed:', JSON.stringify(tokenData))
-      return res.redirect(302, `/admin/financeiro?tab=billing_methods&mp_error=${encodeURIComponent(tokenData.message || 'Falha na troca de token')}`)
+      return res.redirect(302, `/admin/financeiro?tab=billing_methods&mp_error=${encodeURIComponent(tokenData.message || tokenData.error || 'Falha na troca de token')}`)
     }
     
     const userRes = await fetch('https://api.mercadopago.com/users/me', {
@@ -58,7 +58,7 @@ export default async function handler(req, res) {
       refresh_token: tokenData.refresh_token || null,
       public_key: tokenData.public_key || null,
       user_id: userData.id || null,
-      user_nickname: userData.nickname || null,
+      user_nickname: userData.nickname || userData.first_name || '',
       expires_at: new Date(Date.now() + (tokenData.expires_in || 21600) * 1000).toISOString()
     })
     

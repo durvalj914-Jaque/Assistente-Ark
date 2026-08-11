@@ -21,7 +21,6 @@ export default function FinanceiroPage() {
   const [mpConnected, setMpConnected] = useState(false)
   const [mpConnecting, setMpConnecting] = useState(false)
   const [mpUser, setMpUser] = useState('')
-  const [mpTokenInput, setMpTokenInput] = useState('')
   const [payments, setPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
 
@@ -111,40 +110,14 @@ export default function FinanceiroPage() {
     } catch (e) {}
   }
 
-  async function connectMPManual() {
-    if (!mpTokenInput.trim()) return
+  async function connectMP() {
     setMpConnecting(true)
     try {
-      // Validate the token by calling /users/me
-      const validateRes = await fetch('https://api.mercadopago.com/users/me', {
-        headers: { Authorization: `Bearer ${mpTokenInput.trim()}` }
-      })
-      const userData = await validateRes.json()
-      
-      if (!userData.id) {
-        alert('❌ Token inválido. Verifique se copiou o Access Token de produção correto.')
-        return
-      }
-      
-      // Save token to tenant config
       const h = await authHeader()
-      const tokenBundle = JSON.stringify({
-        access_token: mpTokenInput.trim(),
-        user_id: userData.id,
-        user_nickname: userData.nickname || userData.first_name || '',
-        expires_at: null
-      })
-      
-      await fetch('/api/payments/config', {
-        method: 'POST',
-        headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...payConfig, mp_access_token: tokenBundle })
-      })
-      
-      setMpConnected(true)
-      setMpUser(userData.nickname || userData.first_name || '')
-      setMpTokenInput('')
-      alert('✅ Mercado Pago conectado com sucesso!')
+      const res = await fetch('/api/mercadopago/oauth/init', { headers: h })
+      const json = await res.json()
+      if (json.authUrl) window.location.href = json.authUrl
+      else alert('Erro ao iniciar conexão: ' + (json.error || ''))
     } catch (e) { alert('Erro: ' + e.message) }
     finally { setMpConnecting(false) }
   }
@@ -309,7 +282,7 @@ export default function FinanceiroPage() {
             </button>
           </div>
 
-          {/* Conectar Mercado Pago via token manual (só na aba Formas de Cobrança) */}
+          {/* Conectar Mercado Pago via OAuth (um clique) */}
           {subTab === 'billing_methods' && (
             <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: mpConnected ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(0,158,227,0.25)' }}>
               {mpConnected ? (
@@ -327,31 +300,19 @@ export default function FinanceiroPage() {
                   </button>
                 </div>
               ) : (
-                <div>
-                  <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🟡 Conecte seu Mercado Pago</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 12 }}>
-                    Receba PIX e pagamentos de cartão dos pedidos do catálogo direto na sua conta.<br />
-                    A Arkiel cobra apenas 2% por transação — sem mensalidade extra.
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🟡 Conecte seu Mercado Pago</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5 }}>
+                      Receba PIX e pagamentos de cartão dos pedidos do catálogo direto na sua conta.<br />
+                      A Arkiel cobra apenas 2% por transação — sem mensalidade extra.
+                    </div>
                   </div>
-                  <div style={{ background: 'rgba(0,158,227,0.08)', borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                    <strong style={{ color: 'var(--text-primary)' }}>Como conectar:</strong><br />
-                    1. Acesse <a href="https://www.mercadopago.com.br/developers/panel/credentials" target="_blank" style={{ color: '#009ee3', textDecoration: 'underline' }}>suas credenciais do MP</a><br />
-                    2. Copie seu <strong>Access Token</strong> de produção<br />
-                    3. Cole no campo abaixo e clique em Conectar
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <input
-                      type="password"
-                      placeholder="APP_USR-XXXX-XXXX-XXXX-XXXX"
-                      value={mpTokenInput}
-                      onChange={e => setMpTokenInput(e.target.value)}
-                      style={{ flex: 1, minWidth: 250, padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }}
-                    />
-                    <button onClick={connectMPManual} disabled={mpConnecting || !mpTokenInput.trim()}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', borderRadius: 8, border: 'none', background: '#009ee3', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: (mpConnecting || !mpTokenInput.trim()) ? 0.5 : 1, whiteSpace: 'nowrap' }}>
-                      {mpConnecting ? 'Validando...' : 'Conectar'}
-                    </button>
-                  </div>
+                  <button onClick={connectMP} disabled={mpConnecting}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: mpConnecting ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 18 }}>🔗</span>
+                    {mpConnecting ? 'Conectando...' : 'Conectar Mercado Pago'}
+                  </button>
                 </div>
               )}
             </div>
