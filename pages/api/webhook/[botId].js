@@ -322,7 +322,6 @@ async function handleCatalogOrder(db, botId, order, from) {
   const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_2
   let pixCreated = false
   let pixCopyPaste = null
-  let pixQrBase64 = null
   let checkoutUrl = null
 
   if (mpToken && savedOrder) {
@@ -350,7 +349,6 @@ async function handleCatalogOrder(db, botId, order, from) {
       if (pixData.id && pixData.point_of_interaction?.transaction_data?.qr_code) {
         pixCreated = true
         pixCopyPaste = pixData.point_of_interaction.transaction_data.qr_code
-        pixQrBase64 = pixData.point_of_interaction.transaction_data.qr_code_base64
 
         // Salvar payment_id no campo note (JSON)
         await db.from('whatsapp_orders').update({
@@ -430,31 +428,26 @@ Aceitamos crédito, débito e boleto pelo link seguro.`
       contact_id: contact.id, direction: 'outbound', type: 'text', content: payText
     })
 
-    // Tentar enviar QR Code como imagem (opcional, nao bloqueia)
-    if (pixQrBase64) {
+    // Enviar QR Code como imagem via URL publica (gerado do PIX code)
+    if (pixCopyPaste) {
       try {
-        const buf = Buffer.from(pixQrBase64, 'base64')
-        const fd = new FormData()
-        fd.append('file', new Blob([buf], { type: 'image/png' }), 'qrcode.png')
-        fd.append('messaging_product', 'whatsapp')
-        fd.append('type', 'image/png')
-
-        const mediaRes = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/media`, {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(pixCopyPaste)}`
+        const imgRes = await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${waToken}` },
-          body: fd
+          headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: from,
+            type: 'image',
+            image: { link: qrUrl, caption: `Escaneie para pagar via PIX - R$ ${totalFmt}` }
+          })
         })
-        const mediaData = await mediaRes.json()
-        if (mediaData.id) {
-          await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${waToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              messaging_product: 'whatsapp',
-              to: from,
-              type: 'image',
-              image: { id: mediaData.id, caption: 'Escaneie o QR Code para pagar via PIX' }
-            })
+        const imgData = await imgRes.json()
+        if (imgData.messages) {
+          await db.from('messages').insert({
+            tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+            contact_id: contact.id, direction: 'outbound', type: 'image',
+            content: `QR Code PIX - R$ ${totalFmt}`
           })
         }
       } catch (imgErr) {
