@@ -15,17 +15,16 @@ export default async function handler(req, res) {
       .eq('id', tenantId)
       .maybeSingle()
 
-    if (!tenant?.mp_access_token) {
-      return res.status(200).json({ connected: false, methods: [] })
-    }
-
     let token = null
     let usingPlatform = false
-    try {
-      const parsed = JSON.parse(tenant.mp_access_token)
-      token = parsed.access_token
-    } catch {
-      token = tenant.mp_access_token
+    
+    if (tenant?.mp_access_token) {
+      try {
+        const parsed = JSON.parse(tenant.mp_access_token)
+        token = parsed.access_token
+      } catch {
+        token = tenant.mp_access_token
+      }
     }
 
     // Fallback para token da plataforma se tenant não tem proprio token
