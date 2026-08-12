@@ -111,10 +111,10 @@ export default function FinanceiroPage() {
             const parsed = JSON.parse(json.config.mp_access_token); 
             setMpUser(parsed.user_nickname || '')
             if (parsed.mp_methods) setMpMethods(parsed.mp_methods)
-            // Fetch real methods from MP API
-            fetchMPMethods(json.config.id)
           } catch {}
         }
+        // Sempre buscar formas disponiveis (usando token do tenant ou fallback da plataforma)
+        if (json.config.id) fetchMPMethods(json.config.id)
       }
     } catch (e) {}
   }
@@ -318,25 +318,35 @@ export default function FinanceiroPage() {
           {/* Conectar Mercado Pago via OAuth (um clique) */}
           {subTab === 'billing_methods' && (
             <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: mpConnected ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(0,158,227,0.25)' }}>
-              {mpConnected ? (
-                <div>
-                  {/* Header com status e botao desconectar */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 26 }}>✅</span>
-                      <div>
-                        <div style={{ color: '#22c55e', fontSize: 14, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` — ${mpUser}` : ''}</div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Taxa Arkiel: 2% por transação • Confirmação automática via webhook</div>
-                      </div>
+              {/* Header com status da conexao */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 26 }}>{mpConnected ? '✅' : '🟡'}</span>
+                  <div>
+                    <div style={{ color: mpConnected ? '#22c55e' : 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
+                      {mpConnected ? `Mercado Pago conectado${mpUser ? ` — ${mpUser}` : ''}` : 'Mercado Pago (via plataforma Arkiel)'}
                     </div>
-                    <button onClick={disconnectMP}
-                      style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
-                      Desconectar
-                    </button>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
+                      {mpConnected ? 'Taxa Arkiel: 2% por transação • Confirmação automática via webhook' : 'Conecte sua própria conta para receber direto • Taxa Arkiel: 2% por transação'}
+                    </div>
                   </div>
+                </div>
+                {mpConnected ? (
+                  <button onClick={disconnectMP}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
+                    Desconectar
+                  </button>
+                ) : (
+                  <button onClick={connectMP} disabled={mpConnecting}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: mpConnecting ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 16 }}>🔗</span>
+                    {mpConnecting ? 'Conectando...' : 'Conectar minha conta'}
+                  </button>
+                )}
+              </div>
 
-                  {/* Formas de cobrança ativas via MP */}
-                  <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
+              {/* Formas de cobrança vinculadas à conta */}
+              <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
                     <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Formas de cobrança vinculadas à conta
                     </div>
@@ -387,23 +397,6 @@ export default function FinanceiroPage() {
                       </div>
                     )}
                   </div>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                  <div>
-                    <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>🟡 Conecte seu Mercado Pago</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5 }}>
-                      Receba PIX e pagamentos de cartão dos pedidos do catálogo direto na sua conta.<br />
-                      A Arkiel cobra apenas 2% por transação — sem mensalidade extra.
-                    </div>
-                  </div>
-                  <button onClick={connectMP} disabled={mpConnecting}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 22px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: mpConnecting ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                    <span style={{ fontSize: 18 }}>🔗</span>
-                    {mpConnecting ? 'Conectando...' : 'Conectar Mercado Pago'}
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
