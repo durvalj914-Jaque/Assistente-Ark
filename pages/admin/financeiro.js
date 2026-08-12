@@ -341,16 +341,18 @@ export default function FinanceiroPage() {
             {mpDisconnecting ? 'Desconectando...' : '🗑️ Desconectar MP'}
           </button>
         ) : (
-          <button onClick={connectMP} disabled={mpConnecting}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
-              border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)',
-              color: '#fff', fontSize: 13, fontWeight: 700, transition: 'all .15s',
-              whiteSpace: 'nowrap', opacity: mpConnecting ? 0.5 : 1,
-            }}>
-            {mpConnecting ? 'Conectando...' : '🔗 Conectar minha conta'}
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button onClick={connectMP} disabled={mpConnecting}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
+                border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)',
+                color: '#fff', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+                whiteSpace: 'nowrap', opacity: mpConnecting ? 0.5 : 1,
+              }}>
+              {mpConnecting ? 'Conectando...' : '🔗 Conectar minha conta'}
+            </button>
+          </div>
         )}
       </div>
       {/* Feedback da desconexão MP */}
