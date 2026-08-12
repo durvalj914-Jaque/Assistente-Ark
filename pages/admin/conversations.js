@@ -927,22 +927,45 @@ export default function ConversationsPage() {
                       </button>
                     ))}
                   </div>
-                  {/* Connected methods from MP account */}
+                  {/* Connected methods from MP account - selecionaveis */}
                   {mpChargeMethods.length > 0 && (
                     <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10, marginTop: 4 }}>
                       <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Formas ativas na conta
+                        Formas ativas na conta — toque para selecionar
                       </div>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {mpChargeMethods.map(cat => (
-                          <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
-                            <span style={{ fontSize: 14 }}>{cat.icon}</span>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{cat.label}</span>
-                            {cat.methods.length > 1 && (
-                              <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>+{cat.methods.length - 1}</span>
-                            )}
-                          </div>
-                        ))}
+                        {mpChargeMethods.map(cat => {
+                          const methodKey = cat.key === 'pix' ? 'pix' : 'mercadopago'
+                          const isActive = payMethod === methodKey
+                          return (
+                            <button key={cat.key} onClick={() => setPayMethod(methodKey)}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 5,
+                                padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+                                border: isActive ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                                background: isActive ? 'rgba(79,142,247,0.15)' : 'var(--bg-secondary)',
+                                transition: 'all .15s',
+                              }}>
+                              <span style={{ fontSize: 14 }}>{cat.icon}</span>
+                              <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#4f8ef7' : 'var(--text-secondary)' }}>{cat.label}</span>
+                              {cat.methods.length > 1 && (
+                                <span style={{ fontSize: 9, color: isActive ? '#4f8ef7' : 'var(--text-muted)' }}>+{cat.methods.length - 1}</span>
+                              )}
+                            </button>
+                          )
+                        })}
+                        {/* Botao Ambos */}
+                        <button onClick={() => setPayMethod('both')}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 5,
+                            padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
+                            border: payMethod === 'both' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                            background: payMethod === 'both' ? 'rgba(79,142,247,0.15)' : 'var(--bg-secondary)',
+                            transition: 'all .15s',
+                          }}>
+                          <span style={{ fontSize: 14 }}>🚀</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, color: payMethod === 'both' ? '#4f8ef7' : 'var(--text-secondary)' }}>Ambos</span>
+                        </button>
                       </div>
                     </div>
                   )}
