@@ -236,10 +236,11 @@ export default function FinanceiroPage() {
   // ── LOAD ON MOUNT ──
   useEffect(() => {
     if (!user) return
+    loadPayConfig()
     if (subTab === 'payment_methods') loadPaymentMethods('payment')
-    else if (subTab === 'billing_methods') { loadPaymentMethods('billing'); loadPayConfig() }
+    else if (subTab === 'billing_methods') { loadPaymentMethods('billing') }
     else if (subTab === 'receipts') { loadReceipts('all'); loadPayments() }
-    else if (subTab === 'history') { loadPayments(); loadPayConfig() }
+    else if (subTab === 'history') { loadPayments() }
   }, [user, subTab])
 
 
@@ -303,6 +304,29 @@ export default function FinanceiroPage() {
           </button>
         ))}
       </div>
+
+      {/* ── Status Mercado Pago (sempre visivel) ── */}
+      {mpConnected && (
+        <div className="ark-card" style={{ padding: '14px 18px', marginBottom: 16, border: '1px solid rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 22 }}>✅</span>
+            <div>
+              <div style={{ color: '#22c55e', fontSize: 13, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` — ${mpUser}` : ''}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Taxa Arkiel: 2% por transação • Confirmação automática via webhook</div>
+            </div>
+          </div>
+          <button onClick={disconnectMP}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
+              border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+              color: '#ef4444', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+              whiteSpace: 'nowrap',
+            }}>
+            🗑️ Desconectar MP
+          </button>
+        </div>
+      )}
 
       {/* ── FORMAS DE PAGAMENTO / COBRANÇA ── */}
       {(subTab === 'payment_methods' || subTab === 'billing_methods') && (
