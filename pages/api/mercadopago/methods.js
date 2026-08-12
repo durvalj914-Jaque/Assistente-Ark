@@ -20,11 +20,18 @@ export default async function handler(req, res) {
     }
 
     let token = null
+    let usingPlatform = false
     try {
       const parsed = JSON.parse(tenant.mp_access_token)
       token = parsed.access_token
     } catch {
       token = tenant.mp_access_token
+    }
+
+    // Fallback para token da plataforma se tenant não tem proprio token
+    if (!token) {
+      token = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
+      usingPlatform = true
     }
 
     if (!token) return res.status(200).json({ connected: false, methods: [] })
@@ -72,7 +79,7 @@ export default async function handler(req, res) {
       .filter(([_, cat]) => cat.methods.length > 0)
       .map(([key, cat]) => ({ key, ...cat }))
 
-    return res.status(200).json({ connected: true, methods: result })
+    return res.status(200).json({ connected: true, methods: result, using_platform_token: usingPlatform })
   } catch (e) {
     console.error('[mp-methods] Error:', e.message)
     return res.status(200).json({ connected: false, methods: [], error: e.message })
