@@ -321,8 +321,9 @@ async function handleCatalogOrder(db, botId, order, from) {
   // Gerar PIX dinâmico + link de checkout via Mercado Pago
   // Prioriza token do tenant, fallback para token da plataforma
   const { data: tenantPay } = await db.from('tenants').select('mp_access_token').eq('id', tenantId).maybeSingle()
-  let mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_2
+  let mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
   let usingTenantToken = false
+  let mpMethods = { pix: true, credit_card: true, debit_card: true, boleto: true }
   if (tenantPay?.mp_access_token) {
     try {
       const parsed = JSON.parse(tenantPay.mp_access_token)
@@ -330,6 +331,7 @@ async function handleCatalogOrder(db, botId, order, from) {
         mpToken = parsed.access_token
         usingTenantToken = true
       }
+      if (parsed.mp_methods) mpMethods = parsed.mp_methods
     } catch {
       // Not JSON, use as plain token
       mpToken = tenantPay.mp_access_token
@@ -342,7 +344,8 @@ async function handleCatalogOrder(db, botId, order, from) {
 
   if (mpToken && savedOrder) {
     try {
-      // 1. Criar PIX dinâmico
+      // 1. Criar PIX dinâmico (apenas se ativo)
+      if (mpMethods.pix) {
       const idempotencyKey = `arkiel-${savedOrder.id}`
       const pixRes = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST',
@@ -374,7 +377,10 @@ async function handleCatalogOrder(db, botId, order, from) {
         }).eq('id', savedOrder.id)
       }
 
-      // 2. Criar link de checkout (cartão, boleto, etc)
+      }
+
+      // 2. Criar link de checkout (cartão, boleto) — apenas se algum metodo cartao/boleto ativo
+      if (mpMethods.credit_card || mpMethods.debit_card || mpMethods.boleto) {
       const prefRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
         method: 'POST',
         headers: {
@@ -401,8 +407,9 @@ async function handleCatalogOrder(db, botId, order, from) {
       })
       const prefData = await prefRes.json()
       if (prefData.init_point) {
-        checkoutUrl = prefData.init_point
-      }
+          checkoutUrl = prefData.init_point
+        }
+      } // end checkout methods check
     } catch (mpErr) {
       console.error('[catalog] Erro Mercado Pago:', mpErr.message?.substring(0, 100))
     }
@@ -418,20 +425,19 @@ async function handleCatalogOrder(db, botId, order, from) {
   if (pixCreated && pixCopyPaste) {
     // Montar mensagem com PIX + link de checkout (enviar primeiro!)
     let payText = `💳 *Escolha como pagar:*
-
-🟢 *PIX (Copia e Cola):*
-${pixCopyPaste}
-
-💰 Valor: R$ ${totalFmt}
-✅ Confirmação automática após pagamento`
-
+\n💰 Valor: R$ ${totalFmt}\n`
+    
+    if (mpMethods.pix && pixCopyPaste) {
+      payText += `\n🟢 *PIX (Copia e Cola):*\n${pixCopyPaste}\n\n✅ Confirmação automática após pagamento`
+    }
+    
     if (checkoutUrl) {
-      payText += `
-
-📱 *Cartão / Boleto:*
-${checkoutUrl}
-
-Aceitamos crédito, débito e boleto pelo link seguro.`
+      let methodsList = []
+      if (mpMethods.credit_card) methodsList.push('cartão de crédito')
+      if (mpMethods.debit_card) methodsList.push('cartão de débito')
+      if (mpMethods.boleto) methodsList.push('boleto')
+      const methodsStr = methodsList.join(', ')
+      payText += `\n\n📱 *Pagar com ${methodsStr}:*\n${checkoutUrl}\n\nLink seguro do Mercado Pago.`
     }
 
     payText += `
@@ -446,8 +452,8 @@ Aceitamos crédito, débito e boleto pelo link seguro.`
       contact_id: contact.id, direction: 'outbound', type: 'text', content: payText
     })
 
-    // Enviar QR Code como imagem via URL publica (gerado do PIX code)
-    if (pixCopyPaste) {
+    // Enviar QR Code como imagem via URL publica (apenas se PIX ativo)
+    if (mpMethods.pix && pixCopyPaste) {
       try {
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(pixCopyPaste)}`
         const imgRes = await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {

@@ -21,6 +21,7 @@ export default function FinanceiroPage() {
   const [mpConnected, setMpConnected] = useState(false)
   const [mpConnecting, setMpConnecting] = useState(false)
   const [mpUser, setMpUser] = useState('')
+  const [mpMethods, setMpMethods] = useState({ pix: true, credit_card: true, debit_card: true, boleto: true })
   const [payments, setPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
 
@@ -104,7 +105,11 @@ export default function FinanceiroPage() {
         setPayConfig({ pix_key: json.config.pix_key || '', merchant_name: json.config.merchant_name || '', merchant_city: json.config.merchant_city || '', mp_access_token: json.config.mp_access_token || '' })
         setMpConnected(!!json.config.mp_access_token)
         if (json.config.mp_access_token) {
-          try { const parsed = JSON.parse(json.config.mp_access_token); setMpUser(parsed.user_nickname || '') } catch {}
+          try { 
+            const parsed = JSON.parse(json.config.mp_access_token); 
+            setMpUser(parsed.user_nickname || '')
+            if (parsed.mp_methods) setMpMethods(parsed.mp_methods)
+          } catch {}
         }
       }
     } catch (e) {}
@@ -130,6 +135,19 @@ export default function FinanceiroPage() {
       setMpConnected(false)
       setMpUser('')
     } catch (e) { alert('Erro: ' + e.message) }
+  }
+
+  async function toggleMPMethod(method) {
+    const newMethods = { ...mpMethods, [method]: !mpMethods[method] }
+    setMpMethods(newMethods)
+    try {
+      const h = await authHeader()
+      const parsed = JSON.parse(payConfig.mp_access_token || '{}')
+      parsed.mp_methods = newMethods
+      const updated = JSON.stringify(parsed)
+      setPayConfig(p => ({ ...p, mp_access_token: updated }))
+      await fetch('/api/payments/config', { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payConfig, mp_access_token: updated }) })
+    } catch (e) { console.error('Toggle MP method error:', e) }
   }
 
   async function savePayConfig() {
@@ -286,18 +304,80 @@ export default function FinanceiroPage() {
           {subTab === 'billing_methods' && (
             <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: mpConnected ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(0,158,227,0.25)' }}>
               {mpConnected ? (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span style={{ fontSize: 26 }}>✅</span>
-                    <div>
-                      <div style={{ color: '#22c55e', fontSize: 14, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` (${mpUser})` : ''}</div>
-                      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Pagamentos automáticos via PIX e cartão ativos — a Arkiel cobra 2% por transação</div>
+                <div>
+                  {/* Header com status e botao desconectar */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 26 }}>✅</span>
+                      <div>
+                        <div style={{ color: '#22c55e', fontSize: 14, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` — ${mpUser}` : ''}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Taxa Arkiel: 2% por transação • Confirmação automática via webhook</div>
+                      </div>
+                    </div>
+                    <button onClick={disconnectMP}
+                      style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
+                      Desconectar
+                    </button>
+                  </div>
+
+                  {/* Formas de cobrança ativas via MP */}
+                  <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Formas de cobrança ativas</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                      {/* PIX */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.pix ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.pix ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 20 }}>💸</span>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>PIX</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Copia e cola + QR Code</div>
+                          </div>
+                        </div>
+                        <button onClick={() => toggleMPMethod('pix')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.pix ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.pix ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                          {mpMethods.pix ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                      {/* Cartão Crédito */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.credit_card ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.credit_card ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 20 }}>💳</span>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>Cartão de Crédito</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Parcelamento via Checkout MP</div>
+                          </div>
+                        </div>
+                        <button onClick={() => toggleMPMethod('credit_card')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.credit_card ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.credit_card ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                          {mpMethods.credit_card ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                      {/* Cartão Débito */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.debit_card ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.debit_card ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 20 }}>💳</span>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>Cartão de Débito</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Débito online via Checkout MP</div>
+                          </div>
+                        </div>
+                        <button onClick={() => toggleMPMethod('debit_card')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.debit_card ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.debit_card ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                          {mpMethods.debit_card ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                      {/* Boleto */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.boleto ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.boleto ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: 20 }}>🧾</span>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>Boleto Bancário</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Compensação em 1-2 dias úteis</div>
+                          </div>
+                        </div>
+                        <button onClick={() => toggleMPMethod('boleto')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.boleto ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.boleto ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                          {mpMethods.boleto ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <button onClick={disconnectMP}
-                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
-                    Desconectar
-                  </button>
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
