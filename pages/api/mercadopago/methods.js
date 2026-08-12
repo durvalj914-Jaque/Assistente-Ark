@@ -35,16 +35,42 @@ export default async function handler(req, res) {
 
     if (!token) return res.status(200).json({ connected: false, methods: [] })
 
-    // Fetch payment methods from MP API
-    const mpRes = await fetch('https://api.mercadopago.com/v1/payment_methods', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    // Fetch payment methods and account info in parallel
+    const [mpRes, userRes] = await Promise.all([
+      fetch('https://api.mercadopago.com/v1/payment_methods', {
+        headers: { Authorization: `Bearer ${token}` }
+      }),
+      fetch('https://api.mercadopago.com/users/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).catch(() => null)
+    ])
 
     if (!mpRes.ok) {
       return res.status(200).json({ connected: true, methods: [], error: 'Failed to fetch methods' })
     }
 
     const allMethods = await mpRes.json()
+
+    // Fetch account info
+    let accountInfo = null
+    if (userRes && userRes.ok) {
+      try {
+        const userData = await userRes.json()
+        accountInfo = {
+          id: userData.id,
+          nickname: userData.nickname,
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+          email: userData.email,
+          site_id: userData.site_id,
+          type: userData.type || 'standard',
+          status: userData.status?.site_status || 'active',
+          country: userData.country_id || 'BR'
+        }
+      } catch (e) {
+        console.error('[mp-methods] user info error:', e.message)
+      }
+    }
 
     // Filter and group by relevant categories
     const relevantTypes = ['bank_transfer', 'credit_card', 'debit_card', 'ticket', 'account_money']
@@ -78,7 +104,12 @@ export default async function handler(req, res) {
       .filter(([_, cat]) => cat.methods.length > 0)
       .map(([key, cat]) => ({ key, ...cat }))
 
-    return res.status(200).json({ connected: true, methods: result, using_platform_token: usingPlatform })
+    return res.status(200).json({ 
+      connected: true, 
+      methods: result, 
+      using_platform_token: usingPlatform,
+      account: accountInfo
+    })
   } catch (e) {
     console.error('[mp-methods] Error:', e.message)
     return res.status(200).json({ connected: false, methods: [], error: e.message })

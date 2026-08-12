@@ -24,6 +24,7 @@ export default function FinanceiroPage() {
   const [mpMethods, setMpMethods] = useState({ pix: true, credit_card: true, debit_card: true, boleto: true })
   const [mpAvailableMethods, setMpAvailableMethods] = useState([])
   const [loadingMpMethods, setLoadingMpMethods] = useState(false)
+  const [mpAccount, setMpAccount] = useState(null)
   const [payments, setPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
 
@@ -126,6 +127,7 @@ export default function FinanceiroPage() {
       const res = await fetch(`/api/mercadopago/methods?tenant_id=${tenantId}`, { headers: h })
       const json = await res.json()
       if (json.connected && json.methods) setMpAvailableMethods(json.methods)
+      if (json.account) setMpAccount(json.account)
     } catch (e) { console.error('fetchMPMethods:', e) }
     finally { setLoadingMpMethods(false) }
   }
@@ -344,6 +346,55 @@ export default function FinanceiroPage() {
                   </button>
                 )}
               </div>
+
+              {/* Info da conta conectada */}
+              {mpAccount && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', marginBottom: 14, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 18 }}>👤</span>
+                    <div>
+                      <div style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 600 }}>
+                        {mpAccount.first_name || mpAccount.nickname || 'Conta MP'}
+                        {mpAccount.last_name ? ' ' + mpAccount.last_name : ''}
+                      </div>
+                      {mpAccount.email && (
+                        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{mpAccount.email}</div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ height: 24, width: 1, background: 'var(--border-soft)' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>ID</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11, fontFamily: 'monospace' }}>{mpAccount.id}</span>
+                  </div>
+                  <div style={{ height: 24, width: 1, background: 'var(--border-soft)' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tipo</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{mpAccount.type === 'standard' ? 'Pessoa Física' : mpAccount.type === 'seller' ? 'Vendedor' : mpAccount.type}</span>
+                  </div>
+                  <div style={{ height: 24, width: 1, background: 'var(--border-soft)' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: mpAccount.status === 'active' ? '#22c55e' : '#f59e0b', display: 'inline-block' }} />
+                    <span style={{ color: mpAccount.status === 'active' ? '#22c55e' : 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>
+                      {mpAccount.status === 'active' ? 'Ativa' : mpAccount.status === 'pending' ? 'Pendente' : mpAccount.status}
+                    </span>
+                  </div>
+                  <div style={{ height: 24, width: 1, background: 'var(--border-soft)' }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>País</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>{mpAccount.country || 'BR'}</span>
+                  </div>
+                  {mpAccount.nickname && (
+                    <>
+                      <div style={{ height: 24, width: 1, background: 'var(--border-soft)' }} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Apelido</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 11 }}>@{mpAccount.nickname}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {/* Formas de cobrança vinculadas à conta */}
               <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
