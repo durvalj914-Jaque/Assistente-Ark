@@ -49,9 +49,7 @@ export default async function handler(req, res) {
   if (method === 'pix' || method === 'both') {
     if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Configure em Configurações.' })
 
-    console.log('[pix-debug]', JSON.stringify({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) }))
     const pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
-    console.log('[pix-debug] Generated code:', pixCode)
     const qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
 
     const blob = new Blob([qrBuffer], { type: 'image/png' })
