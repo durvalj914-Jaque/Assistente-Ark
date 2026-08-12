@@ -14,6 +14,8 @@ export default function WhatsappSetupPage() {
   const [form, setForm] = useState({ business_name: '', whatsapp_number: '', contact_email: '', confirmed_available: false, notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [disconnecting, setDisconnecting] = useState(false)
+  const [disconnectResult, setDisconnectResult] = useState(null)
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
 
@@ -50,6 +52,31 @@ export default function WhatsappSetupPage() {
     setRequest(data)
   }
 
+  async function disconnectWhatsApp() {
+    if (!activeBot) return
+    if (!confirm('⚠️ Desconectar o WhatsApp?\n\nO número será desvinculado da plataforma e liberado. Você poderá:\n• Voltar para o app oficial do WhatsApp\n• Recadastrar em outra conta\n\nConversas existentes serão encerradas (não deletadas).\n\nDeseja continuar?')) return
+    setDisconnecting(true)
+    setDisconnectResult(null)
+    setError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/whatsapp/disconnect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ bot_id: activeBot.id })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Falha ao desconectar')
+      setDisconnectResult({ success: true, message: json.message, steps: json.results?.steps || [] })
+      // Reload after 2s to show disconnected state
+      setTimeout(() => window.location.reload(), 2500)
+    } catch (e) {
+      setDisconnectResult({ success: false, message: e.message })
+    } finally {
+      setDisconnecting(false)
+    }
+  }
+
   if (loading || !user || !tenant || checkingRequest) return null
 
   const label = { color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 6 }
@@ -69,8 +96,38 @@ export default function WhatsappSetupPage() {
 
       {activeBot && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.3)' }}>
-          <div style={{ color: '#10b981', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>✅ WhatsApp já conectado</div>
-          <div style={{ color: '#94a3b8', fontSize: 13 }}>Bot <b style={{ color: '#e2e8f0' }}>{activeBot.name}</b> ativo no número configurado. Se quiser trocar de número ou adicionar outro, é só enviar um novo pedido abaixo.</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ color: '#10b981', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>✅ WhatsApp já conectado</div>
+              <div style={{ color: '#94a3b8', fontSize: 13 }}>Bot <b style={{ color: '#e2e8f0' }}>{activeBot.name}</b> ativo no número configurado.</div>
+            </div>
+            <button
+              onClick={disconnectWhatsApp}
+              disabled={disconnecting}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '10px 18px', borderRadius: 10, cursor: disconnecting ? 'not-allowed' : 'pointer',
+                border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+                color: '#ef4444', fontSize: 13, fontWeight: 700, opacity: disconnecting ? 0.6 : 1,
+                transition: 'all .15s',
+              }}
+            >
+              {disconnecting ? '⏳ Desconectando...' : '🗑️ Desconectar WhatsApp'}
+            </button>
+          </div>
+          {disconnectResult && (
+            <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10,
+              background: disconnectResult.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${disconnectResult.success ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              fontSize: 13, color: disconnectResult.success ? '#10b981' : '#ef4444',
+            }}>
+              {disconnectResult.success ? '✅ ' : '❌ '}{disconnectResult.message}
+              {disconnectResult.success && <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>A página será recarregada automaticamente...</div>}
+            </div>
+          )}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)', color: '#64748b', fontSize: 12 }}>
+            💡 Ao desconectar, o número é liberado da plataforma Arkiel e pode ser usado novamente no app oficial do WhatsApp ou recadastrado em outra conta.
+          </div>
         </div>
       )}
 
