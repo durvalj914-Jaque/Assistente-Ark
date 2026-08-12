@@ -10,7 +10,7 @@
  * Body: { bot_id: string }
  * Requer: sessão autenticada (usuário dono do bot)
  */
-import { supabase } from '../../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -18,32 +18,27 @@ export default async function handler(req, res) {
   const { bot_id } = req.body
   if (!bot_id) return res.status(400).json({ error: 'bot_id é obrigatório' })
 
-  // Verificar sessão do usuário
-  const { data: { session } } = await supabase.auth.getSession({ req })
-  if (!session) {
-    // Fallback: tentar pelo header
-    const authHeader = req.headers.authorization
-    if (!authHeader) return res.status(401).json({ error: 'Não autenticado' })
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-    if (error || !user) return res.status(401).json({ error: 'Sessão inválida' })
-    var userId = user.id
-  } else {
-    var userId = session.user.id
-  }
+  // Autenticar via header Bearer
+  const authHeader = req.headers.authorization
+  if (!authHeader) return res.status(401).json({ error: 'Não autenticado' })
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(token)
+  if (authErr || !user) return res.status(401).json({ error: 'Sessão inválida' })
+
+  const db = supabaseAdmin()
 
   // Buscar o tenant do usuário
-  const { data: member } = await supabase
+  const { data: member } = await db
     .from('tenant_members')
     .select('tenant_id, role')
-    .eq('user_id', userId)
+    .eq('user_id', user.id)
     .limit(1)
     .maybeSingle()
 
   if (!member) return res.status(403).json({ error: 'Sem tenant vinculado' })
 
   // Buscar o bot e confirmar que pertence ao tenant do usuário
-  const { data: bot, error: botErr } = await supabase
+  const { data: bot, error: botErr } = await db
     .from('bots')
     .select('*')
     .eq('id', bot_id)
@@ -74,7 +69,7 @@ export default async function handler(req, res) {
   }
 
   // 2. Limpar dados do WhatsApp no bot (mas não deletar o bot)
-  const { error: updateErr } = await supabase
+  const { error: updateErr } = await db
     .from('bots')
     .update({
       status: 'inactive',
@@ -87,7 +82,7 @@ export default async function handler(req, res) {
   results.steps.push({ step: 'update_bot', success: !updateErr, error: updateErr?.message })
 
   // 3. Fechar conversas abertas (marcar como encerradas, não deletar)
-  const { error: convErr } = await supabase
+  const { error: convErr } = await db
     .from('conversations')
     .update({ status: 'closed' })
     .eq('bot_id', bot_id)

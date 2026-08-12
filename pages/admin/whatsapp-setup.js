@@ -60,17 +60,21 @@ export default function WhatsappSetupPage() {
     setError('')
     try {
       const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error('Sessão expirada. Faça login novamente.')
+      }
       const res = await fetch('/api/whatsapp/disconnect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({ bot_id: activeBot.id })
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Falha ao desconectar')
       setDisconnectResult({ success: true, message: json.message, steps: json.results?.steps || [] })
-      // Reload after 2s to show disconnected state
-      setTimeout(() => window.location.reload(), 2500)
+      // Reload after 3s to show disconnected state
+      setTimeout(() => window.location.reload(), 3000)
     } catch (e) {
+      console.error('[disconnect]', e)
       setDisconnectResult({ success: false, message: e.message })
     } finally {
       setDisconnecting(false)
@@ -122,7 +126,17 @@ export default function WhatsappSetupPage() {
               fontSize: 13, color: disconnectResult.success ? '#10b981' : '#ef4444',
             }}>
               {disconnectResult.success ? '✅ ' : '❌ '}{disconnectResult.message}
-              {disconnectResult.success && <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>A página será recarregada automaticamente...</div>}
+              {disconnectResult.steps?.length > 0 && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {disconnectResult.steps.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{s.success === false ? '❌' : s.success === true ? '✅' : '⏭️'}</span>
+                      <span>{s.step}{s.error ? ': ' + s.error : ''}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {disconnectResult.success && <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>A página será recarregada automaticamente...</div>}
             </div>
           )}
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)', color: '#64748b', fontSize: 12 }}>
