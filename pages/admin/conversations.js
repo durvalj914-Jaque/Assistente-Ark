@@ -114,6 +114,9 @@ export default function ConversationsPage() {
   const [payDesc, setPayDesc] = useState('')
   const [payMethod, setPayMethod] = useState('pix')
   const [sendingPayment, setSendingPayment] = useState(false)
+  const [mpChargeMethods, setMpChargeMethods] = useState([])
+  const [mpChargeAccount, setMpChargeAccount] = useState(null)
+  const [loadingChargeMethods, setLoadingChargeMethods] = useState(false)
   const endRef = useRef(null)
   const listEndRef = useRef(null)
 
@@ -253,6 +256,18 @@ export default function ConversationsPage() {
     } catch (e) {
       alert('Erro ao deletar: ' + e.message)
     } finally { setDeleting(false) }
+  }
+
+  async function fetchChargeMethods() {
+    if (!selected?.tenant_id) return
+    setLoadingChargeMethods(true)
+    try {
+      const res = await fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}`)
+      const json = await res.json()
+      if (json.connected && json.methods) setMpChargeMethods(json.methods)
+      if (json.account) setMpChargeAccount(json.account)
+    } catch (e) { console.error('fetchChargeMethods:', e.message) }
+    finally { setLoadingChargeMethods(false) }
   }
 
   async function sendPayment() {
@@ -611,7 +626,7 @@ export default function ConversationsPage() {
                     </button>
                   )}
                   {/* Botão de pagamento */}
-                  <button onClick={() => setShowPayModal(o => !o)} title="Enviar cobrança"
+                  <button onClick={() => { setShowPayModal(o => !o); if (!showPayModal) fetchChargeMethods() }} title="Enviar cobrança"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 4,
                       padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
@@ -878,27 +893,61 @@ export default function ConversationsPage() {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Forma de pagamento</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                {[
-                  { key: 'pix', label: 'PIX', icon: '💸', desc: 'QR + Copia e cola' },
-                  { key: 'mercadopago', label: 'Checkout', icon: '💳', desc: 'Cartão, PIX, Boleto' },
-                  { key: 'both', label: 'Ambos', icon: '🚀', desc: 'PIX + Checkout' },
-                ].map(opt => (
-                  <button key={opt.key} onClick={() => setPayMethod(opt.key)}
-                    style={{
-                      padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
-                      border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                      background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                      transition: 'all .15s',
-                    }}>
-                    <span style={{ fontSize: 20 }}>{opt.icon}</span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
-                    <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
-                  </button>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Forma de cobrança</div>
+                {mpChargeAccount && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{mpChargeAccount.first_name || mpChargeAccount.nickname || 'MP'}</span>
+                  </div>
+                )}
               </div>
+              {loadingChargeMethods ? (
+                <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '16px 0', textAlign: 'center' }}>Buscando formas conectadas…</div>
+              ) : (
+                <>
+                  {/* Quick options */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                    {[
+                      { key: 'pix', label: 'PIX', icon: '💸', desc: 'QR + Copia e cola' },
+                      { key: 'mercadopago', label: 'Checkout MP', icon: '💳', desc: 'Cartão, Boleto, PIX' },
+                      { key: 'both', label: 'Ambos', icon: '🚀', desc: 'PIX + Checkout' },
+                    ].map(opt => (
+                      <button key={opt.key} onClick={() => setPayMethod(opt.key)}
+                        style={{
+                          padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
+                          border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                          background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                          transition: 'all .15s',
+                        }}>
+                        <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
+                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {/* Connected methods from MP account */}
+                  {mpChargeMethods.length > 0 && (
+                    <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10, marginTop: 4 }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        Formas ativas na conta
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {mpChargeMethods.map(cat => (
+                          <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                            <span style={{ fontSize: 14 }}>{cat.icon}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{cat.label}</span>
+                            {cat.methods.length > 1 && (
+                              <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>+{cat.methods.length - 1}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
             <div style={{ display: 'flex', gap: 8 }}>
