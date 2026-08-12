@@ -19,6 +19,8 @@ export default function FinanceiroPage() {
   const [payConfig, setPayConfig] = useState({ pix_key: '', merchant_name: '', merchant_city: '', mp_access_token: '' })
   const [savingPayConfig, setSavingPayConfig] = useState(false)
   const [mpConnected, setMpConnected] = useState(false)
+  const [mpDisconnecting, setMpDisconnecting] = useState(false)
+  const [mpDisconnectResult, setMpDisconnectResult] = useState(null)
   const [mpConnecting, setMpConnecting] = useState(false)
   const [mpUser, setMpUser] = useState('')
   const [mpMethods, setMpMethods] = useState({ pix: true, credit_card: true, debit_card: true, boleto: true })
@@ -102,15 +104,24 @@ export default function FinanceiroPage() {
   async function loadPayConfig() {
     try {
       const h = await authHeader()
-      const res = await fetch('/api/payments/config', { headers: h })
-      const json = await res.json()
+      // Buscar config e status do MP em paralelo
+      const [configRes, statusRes] = await Promise.all([
+        fetch('/api/payments/config', { headers: h }),
+        fetch('/api/mercadopago/status', { headers: h })
+      ])
+      const json = await configRes.json()
+      const status = await statusRes.json()
+      
       if (json.config) {
         setPayConfig({ pix_key: json.config.pix_key || '', merchant_name: json.config.merchant_name || '', merchant_city: json.config.merchant_city || '', mp_access_token: json.config.mp_access_token || '' })
-        setMpConnected(!!json.config.mp_access_token)
+        // Usar o status endpoint para determinar conexao (mais confiavel)
+        setMpConnected(status.mp_connected === true)
+        if (status.mp_connected && status.token_info) {
+          setMpUser(status.token_info.user_nickname || '')
+        }
         if (json.config.mp_access_token) {
           try { 
-            const parsed = JSON.parse(json.config.mp_access_token); 
-            setMpUser(parsed.user_nickname || '')
+            const parsed = JSON.parse(json.config.mp_access_token)
             if (parsed.mp_methods) setMpMethods(parsed.mp_methods)
           } catch {}
         }
@@ -306,25 +317,50 @@ export default function FinanceiroPage() {
       </div>
 
       {/* ── Status Mercado Pago (sempre visivel) ── */}
-      {mpConnected && (
-        <div className="ark-card" style={{ padding: '14px 18px', marginBottom: 16, border: '1px solid rgba(34,197,94,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 22 }}>✅</span>
-            <div>
-              <div style={{ color: '#22c55e', fontSize: 13, fontWeight: 700 }}>Mercado Pago conectado{mpUser ? ` — ${mpUser}` : ''}</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>Taxa Arkiel: 2% por transação • Confirmação automática via webhook</div>
+      <div className="ark-card" style={{ padding: '14px 18px', marginBottom: 16, border: mpConnected ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(0,158,227,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 22 }}>{mpConnected ? '✅' : '🟡'}</span>
+          <div>
+            <div style={{ color: mpConnected ? '#22c55e' : 'var(--text-primary)', fontSize: 13, fontWeight: 700 }}>
+              {mpConnected ? `Mercado Pago conectado${mpUser ? ` — ${mpUser}` : ''}` : 'Mercado Pago — usando conta da plataforma'}
+            </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
+              {mpConnected ? 'Sua conta própria • Taxa Arkiel: 2% • Confirmação automática via webhook' : 'Conecte sua própria conta para receber direto • Taxa Arkiel: 2% por transação'}
             </div>
           </div>
-          <button onClick={disconnectMP}
+        </div>
+        {mpConnected ? (
+          <button onClick={disconnectMP} disabled={mpDisconnecting}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '8px 16px', borderRadius: 10, cursor: mpDisconnecting ? 'wait' : 'pointer',
+              border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+              color: '#ef4444', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+              whiteSpace: 'nowrap', opacity: mpDisconnecting ? 0.5 : 1,
+            }}>
+            {mpDisconnecting ? 'Desconectando...' : '🗑️ Desconectar MP'}
+          </button>
+        ) : (
+          <button onClick={connectMP} disabled={mpConnecting}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 8,
               padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
-              border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
-              color: '#ef4444', fontSize: 13, fontWeight: 700, transition: 'all .15s',
-              whiteSpace: 'nowrap',
+              border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)',
+              color: '#fff', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+              whiteSpace: 'nowrap', opacity: mpConnecting ? 0.5 : 1,
             }}>
-            🗑️ Desconectar MP
+            {mpConnecting ? 'Conectando...' : '🔗 Conectar minha conta'}
           </button>
+        )}
+      </div>
+      {/* Feedback da desconexão MP */}
+      {mpDisconnectResult && (
+        <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10,
+          background: mpDisconnectResult.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+          border: `1px solid ${mpDisconnectResult.success ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+          fontSize: 13, color: mpDisconnectResult.success ? '#10b981' : '#ef4444',
+        }}>
+          {mpDisconnectResult.success ? '✅ ' : '❌ '}{mpDisconnectResult.message}
         </div>
       )}
 
@@ -341,40 +377,16 @@ export default function FinanceiroPage() {
             </button>
           </div>
 
-          {/* Conectar Mercado Pago via OAuth (um clique) */}
+          {/* Formas de pagamento disponíveis no Mercado Pago */}
           {subTab === 'billing_methods' && (
-            <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: mpConnected ? '1px solid rgba(34,197,94,0.25)' : '1px solid rgba(0,158,227,0.25)' }}>
-              {/* Header com status da conexao */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 26 }}>{mpConnected ? '✅' : '🟡'}</span>
-                  <div>
-                    <div style={{ color: mpConnected ? '#22c55e' : 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
-                      {mpConnected ? `Mercado Pago conectado${mpUser ? ` — ${mpUser}` : ''}` : 'Mercado Pago (via plataforma Arkiel)'}
-                    </div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
-                      {mpConnected ? 'Taxa Arkiel: 2% por transação • Confirmação automática via webhook' : 'Conecte sua própria conta para receber direto • Taxa Arkiel: 2% por transação'}
-                    </div>
-                  </div>
+            <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+                  Formas de pagamento disponíveis
                 </div>
-                {mpConnected ? (
-                  <button onClick={disconnectMP}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 8,
-                      padding: '10px 18px', borderRadius: 10, cursor: 'pointer',
-                      border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
-                      color: '#ef4444', fontSize: 13, fontWeight: 700, transition: 'all .15s',
-                      whiteSpace: 'nowrap',
-                    }}>
-                    🗑️ Desconectar MP
-                  </button>
-                ) : (
-                  <button onClick={connectMP} disabled={mpConnecting}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #009ee3, #00b1c0)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: mpConnecting ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                    <span style={{ fontSize: 16 }}>🔗</span>
-                    {mpConnecting ? 'Conectando...' : 'Conectar minha conta'}
-                  </button>
-                )}
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                  {mpConnected ? `Gerenciado pela sua conta MP${mpUser ? ` (${mpUser})` : ''}` : 'Gerenciado pela conta da plataforma Arkiel'}
+                </div>
               </div>
 
               {/* Info da conta conectada */}
