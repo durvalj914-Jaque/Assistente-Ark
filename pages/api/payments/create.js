@@ -47,10 +47,47 @@ export default async function handler(req, res) {
   if (!contact?.phone) return res.status(400).json({ error: 'Contato sem telefone' })
 
   if (method === 'pix' || method === 'both') {
-    if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Configure em Configurações.' })
+    // Verificar se MP está conectado — se sim, usar PIX via API do MP (dinâmico)
+    let mpTokenForPix = null
+    if (tenant?.mp_access_token) {
+      try { mpTokenForPix = JSON.parse(tenant.mp_access_token).access_token } catch { mpTokenForPix = tenant.mp_access_token }
+    }
+    if (!mpTokenForPix) mpTokenForPix = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
 
-    const pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
-    const qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+    let qrBuffer, pixCode, mpPixId = null
+
+    if (mpTokenForPix) {
+      // === PIX via Mercado Pago (dinâmico) ===
+      const mpPixRes = await fetch('https://api.mercadopago.com/v1/payments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpTokenForPix}` },
+        body: JSON.stringify({
+          transaction_amount: parseFloat(amount),
+          description: description || 'Pagamento Arkiel',
+          payment_method_id: 'pix',
+          external_reference: txid,
+          notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+          payer: { email: contact?.phone ? contact.phone.replace(/\D/g, '') + '@arkiel.client' : 'cliente@arkiel.com.br' }
+        })
+      })
+      const mpPixData = await mpPixRes.json()
+
+      if (mpPixData?.point_of_interaction?.transaction_data?.qr_code_base64) {
+        // MP retornou o QR Code em base64
+        qrBuffer = Buffer.from(mpPixData.point_of_interaction.transaction_data.qr_code_base64, 'base64')
+        pixCode = mpPixData.point_of_interaction.transaction_data.qr_code
+        mpPixId = mpPixData.id
+      } else {
+        console.error('[pix-mp] Falha ao criar PIX via MP:', JSON.stringify(mpPixData).substring(0, 300))
+        // Fallback para PIX estático se MP falhar
+      }
+    }
+
+    if (!qrBuffer && !pixCode) {
+      // === PIX estático (fallback sem MP) ===
+      if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada e MP não conectado.' })
+      pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
+      qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+    }
 
     const blob = new Blob([qrBuffer], { type: 'image/png' })
     const formData = new FormData()
@@ -62,17 +99,18 @@ export default async function handler(req, res) {
     const upJson = await upRes.json()
     if (!upJson.id) return res.status(500).json({ error: 'Falha ao subir QR Code', detail: upJson })
 
+    const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : 'PIX'
     await fetch(`${WA_API}/${phoneId}/messages`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
       body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'image',
-        image: { id: upJson.id, caption: `💰 *Pagamento PIX* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Escaneie o QR Code ou copie o código abaixo:*\n\n${pixCode}` } }),
+        image: { id: upJson.id, caption: `💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Escaneie o QR Code ou copie o código abaixo:*\n\n${pixCode}` } }),
     })
 
-    await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento PIX* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}`, sent_by: 'human' })
+    await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}`, sent_by: 'human' })
 
     // Se method === 'both', nao retorna ainda — continua para criar tambem o link de Checkout
     if (method !== 'both') {
-      return res.status(200).json({ ok: true, payment_id: paymentId, method: 'pix', pix_code: pixCode })
+      return res.status(200).json({ ok: true, payment_id: paymentId, method: 'pix', pix_code: pixCode, mp_pix_id: mpPixId })
     }
 
   }
