@@ -4,24 +4,29 @@ import { sendText } from '../../../lib/meta'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  // MP sometimes sends GET for validation
-  if (req.method === 'GET') {
-    return res.status(200).json({ ok: true })
-  }
-
   const db = supabaseAdmin()
 
   try {
     const body = req.body || {}
-    const type = body.type || body.action
-    const paymentId = body.data?.id
+    
+    // Handle BOTH notification formats:
+    // New: { type: "payment", data: { id: "123" } }
+    // Old IPN: { resource: "123", topic: "payment" }
+    let type = body.type || body.action || body.topic
+    let paymentId = body.data?.id || body.resource
+    
+    // Also handle "payment.updated" action format
+    if (body.action && body.action.includes('payment')) {
+      type = 'payment'
+      paymentId = body.data?.id
+    }
 
     console.log('[mp-webhook] Received:', { type, paymentId, body: JSON.stringify(body).substring(0, 500) })
 
     if (!paymentId) return res.status(200).json({ ok: true })
 
     // Only process payment notifications
-    if (!type?.includes('payment') && type !== 'payment.updated' && type !== 'payment.created' && type !== 'payment') {
+    if (!type?.includes('payment') && type !== 'payment') {
       return res.status(200).json({ ok: true })
     }
 
@@ -37,8 +42,7 @@ export default async function handler(req, res) {
       payment = await mpRes.json()
     }
 
-    // If platform token fails, try to find the order by payment_id in notes
-    // and use the tenant's token
+    // If platform token fails, search orders and try tenant tokens
     if (!payment) {
       console.log('[mp-webhook] Platform token failed, searching orders for payment_id:', paymentId)
       const { data: orders } = await db.from('whatsapp_orders')
@@ -77,7 +81,7 @@ export default async function handler(req, res) {
 
     console.log('[mp-webhook] Payment:', payment.id, 'status:', payment.status)
 
-    // Find order by metadata or by payment_id in notes
+    // Find order by metadata.order_id
     const orderId = payment.metadata?.order_id
     let order = null
 
@@ -89,8 +93,17 @@ export default async function handler(req, res) {
       order = data
     }
 
+    // Also try external_reference
+    if (!order && payment.external_reference) {
+      const { data } = await db.from('whatsapp_orders')
+        .select('id, tenant_id, bot_id, contact_id, conversation_id, total, status, note')
+        .eq('id', payment.external_reference)
+        .maybeSingle()
+      order = data
+    }
+
+    // Try searching by payment_id in notes
     if (!order) {
-      // Try to find by payment_id stored in note
       const { data: orders } = await db.from('whatsapp_orders')
         .select('id, tenant_id, bot_id, contact_id, conversation_id, total, status, note')
         .ilike('note', `%${paymentId}%`)
