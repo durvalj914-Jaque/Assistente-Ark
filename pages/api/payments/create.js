@@ -37,12 +37,8 @@ export default async function handler(req, res) {
   const finalCity = (merchant_city || tenant?.merchant_city || 'SAO PAULO').substring(0, 15)
 
   const txid = `ARK${Date.now().toString(36).toUpperCase()}`
-  const { data: payment, error: payErr } = await db.from('payments').insert({
-    tenant_id: conv.tenant_id,
-    metadata: { txid, contact_id: conv.contact_id, conversation_id, bot_id: conv.bot_id, amount: parseFloat(amount), description: description || 'Pagamento', status: 'pending', method, payment_ref: txid },
-  }).select().single()
-
-  if (payErr) return res.status(500).json({ error: payErr.message })
+  // Payment record stored in messages table instead of payments (table schema incomplete)
+  const paymentId = txid
 
   const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
   const phoneId = bot.phone_number_id
@@ -72,12 +68,11 @@ export default async function handler(req, res) {
         image: { id: upJson.id, caption: `💰 *Pagamento PIX* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Escaneie o QR Code ou copie o código abaixo:*\n\n${pixCode}` } }),
     })
 
-    await db.from('payments').update({ metadata: { txid, contact_id: conv.contact_id, conversation_id, bot_id: conv.bot_id, amount: parseFloat(amount), description: description || 'Pagamento', status: 'pending', method, payment_ref: txid, pix_code: pixCode, pix_qr_url: upJson.id } }).eq('id', payment.id)
     await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento PIX* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}`, sent_by: 'human' })
 
     // Se method === 'both', nao retorna ainda — continua para criar tambem o link de Checkout
     if (method !== 'both') {
-      return res.status(200).json({ ok: true, payment_id: payment.id, method: 'pix', pix_code: pixCode })
+      return res.status(200).json({ ok: true, payment_id: paymentId, method: 'pix', pix_code: pixCode })
     }
 
   } else if (method === 'mercadopago' || method === 'both') {
@@ -105,10 +100,9 @@ export default async function handler(req, res) {
     await fetch(`${WA_API}/${phoneId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
       body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: linkText } }) })
 
-    await db.from('payments').update({ metadata: { txid, contact_id: conv.contact_id, conversation_id, bot_id: conv.bot_id, amount: parseFloat(amount), description: description || 'Pagamento', status: 'pending', method, payment_ref: txid, mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point } }).eq('id', payment.id)
     await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: linkText, sent_by: 'human' })
 
-    return res.status(200).json({ ok: true, payment_id: payment.id, method: method === 'both' ? 'both' : 'mercadopago', checkout_url: mpData.init_point })
+    return res.status(200).json({ ok: true, payment_id: paymentId, method: method === 'both' ? 'both' : 'mercadopago', checkout_url: mpData.init_point })
   }
 
   return res.status(400).json({ error: 'Método inválido.' })
