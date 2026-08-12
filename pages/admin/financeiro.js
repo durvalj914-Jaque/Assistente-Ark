@@ -145,7 +145,7 @@ export default function FinanceiroPage() {
   }
 
   async function disconnectMP() {
-    if (!confirm('Desconectar o Mercado Pago?')) return
+    if (!confirm('⚠️ Desconectar o Mercado Pago?\n\nSua conta MP será desvinculada da plataforma Arkiel.\n\n• Os pagamentos deixarão de ter confirmação automática\n• A taxa de 2% não será mais aplicada\n• Você voltará a receber apenas via PIX direto (chave própria)\n\nDeseja continuar?')) return
     try {
       const h = await authHeader()
       await fetch('/api/payments/config', { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payConfig, mp_access_token: '' }) })
@@ -335,8 +335,14 @@ export default function FinanceiroPage() {
                 </div>
                 {mpConnected ? (
                   <button onClick={disconnectMP}
-                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>
-                    Desconectar
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 8,
+                      padding: '10px 18px', borderRadius: 10, cursor: 'pointer',
+                      border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+                      color: '#ef4444', fontSize: 13, fontWeight: 700, transition: 'all .15s',
+                      whiteSpace: 'nowrap',
+                    }}>
+                    🗑️ Desconectar MP
                   </button>
                 ) : (
                   <button onClick={connectMP} disabled={mpConnecting}
