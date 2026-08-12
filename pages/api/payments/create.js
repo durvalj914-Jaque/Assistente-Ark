@@ -46,8 +46,10 @@ export default async function handler(req, res) {
   const { data: contact } = await db.from('contacts').select('phone').eq('id', conv.contact_id).maybeSingle()
   if (!contact?.phone) return res.status(400).json({ error: 'Contato sem telefone' })
 
-  if (method === 'pix' || method === 'both') {
-    // Verificar se MP está conectado — se sim, usar PIX via API do MP (dinâmico)
+  if (method === 'pix' || method === 'pix_direct' || method === 'both') {
+    // pix_direct = sempre PIX estático (chave própria do tenant)
+    // pix = PIX via MP se conectado, fallback para estático
+    const useDirectPix = method === 'pix_direct'
     let mpTokenForPix = null
     if (tenant?.mp_access_token) {
       try { mpTokenForPix = JSON.parse(tenant.mp_access_token).access_token } catch { mpTokenForPix = tenant.mp_access_token }
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
 
     let qrBuffer, pixCode, mpPixId = null
 
-    if (mpTokenForPix) {
+    if (mpTokenForPix && !useDirectPix) {
       // === PIX via Mercado Pago (dinâmico) ===
       const mpPixRes = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpTokenForPix}` },
@@ -84,7 +86,7 @@ export default async function handler(req, res) {
 
     if (!qrBuffer && !pixCode) {
       // === PIX estático (fallback sem MP) ===
-      if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada e MP não conectado.' })
+      if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Cadastre uma chave PIX em Configurações ou conecte o Mercado Pago.' })
       pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
       qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
     }
@@ -99,7 +101,7 @@ export default async function handler(req, res) {
     const upJson = await upRes.json()
     if (!upJson.id) return res.status(500).json({ error: 'Falha ao subir QR Code', detail: upJson })
 
-    const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : 'PIX'
+    const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : (useDirectPix ? 'PIX Direto' : 'PIX')
     await fetch(`${WA_API}/${phoneId}/messages`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
       body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'image',
@@ -110,7 +112,7 @@ export default async function handler(req, res) {
 
     // Se method === 'both', nao retorna ainda — continua para criar tambem o link de Checkout
     if (method !== 'both') {
-      return res.status(200).json({ ok: true, payment_id: paymentId, method: 'pix', pix_code: pixCode, mp_pix_id: mpPixId })
+      return res.status(200).json({ ok: true, payment_id: paymentId, method: useDirectPix ? 'pix_direct' : 'pix', pix_code: pixCode, mp_pix_id: mpPixId })
     }
 
   }

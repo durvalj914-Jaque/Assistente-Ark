@@ -906,27 +906,53 @@ export default function ConversationsPage() {
                 <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '16px 0', textAlign: 'center' }}>Buscando formas conectadas…</div>
               ) : (
                 <>
-                  {/* Quick options */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
-                    {[
-                      { key: 'pix', label: 'PIX', icon: '💸', desc: 'QR + Copia e cola' },
-                      { key: 'mercadopago', label: 'Checkout MP', icon: '💳', desc: 'Cartão, Boleto, PIX' },
-                      { key: 'both', label: 'Ambos', icon: '🚀', desc: 'PIX + Checkout' },
-                    ].map(opt => (
-                      <button key={opt.key} onClick={() => setPayMethod(opt.key)}
-                        style={{
-                          padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
-                          border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                          background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                          transition: 'all .15s',
-                        }}>
-                        <span style={{ fontSize: 20 }}>{opt.icon}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
-                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
-                      </button>
-                    ))}
-                  </div>
+                  {/* Quick options — muda conforme MP conectado */}
+                  {mpChargeAccount ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      {[
+                        { key: 'pix', label: 'PIX via MP', icon: '💸', desc: 'Auto-confirma · Taxa 2%', highlight: 'Conectado' },
+                        { key: 'pix_direct', label: 'PIX Direto', icon: '🏦', desc: 'Chave própria · Sem taxa', highlight: 'Conta própria' },
+                        { key: 'mercadopago', label: 'Checkout MP', icon: '💳', desc: 'Cartão, Boleto, PIX' },
+                        { key: 'both', label: 'Ambos', icon: '🚀', desc: 'PIX MP + Checkout' },
+                      ].map(opt => (
+                        <button key={opt.key} onClick={() => setPayMethod(opt.key)}
+                          style={{
+                            padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
+                            border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                            background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                            transition: 'all .15s', position: 'relative',
+                          }}>
+                          {opt.highlight && (
+                            <span style={{ position: 'absolute', top: 4, right: 6, fontSize: 8, fontWeight: 700, color: opt.key === 'pix' ? '#22c55e' : 'var(--text-muted)', background: opt.key === 'pix' ? 'rgba(34,197,94,0.15)' : 'var(--bg-tertiary)', padding: '1px 5px', borderRadius: 6 }}>{opt.highlight}</span>
+                          )}
+                          <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                      {[
+                        { key: 'pix', label: 'PIX', icon: '💸', desc: 'QR + Copia e cola' },
+                        { key: 'pix_direct', label: 'PIX Direto', icon: '🏦', desc: 'Chave própria' },
+                      ].map(opt => (
+                        <button key={opt.key} onClick={() => setPayMethod(opt.key)}
+                          style={{
+                            padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
+                            border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                            background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                            transition: 'all .15s',
+                          }}>
+                          <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {/* Connected methods from MP account - selecionaveis */}
                   {mpChargeMethods.length > 0 && (
                     <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10, marginTop: 4 }}>
