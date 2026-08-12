@@ -22,6 +22,8 @@ export default function FinanceiroPage() {
   const [mpConnecting, setMpConnecting] = useState(false)
   const [mpUser, setMpUser] = useState('')
   const [mpMethods, setMpMethods] = useState({ pix: true, credit_card: true, debit_card: true, boleto: true })
+  const [mpAvailableMethods, setMpAvailableMethods] = useState([])
+  const [loadingMpMethods, setLoadingMpMethods] = useState(false)
   const [payments, setPayments] = useState([])
   const [loadingPayments, setLoadingPayments] = useState(false)
 
@@ -109,10 +111,23 @@ export default function FinanceiroPage() {
             const parsed = JSON.parse(json.config.mp_access_token); 
             setMpUser(parsed.user_nickname || '')
             if (parsed.mp_methods) setMpMethods(parsed.mp_methods)
+            // Fetch real methods from MP API
+            fetchMPMethods(json.config.id)
           } catch {}
         }
       }
     } catch (e) {}
+  }
+
+  async function fetchMPMethods(tenantId) {
+    setLoadingMpMethods(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch(`/api/mercadopago/methods?tenant_id=${tenantId}`, { headers: h })
+      const json = await res.json()
+      if (json.connected && json.methods) setMpAvailableMethods(json.methods)
+    } catch (e) { console.error('fetchMPMethods:', e) }
+    finally { setLoadingMpMethods(false) }
   }
 
   async function connectMP() {
@@ -322,61 +337,55 @@ export default function FinanceiroPage() {
 
                   {/* Formas de cobrança ativas via MP */}
                   <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Formas de cobrança ativas</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-                      {/* PIX */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.pix ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.pix ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 20 }}>💸</span>
-                          <div>
-                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>PIX</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Copia e cola + QR Code</div>
-                          </div>
-                        </div>
-                        <button onClick={() => toggleMPMethod('pix')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.pix ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.pix ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
-                          {mpMethods.pix ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
-                      {/* Cartão Crédito */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.credit_card ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.credit_card ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 20 }}>💳</span>
-                          <div>
-                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>Cartão de Crédito</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Parcelamento via Checkout MP</div>
-                          </div>
-                        </div>
-                        <button onClick={() => toggleMPMethod('credit_card')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.credit_card ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.credit_card ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
-                          {mpMethods.credit_card ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
-                      {/* Cartão Débito */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.debit_card ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.debit_card ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 20 }}>💳</span>
-                          <div>
-                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>Cartão de Débito</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Débito online via Checkout MP</div>
-                          </div>
-                        </div>
-                        <button onClick={() => toggleMPMethod('debit_card')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.debit_card ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.debit_card ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
-                          {mpMethods.debit_card ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
-                      {/* Boleto */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: mpMethods.boleto ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: mpMethods.boleto ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ fontSize: 20 }}>🧾</span>
-                          <div>
-                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>Boleto Bancário</div>
-                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Compensação em 1-2 dias úteis</div>
-                          </div>
-                        </div>
-                        <button onClick={() => toggleMPMethod('boleto')} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: mpMethods.boleto ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: mpMethods.boleto ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
-                          {mpMethods.boleto ? 'ON' : 'OFF'}
-                        </button>
-                      </div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Formas de cobrança vinculadas à conta
                     </div>
+                    {loadingMpMethods ? (
+                      <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '12px 0' }}>Buscando formas disponíveis...</div>
+                    ) : mpAvailableMethods.length > 0 ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                        {mpAvailableMethods.map(cat => {
+                          const isActive = mpMethods[cat.key] !== false
+                          const methodsList = cat.methods.map(m => m.name).join(', ')
+                          return (
+                            <div key={cat.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: isActive ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: isActive ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                                <span style={{ fontSize: 20 }}>{cat.icon}</span>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{cat.label}</div>
+                                  <div style={{ color: 'var(--text-muted)', fontSize: 10, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{methodsList}</div>
+                                </div>
+                              </div>
+                              <button onClick={() => toggleMPMethod(cat.key)} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: isActive ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: isActive ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer', flexShrink: 0 }}>
+                                {isActive ? 'ON' : 'OFF'}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                        {['pix', 'credit_card', 'debit_card', 'boleto'].map(key => {
+                          const labels = { pix: { label: 'PIX', icon: '💸', desc: 'Copia e cola + QR Code' }, credit_card: { label: 'Cartão de Crédito', icon: '💳', desc: 'Parcelamento via Checkout MP' }, debit_card: { label: 'Cartão de Débito', icon: '💳', desc: 'Débito online via Checkout MP' }, boleto: { label: 'Boleto Bancário', icon: '🧾', desc: 'Compensação em 1-2 dias úteis' } }
+                          const cat = labels[key]
+                          const isActive = mpMethods[key] !== false
+                          return (
+                            <div key={key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, border: isActive ? '1px solid rgba(34,197,94,0.3)' : '1px solid var(--border-soft)', background: isActive ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <span style={{ fontSize: 20 }}>{cat.icon}</span>
+                                <div>
+                                  <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{cat.label}</div>
+                                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{cat.desc}</div>
+                                </div>
+                              </div>
+                              <button onClick={() => toggleMPMethod(key)} style={{ padding: '3px 8px', borderRadius: 6, border: 'none', background: isActive ? 'rgba(34,197,94,0.2)' : 'rgba(100,116,139,0.15)', color: isActive ? '#22c55e' : 'var(--text-muted)', fontSize: 10, fontWeight: 700, cursor: 'pointer' }}>
+                                {isActive ? 'ON' : 'OFF'}
+                              </button>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

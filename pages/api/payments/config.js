@@ -17,7 +17,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     if (!tenantId) return res.status(200).json({ config: {} })
-    const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, mp_access_token').eq('id', tenantId).maybeSingle()
+    const { data: tenant } = await db.from('tenants').select('id, pix_key, merchant_name, merchant_city, mp_access_token').eq('id', tenantId).maybeSingle()
     return res.status(200).json({ config: tenant || {} })
 
   } else if (req.method === 'POST') {
