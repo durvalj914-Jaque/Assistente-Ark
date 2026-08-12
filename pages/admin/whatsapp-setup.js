@@ -139,8 +139,11 @@ export default function WhatsappSetupPage() {
               {disconnectResult.success && <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>A página será recarregada automaticamente...</div>}
             </div>
           )}
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)', color: '#64748b', fontSize: 12 }}>
-            💡 Ao desconectar, o número é liberado da plataforma Arkiel e pode ser usado novamente no app oficial do WhatsApp ou recadastrado em outra conta.
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)', color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
+            💡 Ao desconectar, o número é liberado da plataforma Arkiel e pode ser usado novamente.<br/>
+            <b style={{ color: '#94a3b8' }}>Prazos para reutilizar:</b><br/>
+            • <b>App oficial do WhatsApp</b> — geralmente em algumas horas<br/>
+            • <b>Recadastrar em outra conta de API</b> — até 24h (em casos raros, a Meta pode segurar até 30 dias)
           </div>
         </div>
       )}
