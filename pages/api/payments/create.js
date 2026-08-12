@@ -38,9 +38,9 @@ export default async function handler(req, res) {
 
   const txid = `ARK${Date.now().toString(36).toUpperCase()}`
   const { data: payment, error: payErr } = await db.from('payments').insert({
-    tenant_id: conv.tenant_id, bot_id: conv.bot_id, conversation_id,
+    tenant_id: conv.tenant_id,
     amount: parseFloat(amount), description: description || 'Pagamento', status: 'pending', method,
-    payment_ref: txid, metadata: { txid, contact_id: conv.contact_id },
+    payment_ref: txid, metadata: { txid, contact_id: conv.contact_id, conversation_id, bot_id: conv.bot_id },
   }).select().single()
 
   if (payErr) return res.status(500).json({ error: payErr.message })
