@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   const { data: contact } = await db.from('contacts').select('phone').eq('id', conv.contact_id).maybeSingle()
   if (!contact?.phone) return res.status(400).json({ error: 'Contato sem telefone' })
 
-  if (method === 'pix') {
+  if (method === 'pix' || method === 'both') {
     if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Configure em Configurações.' })
 
     const pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
@@ -76,10 +76,18 @@ export default async function handler(req, res) {
     await db.from('payments').update({ pix_code: pixCode, pix_qr_url: upJson.id }).eq('id', payment.id)
     await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento PIX* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}`, sent_by: 'human' })
 
-    return res.status(200).json({ ok: true, payment_id: payment.id, method: 'pix', pix_code: pixCode })
+    // Se method === 'both', nao retorna ainda — continua para criar tambem o link de Checkout
+    if (method !== 'both') {
+      return res.status(200).json({ ok: true, payment_id: payment.id, method: 'pix', pix_code: pixCode })
+    }
 
-  } else if (method === 'mercadopago') {
-    const mpToken = process.env.MERCADOPAGO_ACCESS_TOKEN
+  } else if (method === 'mercadopago' || method === 'both') {
+    // Usa token do tenant (OAuth) com fallback para token da plataforma
+    let mpToken = null
+    if (tenant?.mp_access_token) {
+      try { mpToken = JSON.parse(tenant.mp_access_token).access_token } catch { mpToken = tenant.mp_access_token }
+    }
+    if (!mpToken) mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
     if (!mpToken) return res.status(400).json({ error: 'Mercado Pago não configurado.' })
 
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -101,7 +109,7 @@ export default async function handler(req, res) {
     await db.from('payments').update({ mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point }).eq('id', payment.id)
     await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: linkText, sent_by: 'human' })
 
-    return res.status(200).json({ ok: true, payment_id: payment.id, method: 'mercadopago', checkout_url: mpData.init_point })
+    return res.status(200).json({ ok: true, payment_id: payment.id, method: method === 'both' ? 'both' : 'mercadopago', checkout_url: mpData.init_point })
   }
 
   return res.status(400).json({ error: 'Método inválido.' })

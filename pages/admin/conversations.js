@@ -804,6 +804,125 @@ export default function ConversationsPage() {
         </div>
       </div>
       {/* Modal confirmação de deleção — igual WhatsApp */}
+      {/* Modal Cobrar */}
+      {showPayModal && selected && (
+        <div onClick={() => !sendingPayment && setShowPayModal(false)} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 16,
+            padding: 24, maxWidth: 420, width: '100%',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                💰 Cobrar cliente
+              </h3>
+              <button onClick={() => !sendingPayment && setShowPayModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', padding: 4 }}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cliente</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                <span style={{ fontSize: 18 }}>👤</span>
+                <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{selected.contacts?.name || selected.contacts?.phone}</span>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Valor (R$) *</div>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', fontSize: 16, fontWeight: 600 }}>R$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={payAmount}
+                  onChange={e => setPayAmount(e.target.value)}
+                  placeholder="0,00"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendPayment() } }}
+                  style={{
+                    width: '100%', padding: '12px 14px 12px 42px', borderRadius: 10,
+                    border: '1px solid var(--border-medium)', background: 'var(--bg-input)',
+                    color: 'var(--text-primary)', fontSize: 20, fontWeight: 700, outline: 'none',
+                  }}
+                />
+              </div>
+              {/* Quick amounts */}
+              <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                {[10, 25, 50, 100, 200].map(v => (
+                  <button key={v} onClick={() => setPayAmount(String(v))}
+                    style={{ padding: '4px 12px', borderRadius: 20, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                    R$ {v}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Descrição (opcional)</div>
+              <input
+                type="text"
+                value={payDesc}
+                onChange={e => setPayDesc(e.target.value)}
+                placeholder="Ex: Consultoria, Produto, Serviço..."
+                onKeyDown={e => { if (e.key === 'Enter' && e.shiftKey) { e.preventDefault(); sendPayment() } }}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 10,
+                  border: '1px solid var(--border-medium)', background: 'var(--bg-input)',
+                  color: 'var(--text-primary)', fontSize: 14, outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Forma de pagamento</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                {[
+                  { key: 'pix', label: 'PIX', icon: '💸', desc: 'QR + Copia e cola' },
+                  { key: 'mercadopago', label: 'Checkout', icon: '💳', desc: 'Cartão, PIX, Boleto' },
+                  { key: 'both', label: 'Ambos', icon: '🚀', desc: 'PIX + Checkout' },
+                ].map(opt => (
+                  <button key={opt.key} onClick={() => setPayMethod(opt.key)}
+                    style={{
+                      padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
+                      border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                      background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                      transition: 'all .15s',
+                    }}>
+                    <span style={{ fontSize: 20 }}>{opt.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowPayModal(false)} disabled={sendingPayment}
+                className="ark-btn-ghost" style={{ flex: 1, fontSize: 13, padding: '12px 18px' }}>
+                Cancelar
+              </button>
+              <button onClick={sendPayment} disabled={sendingPayment || !payAmount}
+                style={{
+                  flex: 1.5, fontSize: 14, padding: '12px 18px', borderRadius: 10,
+                  border: 'none', cursor: 'pointer', fontWeight: 700,
+                  background: sendingPayment ? 'rgba(79,142,247,0.5)' : 'linear-gradient(135deg, #4f8ef7, #3b82f6)',
+                  color: '#fff',
+                  opacity: (!payAmount || sendingPayment) ? 0.5 : 1,
+                }}>
+                {sendingPayment ? 'Enviando…' : '💵 Enviar cobrança'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+
+      }
+
       {deleteConfirm && selected && (
         <div onClick={() => !deleting && setDeleteConfirm(false)} style={{
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
