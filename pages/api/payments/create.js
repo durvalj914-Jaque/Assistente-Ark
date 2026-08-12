@@ -75,7 +75,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, payment_id: paymentId, method: 'pix', pix_code: pixCode })
     }
 
-  } else if (method === 'mercadopago' || method === 'both') {
+  }
+  if (method === 'mercadopago' || method === 'both') {
     // Usa token do tenant (OAuth) com fallback para token da plataforma
     let mpToken = null
     if (tenant?.mp_access_token) {
