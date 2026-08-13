@@ -394,8 +394,8 @@ export default function FinanceiroPage() {
                 </div>
               </div>
 
-              {/* Info da conta conectada */}
-              {mpAccount && (
+              {/* Info da conta conectada - so quando conectado */}
+              {mpConnected && mpAccount && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', marginBottom: 14, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ fontSize: 18 }}>👤</span>
@@ -496,6 +496,7 @@ export default function FinanceiroPage() {
                       </div>
                     )}
                   </div>
+              )}
             </div>
           )}
 
