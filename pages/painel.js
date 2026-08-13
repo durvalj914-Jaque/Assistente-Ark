@@ -324,8 +324,8 @@ export default function PainelAdminPage() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ color: '#fff', fontWeight: 800, fontSize: 22 }}>Painel Assistente Ark</h1>
-          <p style={{ color: '#64748b', fontSize: 13, marginTop: 4 }}>Controle total da plataforma — clientes, bots, atividade e servidor.</p>
+          <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 22 }}>Painel Assistente Ark</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 4 }}>Controle total da plataforma — clientes, bots, atividade e servidor.</p>
         </div>
         {tab === 'clients' && (
           <button onClick={() => setShowNewClient(true)} className="ark-btn">+ Novo Cliente</button>
@@ -339,7 +339,7 @@ export default function PainelAdminPage() {
             style={{
               padding: '10px 16px', background: 'none', border: 'none',
               borderBottom: tab === t.key ? '2px solid #4f8ef7' : '2px solid transparent',
-              color: tab === t.key ? '#4f8ef7' : '#64748b',
+              color: tab === t.key ? '#4f8ef7' : 'var(--text-muted)',
               fontWeight: 600, fontSize: 13, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 6
             }}>
@@ -352,7 +352,7 @@ export default function PainelAdminPage() {
       {tab === 'dashboard' && (
         <div>
           {loadingStats ? (
-            <p style={{ color: '#64748b' }}>Carregando estatisticas...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando estatisticas...</p>
           ) : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 28 }}>
@@ -363,16 +363,16 @@ export default function PainelAdminPage() {
               </div>
 
               <div className="ark-card">
-                <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Atividade Recente</h3>
+                <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Atividade Recente</h3>
                 {recentActivity.length === 0 ? (
-                  <p style={{ color: '#64748b', fontSize: 13 }}>Nenhuma atividade registrada.</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nenhuma atividade registrada.</p>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {recentActivity.map((log, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < recentActivity.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: i < recentActivity.length - 1 ? '1px solid var(--border-soft)' : 'none' }}>
                         <span style={{ fontSize: 16 }}>{log.error ? '\uD83D\uDD34' : log.event_type === 'message_received' ? '\uD83D\uDCE8' : log.event_type === 'message_sent' ? '\uD83D\uDCE4' : '\u2699\uFE0F'}</span>
                         <div style={{ flex: 1 }}>
-                          <div style={{ color: '#e2e8f0', fontSize: 12 }}>{log.event_type || 'evento'} {log.contact_phone ? ' - ' + log.contact_phone : ''}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{log.event_type || 'evento'} {log.contact_phone ? ' - ' + log.contact_phone : ''}</div>
                           <div style={{ color: '#334155', fontSize: 11 }}>{new Date(log.created_at).toLocaleString('pt-BR')}</div>
                         </div>
                         {log.error && <span style={{ color: '#ef4444', fontSize: 11 }}>erro</span>}
@@ -390,10 +390,10 @@ export default function PainelAdminPage() {
       {tab === 'clients' && (
         <div>
           {loadingClients ? (
-            <p style={{ color: '#64748b' }}>Carregando...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
           ) : clients.length === 0 ? (
             <div className="ark-card" style={{ textAlign: 'center', padding: 40 }}>
-              <p style={{ color: '#64748b', fontSize: 14 }}>Nenhuma empresa cadastrada ainda.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Nenhuma empresa cadastrada ainda.</p>
               <button onClick={() => setShowNewClient(true)} className="ark-btn" style={{ marginTop: 16 }}>+ Criar primeiro cliente</button>
             </div>
           ) : (
@@ -408,9 +408,9 @@ export default function PainelAdminPage() {
       {tab === 'bots' && (
         <div>
           {loadingBots ? (
-            <p style={{ color: '#64748b' }}>Carregando bots...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando bots...</p>
           ) : allBots.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Nenhum bot encontrado.</p>
+            <p style={{ color: 'var(--text-muted)' }}>Nenhum bot encontrado.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {allBots.map(bot => (
@@ -423,21 +423,21 @@ export default function PainelAdminPage() {
                       {bot.status === 'active' ? '\uD83D\uDFE2' : '\u2B55'}
                     </div>
                     <div>
-                      <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>{bot.name}</div>
-                      <div style={{ color: '#64748b', fontSize: 12, marginTop: 2 }}>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{bot.name}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>
                         {bot.tenant_name} {bot.phone_number_id ? ' - conectado' : ' - sem numero'}
                       </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>{bot.total_messages || 0}</div>
+                      <div style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>{bot.total_messages || 0}</div>
                       <div style={{ color: '#334155', fontSize: 10 }}>mensagens</div>
                     </div>
                     <span style={{
                       padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 600,
                       background: bot.status === 'active' ? 'rgba(34,197,94,0.15)' : 'rgba(100,116,139,0.1)',
-                      color: bot.status === 'active' ? '#22c55e' : '#64748b'
+                      color: bot.status === 'active' ? '#22c55e' : 'var(--text-muted)'
                     }}>
                       {bot.status}
                     </span>
@@ -473,10 +473,10 @@ export default function PainelAdminPage() {
             padding: 24, maxWidth: 440, width: '100%'
           }}>
             <h3 style={{ margin: '0 0 12px', fontSize: 18 }}>⚠️ Confirmar descadastro</h3>
-            <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 16 }}>
-              Isso vai remover <strong style={{ color: '#fff' }}>{deregisterTarget.name}</strong> completamente:
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
+              Isso vai remover <strong style={{ color: 'var(--text-primary)' }}>{deregisterTarget.name}</strong> completamente:
             </p>
-            <ul style={{ color: '#64748b', fontSize: 13, margin: '0 0 16px', paddingLeft: 20 }}>
+            <ul style={{ color: 'var(--text-muted)', fontSize: 13, margin: '0 0 16px', paddingLeft: 20 }}>
               <li>Desvincula o número da WhatsApp Cloud API (Meta)</li>
               <li>Deleta o bot, conversas e mensagens</li>
               <li>Remove o cliente (tenant) e dados sincronizados</li>
@@ -532,7 +532,7 @@ export default function PainelAdminPage() {
                 onChange={e => setSelectedTenantContacts(e.target.value)}
                 style={{
                   background: '#12121f', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 8,
-                  color: '#fff', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit',
+                  color: 'var(--text-primary)', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit',
                 }}
               >
                 {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -543,10 +543,10 @@ export default function PainelAdminPage() {
                 onChange={e => setContactSearch(e.target.value)}
                 style={{
                   background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8,
-                  color: '#fff', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit', width: 220,
+                  color: 'var(--text-primary)', padding: '8px 14px', fontSize: 13, outline: 'none', fontFamily: 'inherit', width: 220,
                 }}
               />
-              <span style={{ color: '#64748b', fontSize: 12 }}>{contacts.length} contatos</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{contacts.length} contatos</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={connectGoogle} className="ark-btn-ghost" style={{ fontSize: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -573,7 +573,7 @@ export default function PainelAdminPage() {
           {contacts.length === 0 ? (
             <div className="ark-card" style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📇</div>
-              <p style={{ color: '#64748b', fontSize: 14, marginBottom: 8 }}>Nenhum contato sincronizado ainda</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 8 }}>Nenhum contato sincronizado ainda</p>
               <p style={{ color: '#334155', fontSize: 12 }}>Selecione um cliente acima e clique em "Sincronizar Google" para importar contatos do Gmail.</p>
             </div>
           ) : (
@@ -597,11 +597,11 @@ export default function PainelAdminPage() {
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ color: '#fff', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {c.full_name || 'Sem nome'}
                       </div>
-                      {c.email && <div style={{ color: '#64748b', fontSize: 11, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {c.email}</div>}
-                      {c.phone && <div style={{ color: '#64748b', fontSize: 11, marginTop: 1 }}>📱 {c.phone}</div>}
+                      {c.email && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {c.email}</div>}
+                      {c.phone && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>📱 {c.phone}</div>}
                       {c.organization && <div style={{ color: '#334155', fontSize: 10, marginTop: 2 }}>🏢 {c.organization}{c.job_title ? ' · ' + c.job_title : ''}</div>}
                     </div>
                   </div>
@@ -614,23 +614,23 @@ export default function PainelAdminPage() {
       {/* ATIVIDADE */}
       {tab === 'activity' && (
         <div className="ark-card">
-          <h3 style={{ color: '#fff', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Atividade do Servidor</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15, marginBottom: 16 }}>Atividade do Servidor</h3>
           {loadingStats ? (
-            <p style={{ color: '#64748b' }}>Carregando...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
           ) : recentActivity.length === 0 ? (
-            <p style={{ color: '#64748b', fontSize: 13 }}>Nenhuma atividade registrada ainda.</p>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nenhuma atividade registrada ainda.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {recentActivity.map((log, i) => (
                 <div key={i} style={{
                   display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 8,
-                  background: log.error ? 'rgba(239,68,68,0.05)' : 'rgba(255,255,255,0.02)',
-                  border: '1px solid ' + (log.error ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)')
+                  background: log.error ? 'rgba(239,68,68,0.05)' : 'var(--bg-secondary)',
+                  border: '1px solid ' + (log.error ? 'rgba(239,68,68,0.1)' : 'var(--border-soft)')
                 }}>
                   <span style={{ fontSize: 14 }}>{log.error ? '\uD83D\uDD34' : '\uD83D\uDFE2'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: '#e2e8f0', fontSize: 12, fontWeight: 600 }}>{log.event_type || 'evento'}</div>
-                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>{log.event_type || 'evento'}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
                       {log.contact_phone || log.bot_name || '-'} {new Date(log.created_at).toLocaleString('pt-BR')}
                     </div>
                     {log.error && <div style={{ color: '#ef4444', fontSize: 11, marginTop: 4 }}>{log.error}</div>}
@@ -650,9 +650,9 @@ export default function PainelAdminPage() {
               <button key={s} onClick={() => setLogFilter(s)}
                 style={{
                   padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                  border: '1px solid ' + (logFilter === s ? '#4f8ef7' : 'rgba(255,255,255,0.08)'),
+                  border: '1px solid ' + (logFilter === s ? '#4f8ef7' : 'var(--border-soft)'),
                   background: logFilter === s ? 'rgba(79,142,247,0.15)' : 'transparent',
-                  color: logFilter === s ? '#4f8ef7' : '#64748b'
+                  color: logFilter === s ? '#4f8ef7' : 'var(--text-muted)'
                 }}>
                 {s === 'all' ? 'Todos' : s === 'error' ? 'Erros' : s.replace(/_/g, ' ')}
                 {s !== 'all' && ' (' + (s === 'error' ? logs.filter(l => l.error || l.status === 'error') : logs.filter(l => l.event_type === s)).length + ')'}
@@ -662,9 +662,9 @@ export default function PainelAdminPage() {
           </div>
 
           {loadingLogs ? (
-            <p style={{ color: '#64748b' }}>Carregando logs...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando logs...</p>
           ) : filteredLogs.length === 0 ? (
-            <p style={{ color: '#64748b' }}>Nenhum log encontrado.</p>
+            <p style={{ color: 'var(--text-muted)' }}>Nenhum log encontrado.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {filteredLogs.slice(0, 100).map((log, i) => (
@@ -678,12 +678,12 @@ export default function PainelAdminPage() {
                       }}>
                         {log.event_type || 'event'}
                       </span>
-                      <span style={{ color: '#94a3b8', fontSize: 12, marginLeft: 10 }}>{log.contact_phone || ''}</span>
+                      <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 10 }}>{log.contact_phone || ''}</span>
                     </div>
                     <span style={{ color: '#334155', fontSize: 11 }}>{new Date(log.created_at).toLocaleString('pt-BR')}</span>
                   </div>
                   {log.error && <div style={{ color: '#ef4444', fontSize: 12, marginTop: 8, fontFamily: 'monospace' }}>{log.error}</div>}
-                  {log.response && <div style={{ color: '#64748b', fontSize: 11, marginTop: 6, fontFamily: 'monospace' }}>{'-> '}{log.response}</div>}
+                  {log.response && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 6, fontFamily: 'monospace' }}>{'-> '}{log.response}</div>}
                 </div>
               ))}
             </div>
@@ -694,39 +694,39 @@ export default function PainelAdminPage() {
       {tab === 'payments' && (
         <div>
           <div className="ark-card" style={{ padding: 20, marginBottom: 20 }}>
-            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 16 }}>💰 Configuração de Pagamentos</h3>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 16 }}>💰 Configuração de Pagamentos</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
               <div>
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Chave PIX</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Chave PIX</label>
                 <input value={payConfig.pix_key} onChange={e => setPayConfig(c => ({ ...c, pix_key: e.target.value }))} placeholder="ex: arkieltech@gmail.com"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
               </div>
               <div>
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Nome do Recebedor</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Nome do Recebedor</label>
                 <input value={payConfig.merchant_name} onChange={e => setPayConfig(c => ({ ...c, merchant_name: e.target.value }))} placeholder="ex: Arkiel Tech"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
               </div>
               <div>
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Cidade</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Cidade</label>
                 <input value={payConfig.merchant_city} onChange={e => setPayConfig(c => ({ ...c, merchant_city: e.target.value }))} placeholder="ex: SAO PAULO"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
               </div>
               <div>
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>Token Mercado Pago (opcional)</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Token Mercado Pago (opcional)</label>
                 <input value={payConfig.mp_access_token} onChange={e => setPayConfig(c => ({ ...c, mp_access_token: e.target.value }))} placeholder="APP_USR-..." type="password"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginTop: 4 }} />
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
               </div>
             </div>
             <button onClick={savePayConfig} disabled={savingPayConfig}
-              style={{ marginTop: 16, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingPayConfig ? 0.5 : 1 }}>
+              style={{ marginTop: 16, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingPayConfig ? 0.5 : 1 }}>
               {savingPayConfig ? 'Salvando...' : '💾 Salvar Configuração'}
             </button>
           </div>
 
           {/* ── Taxas por método de pagamento ── */}
           <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
-            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📊 Taxas da Plataforma (Marketplace Fee)</h3>
-            <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 16 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📊 Taxas da Plataforma (Marketplace Fee)</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
               Define a porcentagem que a Arkiel retém de cada transação B2B, por método de pagamento. O valor vai direto para a conta MP do cliente, e o MP retém a taxa automaticamente.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
@@ -736,10 +736,10 @@ export default function PainelAdminPage() {
                 { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
                 { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
               ].map(method => (
-                <div key={method.key} style={{ padding: '14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div key={method.key} style={{ padding: '14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                     <span style={{ fontSize: 18 }}>{method.icon}</span>
-                    <span style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>{method.label}</span>
+                    <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>{method.label}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <input
@@ -751,14 +751,14 @@ export default function PainelAdminPage() {
                       onChange={e => setFeeConfig(f => ({ ...f, [method.key]: parseFloat(e.target.value) || 0 }))}
                       style={{
                         width: '100%', padding: '8px 10px', borderRadius: 8,
-                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
-                        color: '#fff', fontSize: 14, fontWeight: 700, outline: 'none',
+                        border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)',
+                        color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, outline: 'none',
                         textAlign: 'center',
                       }}
                     />
                     <span style={{ color: method.color, fontSize: 16, fontWeight: 700 }}>%</span>
                   </div>
-                  <div style={{ color: '#475569', fontSize: 10, marginTop: 6, textAlign: 'center' }}>
+                  <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 6, textAlign: 'center' }}>
                     R$ {((feeConfig[method.key] ?? 2.0) / 100 * 100).toFixed(2)} por cada R$100
                   </div>
                 </div>
@@ -772,7 +772,7 @@ export default function PainelAdminPage() {
               </div>
             )}
             <button onClick={saveFeeConfig} disabled={savingFees}
-              style={{ marginTop: 14, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingFees ? 0.5 : 1 }}>
+              style={{ marginTop: 14, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingFees ? 0.5 : 1 }}>
               {savingFees ? 'Salvando...' : '💾 Salvar Taxas'}
             </button>
           </div>
@@ -783,11 +783,11 @@ export default function PainelAdminPage() {
             <StatTile label="Pagamentos" value={payments.length} icon="📊" />
           </div>
 
-          <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Histórico de Pagamentos</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Histórico de Pagamentos</h3>
           {loadingPayments ? (
-            <p style={{ color: '#64748b' }}>Carregando...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
           ) : payments.length === 0 ? (
-            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>💸</div>
               Nenhum pagamento ainda. Quando você enviar um PIX ou link de pagamento pelo chat, ele aparece aqui.
             </div>
@@ -798,7 +798,7 @@ export default function PainelAdminPage() {
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <span style={{ fontSize: 16 }}>{p.method === 'pix' ? '💠' : '💳'}</span>
-                      <span style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>R$ {parseFloat(p.amount).toFixed(2)}</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>R$ {parseFloat(p.amount).toFixed(2)}</span>
                       <span style={{
                         padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
                         background: p.status === 'paid' ? 'rgba(34,197,94,0.15)' : p.status === 'pending' ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
@@ -807,20 +807,20 @@ export default function PainelAdminPage() {
                         {p.status === 'paid' ? '✅ Pago' : p.status === 'pending' ? '⏳ Pendente' : '❌ ' + p.status}
                       </span>
                     </div>
-                    <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>
                       {p.description || 'Pagamento'} • {new Date(p.created_at).toLocaleString('pt-BR')}
                       {p.paid_at && ' • Pago em ' + new Date(p.paid_at).toLocaleString('pt-BR')}
                     </div>
                   </div>
                   {p.pix_code && (
                     <button onClick={() => navigator.clipboard.writeText(p.pix_code)} title="Copiar código PIX"
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#4f8ef7', fontSize: 11, cursor: 'pointer' }}>
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, cursor: 'pointer' }}>
                       📋 Copiar PIX
                     </button>
                   )}
                   {p.mp_checkout_url && (
                     <a href={p.mp_checkout_url} target="_blank" rel="noopener"
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#4f8ef7', fontSize: 11, textDecoration: 'none' }}>
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, textDecoration: 'none' }}>
                       🔗 Ver link
                     </a>
                   )}
@@ -835,7 +835,7 @@ export default function PainelAdminPage() {
       {tab === 'receipts' && (
         <div>
           {/* Sub-tabs de categoria */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16, borderBottom: '1px solid var(--border-soft)', paddingBottom: 8 }}>
             {[
               { key: 'all', label: 'Todos', icon: '📋', color: '#4f8ef7' },
               { key: 'b2c_client', label: 'Cliente → Empresa', icon: '👤', color: '#22c55e', desc: 'PIX/Link enviado ao cliente' },
@@ -847,7 +847,7 @@ export default function PainelAdminPage() {
                   padding: '8px 14px', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontSize: 12, fontWeight: 600,
                   border: 'none', borderBottom: receiptCategory === cat.key ? `2px solid ${cat.color}` : '2px solid transparent',
                   background: receiptCategory === cat.key ? `${cat.color}15` : 'transparent',
-                  color: receiptCategory === cat.key ? cat.color : '#64748b',
+                  color: receiptCategory === cat.key ? cat.color : 'var(--text-muted)',
                   display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s',
                 }}>
                 <span>{cat.icon}</span> {cat.label}
@@ -856,11 +856,11 @@ export default function PainelAdminPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
               📄 Comprovantes{receiptCategory !== 'all' ? ` — ${receipts.length} registro(s)` : ''}
             </h3>
             <button onClick={() => { setReceiptModal(true); loadPayments() }}
-              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#a78bfa', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+              style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#a78bfa', color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
               🏢 + Comprovante Manual
             </button>
           </div>
@@ -880,8 +880,8 @@ export default function PainelAdminPage() {
                   <div key={s.cat} className="ark-card" style={{ padding: 14, cursor: 'pointer' }}
                        onClick={() => { setReceiptCategory(s.cat); loadReceipts(s.cat) }}>
                     <div style={{ fontSize: 20, marginBottom: 4 }}>{s.icon}</div>
-                    <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600 }}>{s.label}</div>
-                    <div style={{ color: '#fff', fontSize: 20, fontWeight: 700, marginTop: 4 }}>{count}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>{s.label}</div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: 20, fontWeight: 700, marginTop: 4 }}>{count}</div>
                     <div style={{ color: '#22c55e', fontSize: 12, fontWeight: 600 }}>R$ {total.toFixed(2)}</div>
                   </div>
                 )
@@ -890,9 +890,9 @@ export default function PainelAdminPage() {
           )}
 
           {loadingReceipts ? (
-            <p style={{ color: '#64748b' }}>Carregando...</p>
+            <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
           ) : receipts.length === 0 ? (
-            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
               <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
               Nenhum comprovante nesta categoria.
             </div>
@@ -904,7 +904,7 @@ export default function PainelAdminPage() {
                   b2c_client: { label: '👤 Cliente', color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
                   b2c_catalog: { label: '🛒 Catálogo', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
                   b2b_manual: { label: '🏢 Manual', color: '#a78bfa', bg: 'rgba(167,139,246,0.12)' },
-                }[cat] || { label: '📄', color: '#64748b', bg: 'rgba(100,116,139,0.12)' }
+                }[cat] || { label: '📄', color: 'var(--text-muted)', bg: 'rgba(100,116,139,0.12)' }
 
                 return (
                   <div key={r.id} className="ark-card" style={{ padding: 14, borderLeft: `3px solid ${catInfo.color}` }}>
@@ -927,12 +927,12 @@ export default function PainelAdminPage() {
                     </div>
 
                     {r.payments && parseFloat(r.payments.amount) > 0 && (
-                      <div style={{ color: '#fff', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
                         R$ {parseFloat(r.payments.amount).toFixed(2)} — {r.payments.description || 'Pagamento'}
                       </div>
                     )}
                     {(!r.payments || parseFloat(r.payments.amount) === 0) && (
-                      <div style={{ color: cat === 'b2b_manual' ? '#a78bfa' : '#94a3b8', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
+                      <div style={{ color: cat === 'b2b_manual' ? '#a78bfa' : 'var(--text-muted)', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>
                         {r.notes || 'Sem valor informado'}
                       </div>
                     )}
@@ -946,12 +946,12 @@ export default function PainelAdminPage() {
                       </a>
                     )}
                     {r.file_type === 'catalog_order' && r.metadata?.items && (
-                      <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>
                         {r.metadata.items.length} item(ns) — R$ {parseFloat(r.metadata.total || 0).toFixed(2)}
                       </div>
                     )}
                     {r.file_type === 'mp_confirmation' && (
-                      <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>Confirmado automaticamente via Mercado Pago</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>Confirmado automaticamente via Mercado Pago</div>
                     )}
 
                     {/* Editar valor de avulso */}
@@ -965,11 +965,11 @@ export default function PainelAdminPage() {
                       <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
                         <input type="number" step="0.01" placeholder="Valor R$" defaultValue=""
                           id={`edit-val-${r.id}`}
-                          style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13 }} />
+                          style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13 }} />
                         <button onClick={() => { const v = document.getElementById(`edit-val-${r.id}`).value; if (v) updateReceipt(r.id, v, r.notes) }}
-                          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓</button>
+                          style={{ padding: '6px 12px', borderRadius: 6, border: 'none', background: '#22c55e', color: 'var(--text-primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>✓</button>
                         <button onClick={() => setEditingReceipt(null)}
-                          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, cursor: 'pointer' }}>✕</button>
                       </div>
                     )}
 
@@ -987,24 +987,24 @@ export default function PainelAdminPage() {
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
                  onClick={() => setReceiptModal(null)}>
               <div onClick={e => e.stopPropagation()} style={{ background: '#0d0d1e', borderRadius: 16, padding: 24, maxWidth: 440, width: '90%', border: '1px solid rgba(167,139,246,0.25)' }}>
-                <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>🏢 Comprovante Manual</h3>
-                <p style={{ color: '#64748b', fontSize: 12, marginBottom: 16 }}>Para pagamentos recebidos fora do WhatsApp (maquininha, dinheiro, transferência externa)</p>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>🏢 Comprovante Manual</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>Para pagamentos recebidos fora do WhatsApp (maquininha, dinheiro, transferência externa)</p>
 
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Valor (R$) *</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Valor (R$) *</label>
                 <input type="number" step="0.01" min="0.01" value={receiptAmount} onChange={e => setReceiptAmount(e.target.value)} placeholder="Ex: 50.00"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 12 }} />
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 12 }} />
 
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição</label>
                 <input value={receiptNotes} onChange={e => setReceiptNotes(e.target.value)} placeholder="Ex: Maquininha — Venda presencial"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 13, marginBottom: 16 }} />
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginBottom: 16 }} />
 
-                <label style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Comprovante (imagem ou PDF)</label>
-                <input type="file" accept="image/*,application/pdf" id="receipt-file" style={{ width: '100%', color: '#94a3b8', fontSize: 13, marginBottom: 16 }} />
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Comprovante (imagem ou PDF)</label>
+                <input type="file" accept="image/*,application/pdf" id="receipt-file" style={{ width: '100%', color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }} />
 
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setReceiptModal(null)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+                  <button onClick={() => setReceiptModal(null)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
                   <button onClick={() => { const f = document.getElementById('receipt-file').files[0]; if (f) uploadReceipt(f); else alert('Selecione um arquivo'); if (!receiptAmount) { alert('Informe o valor'); return } }}
-                    style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#a78bfa', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Registrar</button>
+                    style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#a78bfa', color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Registrar</button>
                 </div>
               </div>
             </div>
@@ -1020,10 +1020,10 @@ function StatTile({ label, value, icon, sub, danger }) {
   return (
     <div className="ark-card" style={{ padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-        <span style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>{label}</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>{label}</span>
         <span style={{ fontSize: 20 }}>{icon}</span>
       </div>
-      <div style={{ color: danger ? '#ef4444' : '#fff', fontWeight: 800, fontSize: 28 }}>{value}</div>
+      <div style={{ color: danger ? '#ef4444' : 'var(--text-primary)', fontWeight: 800, fontSize: 28 }}>{value}</div>
       <div style={{ color: danger ? '#ef4444' : '#334155', fontSize: 11, marginTop: 4 }}>{sub}</div>
     </div>
   )

@@ -351,7 +351,7 @@ async function handleCatalogOrder(db, botId, order, from) {
   let mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
   let usingTenantToken = false
   let mpMethods = { pix: true, credit_card: true, debit_card: true, boleto: true }
-  // Taxas editáveis por método (fallback 2% fixo)
+  // Taxas editáveis por método — lê da config global da Arkiel
   let feeConfig = { pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 }
   if (tenantPay?.mp_access_token) {
     try {
@@ -361,22 +361,27 @@ async function handleCatalogOrder(db, botId, order, from) {
         usingTenantToken = true
       }
       if (parsed.mp_methods) mpMethods = parsed.mp_methods
-      // Fee config pode estar dentro do mp_access_token (fallback)
-      if (parsed.fee_config) feeConfig = { ...feeConfig, ...parsed.fee_config }
     } catch {
       // Not JSON, use as plain token
       mpToken = tenantPay.mp_access_token
       usingTenantToken = true
     }
   }
-  // Fee config como coluna separada tem prioridade
-  if (tenantPay?.fee_config) {
+  // Buscar fee_config global do tenant Arkiel (platforma)
+  const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
+  const { data: arkielTenant } = await db.from('tenants')
+    .select('fee_config, mp_access_token')
+    .eq('id', ARKIEL_TENANT_ID)
+    .maybeSingle()
+  if (arkielTenant?.fee_config) {
     try {
-      if (typeof tenantPay.fee_config === 'object') {
-        feeConfig = { ...feeConfig, ...tenantPay.fee_config }
-      } else {
-        feeConfig = { ...feeConfig, ...JSON.parse(tenantPay.fee_config) }
-      }
+      const fc = typeof arkielTenant.fee_config === 'object' ? arkielTenant.fee_config : JSON.parse(arkielTenant.fee_config)
+      if (fc) feeConfig = { ...feeConfig, ...fc }
+    } catch {}
+  } else if (arkielTenant?.mp_access_token) {
+    try {
+      const mp = JSON.parse(arkielTenant.mp_access_token)
+      if (mp.fee_config) feeConfig = { ...feeConfig, ...mp.fee_config }
     } catch {}
   }
   // Função helper: calcula a taxa do método
