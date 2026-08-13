@@ -44,6 +44,26 @@ export default function PainelAdminPage() {
   const [loadingLogs, setLoadingLogs] = useState(true)
   const [logFilter, setLogFilter] = useState('all')
 
+  // ── Payments ──
+  const [payConfig, setPayConfig] = useState({ pix_key: '', merchant_name: '', merchant_city: '', mp_access_token: '' })
+  const [savingPayConfig, setSavingPayConfig] = useState(false)
+  const [payments, setPayments] = useState([])
+  const [loadingPayments, setLoadingPayments] = useState(false)
+
+  // ── Fee Config (taxas por método) ──
+  const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
+  const [savingFees, setSavingFees] = useState(false)
+  const [feeMsg, setFeeMsg] = useState('')
+
+  // ── Receipts ──
+  const [receipts, setReceipts] = useState([])
+  const [loadingReceipts, setLoadingReceipts] = useState(false)
+  const [receiptCategory, setReceiptCategory] = useState('all')
+  const [editingReceipt, setEditingReceipt] = useState(null)
+  const [receiptModal, setReceiptModal] = useState(false)
+  const [receiptNotes, setReceiptNotes] = useState('')
+  const [receiptAmount, setReceiptAmount] = useState('')
+
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
   useEffect(() => { if (!loading && user && profile && !profile.is_platform_admin) router.replace('/admin') }, [loading, user, profile])
 
@@ -89,7 +109,14 @@ export default function PainelAdminPage() {
   useEffect(() => {
     if (!profile?.is_platform_admin) return
     loadAll()
+    loadPayConfig()
+    loadFeeConfig()
   }, [profile])
+
+  useEffect(() => {
+    if (tab === 'payments') { loadPayments() }
+    if (tab === 'receipts') { loadReceipts('all') }
+  }, [tab])
 
   async function loadContacts(tenantId) {
     if (!tenantId) return
@@ -129,6 +156,87 @@ export default function PainelAdminPage() {
       setContactsMsg('❌ ' + e.message)
     }
     setSyncingContacts(false)
+  }
+
+  async function loadPayConfig() {
+    const h = await authHeader()
+    try {
+      const res = await fetch('/api/payments/config', { headers: h })
+      const json = await res.json()
+      if (json.config) {
+        setPayConfig({
+          pix_key: json.config.pix_key || '',
+          merchant_name: json.config.merchant_name || '',
+          merchant_city: json.config.merchant_city || '',
+          mp_access_token: json.config.mp_access_token || '',
+        })
+      }
+    } catch (e) { console.error('loadPayConfig', e) }
+  }
+
+  async function savePayConfig() {
+    setSavingPayConfig(true)
+    try {
+      const h = await authHeader()
+      await fetch('/api/payments/config', { method: 'POST', headers: h, body: JSON.stringify(payConfig) })
+      setFeeMsg('✅ Configurações salvas!')
+      setTimeout(() => setFeeMsg(''), 2500)
+    } catch (e) { setFeeMsg('❌ ' + e.message) }
+    finally { setSavingPayConfig(false) }
+  }
+
+  async function loadPayments() {
+    setLoadingPayments(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/payments/list', { headers: h })
+      const json = await res.json()
+      if (json.payments) setPayments(json.payments)
+    } catch (e) {}
+    finally { setLoadingPayments(false) }
+  }
+
+  async function loadFeeConfig() {
+    const h = await authHeader()
+    try {
+      const res = await fetch('/api/admin/fee-config', { headers: h })
+      const json = await res.json()
+      if (json.fee_config) setFeeConfig(json.fee_config)
+    } catch (e) { console.error('loadFeeConfig', e) }
+  }
+
+  async function saveFeeConfig() {
+    setSavingFees(true)
+    setFeeMsg('')
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/fee-config', {
+        method: 'POST',
+        headers: h,
+        body: JSON.stringify({ fee_config: feeConfig })
+      })
+      const json = await res.json()
+      if (json.ok) {
+        setFeeMsg('✅ Taxas salvas! Aplicadas em todas as transações B2B.')
+        setTimeout(() => setFeeMsg(''), 3000)
+      } else {
+        setFeeMsg('❌ ' + (json.error || 'Erro ao salvar'))
+      }
+    } catch (e) { setFeeMsg('❌ ' + e.message) }
+    finally { setSavingFees(false) }
+  }
+
+  async function loadReceipts(cat) {
+    setLoadingReceipts(true)
+    try {
+      const h = await authHeader()
+      const category = cat || receiptCategory
+      const url = category && category !== 'all' ? '/api/payments/receipts?category=' + category : '/api/payments/receipts'
+      const res = await fetch(url, { headers: h })
+      const json = await res.json()
+      if (json.receipts) setReceipts(json.receipts)
+    } catch (e) {}
+    finally { setLoadingReceipts(false) }
   }
 
   async function handleDeregister(bot) {
@@ -612,6 +720,60 @@ export default function PainelAdminPage() {
             <button onClick={savePayConfig} disabled={savingPayConfig}
               style={{ marginTop: 16, padding: '8px 20px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingPayConfig ? 0.5 : 1 }}>
               {savingPayConfig ? 'Salvando...' : '💾 Salvar Configuração'}
+            </button>
+          </div>
+
+          {/* ── Taxas por método de pagamento ── */}
+          <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
+            <h3 style={{ color: '#fff', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📊 Taxas da Plataforma (Marketplace Fee)</h3>
+            <p style={{ color: '#94a3b8', fontSize: 12, marginBottom: 16 }}>
+              Define a porcentagem que a Arkiel retém de cada transação B2B, por método de pagamento. O valor vai direto para a conta MP do cliente, e o MP retém a taxa automaticamente.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              {[
+                { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
+                { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
+                { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
+                { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
+              ].map(method => (
+                <div key={method.key} style={{ padding: '14px', borderRadius: 10, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 18 }}>{method.icon}</span>
+                    <span style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 600 }}>{method.label}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      value={feeConfig[method.key] ?? 2.0}
+                      onChange={e => setFeeConfig(f => ({ ...f, [method.key]: parseFloat(e.target.value) || 0 }))}
+                      style={{
+                        width: '100%', padding: '8px 10px', borderRadius: 8,
+                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)',
+                        color: '#fff', fontSize: 14, fontWeight: 700, outline: 'none',
+                        textAlign: 'center',
+                      }}
+                    />
+                    <span style={{ color: method.color, fontSize: 16, fontWeight: 700 }}>%</span>
+                  </div>
+                  <div style={{ color: '#475569', fontSize: 10, marginTop: 6, textAlign: 'center' }}>
+                    R$ {((feeConfig[method.key] ?? 2.0) / 100 * 100).toFixed(2)} por cada R$100
+                  </div>
+                </div>
+              ))}
+            </div>
+            {feeMsg && (
+              <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: feeMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: feeMsg.startsWith('✅') ? '#22c55e' : '#ef4444' }}>
+                {feeMsg}
+              </div>
+            )}
+            <button onClick={saveFeeConfig} disabled={savingFees}
+              style={{ marginTop: 14, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingFees ? 0.5 : 1 }}>
+              {savingFees ? 'Salvando...' : '💾 Salvar Taxas'}
             </button>
           </div>
 

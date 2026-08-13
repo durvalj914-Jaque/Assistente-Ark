@@ -347,10 +347,12 @@ async function handleCatalogOrder(db, botId, order, from) {
 
   // Gerar PIX dinâmico + link de checkout via Mercado Pago
   // Prioriza token do tenant, fallback para token da plataforma
-  const { data: tenantPay } = await db.from('tenants').select('mp_access_token').eq('id', tenantId).maybeSingle()
+  const { data: tenantPay } = await db.from('tenants').select('mp_access_token, fee_config').eq('id', tenantId).maybeSingle()
   let mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
   let usingTenantToken = false
   let mpMethods = { pix: true, credit_card: true, debit_card: true, boleto: true }
+  // Taxas editáveis por método (fallback 2% fixo)
+  let feeConfig = { pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 }
   if (tenantPay?.mp_access_token) {
     try {
       const parsed = JSON.parse(tenantPay.mp_access_token)
@@ -359,11 +361,28 @@ async function handleCatalogOrder(db, botId, order, from) {
         usingTenantToken = true
       }
       if (parsed.mp_methods) mpMethods = parsed.mp_methods
+      // Fee config pode estar dentro do mp_access_token (fallback)
+      if (parsed.fee_config) feeConfig = { ...feeConfig, ...parsed.fee_config }
     } catch {
       // Not JSON, use as plain token
       mpToken = tenantPay.mp_access_token
       usingTenantToken = true
     }
+  }
+  // Fee config como coluna separada tem prioridade
+  if (tenantPay?.fee_config) {
+    try {
+      if (typeof tenantPay.fee_config === 'object') {
+        feeConfig = { ...feeConfig, ...tenantPay.fee_config }
+      } else {
+        feeConfig = { ...feeConfig, ...JSON.parse(tenantPay.fee_config) }
+      }
+    } catch {}
+  }
+  // Função helper: calcula a taxa do método
+  function calcFee(method, total) {
+    const pct = feeConfig[method] ?? feeConfig.pix ?? 2.0
+    return Number((total * (pct / 100)).toFixed(2))
   }
   let pixCreated = false
   let pixCopyPaste = null
@@ -388,7 +407,7 @@ async function handleCatalogOrder(db, botId, order, from) {
           payer: { email: `cliente${from.slice(-4)}@arkiel.com.br` },
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: Number((orderTotal * 0.02).toFixed(2)) } : {})
+          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('pix', orderTotal) } : {})
         })
       })
       const pixData = await pixRes.json()
@@ -424,7 +443,7 @@ async function handleCatalogOrder(db, botId, order, from) {
           }],
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: Number((orderTotal * 0.02).toFixed(2)) } : {}),
+          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('credit_card', orderTotal) } : {}),
           back_urls: {
             success: 'https://arkiel.com.br/payment/success',
             failure: 'https://arkiel.com.br/payment/failure'
