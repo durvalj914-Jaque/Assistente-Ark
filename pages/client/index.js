@@ -128,7 +128,7 @@ export default function ClientPortal() {
     setMpConnecting(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const r = await fetch('/api/mercadopago/oauth/init', { headers: { Authorization: `Bearer ${session.access_token}` } })
+      const r = await fetch('/api/mercadopago/oauth/init?return_to=client', { headers: { Authorization: `Bearer ${session.access_token}` } })
       const d = await r.json()
       if (d.authUrl) {
         window.location.href = d.authUrl

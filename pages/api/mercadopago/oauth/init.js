@@ -28,7 +28,10 @@ export default async function handler(req, res) {
   
   if (!member) return res.status(400).json({ error: 'Tenant não encontrado' })
   
-  const authUrl = `https://auth.mercadopago.com/authorization?client_id=${MP_CLIENT_ID}&response_type=code&platform_id=mp&state=${member.tenant_id}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`
+  // Encode return_to in state so callback knows where to redirect
+  const returnTo = req.query.return_to || 'admin'
+  const state = `${member.tenant_id}|${returnTo}`
+  const authUrl = `https://auth.mercadopago.com/authorization?client_id=${MP_CLIENT_ID}&response_type=code&platform_id=mp&state=${encodeURIComponent(state)}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}`
   
   return res.status(200).json({ authUrl })
 }

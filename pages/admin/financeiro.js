@@ -150,7 +150,7 @@ export default function FinanceiroPage() {
     setMpConnecting(true)
     try {
       const h = await authHeader()
-      const res = await fetch('/api/mercadopago/oauth/init', { headers: h })
+      const res = await fetch('/api/mercadopago/oauth/init?return_to=admin', { headers: h })
       const json = await res.json()
       if (json.authUrl) window.location.href = json.authUrl
       else alert('Erro ao iniciar conexão: ' + (json.error || ''))
@@ -244,6 +244,16 @@ export default function FinanceiroPage() {
 
   // Sync subTab with URL query
   useEffect(() => {
+    // Check MP OAuth result
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('mp_success')) {
+      const mpUser = params.get('mp_user')
+      setMpDisconnectResult({ success: true, message: 'Mercado Pago conectado' + (mpUser ? ` — ${mpUser}` : '') })
+      setTimeout(() => window.location.reload(), 2000)
+    }
+    if (params.get('mp_error')) {
+      setMpDisconnectResult({ success: false, message: params.get('mp_error') })
+    }
     if (router.query.tab) setSubTab(router.query.tab)
   }, [router.query.tab])
 
