@@ -3,6 +3,7 @@
  * Recebe notificações do Mercado Pago, atualiza status, confirma pedidos do catálogo e cria comprovante automático.
  */
 import { supabaseAdmin } from '../../../../lib/supabase'
+import { activatePlan } from '../../../../lib/planActivation'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ ok: true })
@@ -89,6 +90,14 @@ export default async function handler(req, res) {
                 })
               } catch (_) {}
             }
+
+            // ── Ativar plano se for assinatura ──
+            try {
+              const result = await activatePlan(db, payment)
+              if (result.ok) {
+                console.log('[webhook-mp] Plano ativado:', JSON.parse(payment.pix_qr_url || '{}')?.plan_name)
+              }
+            } catch (e) { console.error('[webhook-mp] Erro ao ativar plano:', e.message) }
 
             // ── Push notification pro admin ──
             try {

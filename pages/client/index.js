@@ -70,6 +70,10 @@ export default function ClientPortal() {
   const [messages, setMessages] = useState([])
   const [search, setSearch]   = useState('')
   const [loading, setLoading] = useState(true)
+  const [availablePlans, setAvailablePlans] = useState([])
+  const [currentSub, setCurrentSub] = useState(null)
+  const [subscribing, setSubscribing] = useState(null) // plan_id being subscribed
+  const [paymentModal, setPaymentModal] = useState(null) // { plan_name, amount, pix_code, qr_url, checkout_url }
   const [tab, setTab]         = useState('conversations') // conversations | bots | usage
   const [usage, setUsage]     = useState(null)
   const [catalogProducts, setCatalogProducts] = useState([])
@@ -84,9 +88,21 @@ export default function ClientPortal() {
   const [payHistory, setPayHistory] = useState([])
   const [payLoading, setPayLoading] = useState(false)
 
+  async function loadPlans() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/plans/list', { headers: { Authorization: 'Bearer ' + session.access_token } })
+      const json = await res.json()
+      if (json.plans) setAvailablePlans(json.plans)
+      if (json.current_subscription) setCurrentSub(json.current_subscription)
+    } catch (e) { console.error('loadPlans', e) }
+  }
+
   useEffect(() => {
     if (tab === 'catalog') loadCatalog()
     if (tab === 'finance') loadPayConfig()
+    if (tab === 'planos') loadPlans()
   }, [tab, tenant])
 
   async function loadPayConfig() {
@@ -153,12 +169,34 @@ export default function ClientPortal() {
     setSavingPay(false)
   }
 
+  async function loadPlans() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/plans/list', { headers: { Authorization: 'Bearer ' + session.access_token } })
+      const json = await res.json()
+      if (json.plans) setAvailablePlans(json.plans)
+      if (json.current_subscription) setCurrentSub(json.current_subscription)
+    } catch (e) { console.error('loadPlans', e) }
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) load(session.user)
       else router.replace('/login')
     })
   }, [])
+
+  async function loadPlans() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/plans/list', { headers: { Authorization: 'Bearer ' + session.access_token } })
+      const json = await res.json()
+      if (json.plans) setAvailablePlans(json.plans)
+      if (json.current_subscription) setCurrentSub(json.current_subscription)
+    } catch (e) { console.error('loadPlans', e) }
+  }
 
   useEffect(() => {
     if (!selected) return
@@ -228,13 +266,42 @@ export default function ClientPortal() {
     </div>
   )
 
+  async function subscribePlan(planId, method) {
+    setSubscribing(planId)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+      const res = await fetch('/api/plans/subscribe', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + session.access_token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: planId, method })
+      })
+      const json = await res.json()
+      if (json.ok) {
+        setPaymentModal(json)
+      } else {
+        alert('Erro: ' + (json.error || 'Desconhecido'))
+      }
+    } catch (e) { alert('Erro: ' + e.message) }
+    finally { setSubscribing(null) }
+  }
+
   // Paywall: plano free ou sem plano
   if (!isPlanActive(tenant) || tenant?.plan === 'free') {
     return <Paywall tenant={tenant} onRefresh={() => { setLoading(true); load(user) }} />
   }
 
   const plan     = PLANS[tenant?.plan] || PLANS.free
-  const usagePct = Math.min(Math.round(((usage?.messages||0) / plan.max_messages_month) * 100), 100)
+  // Tentar ler subscription dinâmica
+  let dynSub = null
+  try { dynSub = JSON.parse(tenant?.subscription || '{}') } catch {}
+  const hasDynSub = dynSub && dynSub.status === 'active' && (!dynSub.expires_at || new Date(dynSub.expires_at) >= new Date())
+  const effectiveLabel = hasDynSub ? (dynSub.plan_name || 'Personalizado') : plan.label
+  const effectiveMaxMsg = hasDynSub ? (dynSub.limits?.max_messages_month || 500) : plan.max_messages_month
+  const effectiveMaxBots = hasDynSub ? (dynSub.limits?.max_bots || 1) : plan.max_bots
+  const effectiveFeatures = hasDynSub ? (dynSub.limits?.features || []) : plan.features
+  const effectiveExpires = hasDynSub ? dynSub.expires_at : tenant?.plan_expires_at
+  const usagePct = effectiveMaxMsg >= 999999 ? 0 : Math.min(Math.round(((usage?.messages||0) / effectiveMaxMsg) * 100), 100)
   const filteredConvs = convs.filter(c =>
     !search || (c.contacts?.name || c.contacts?.phone || '').toLowerCase().includes(search.toLowerCase())
   )
@@ -259,7 +326,7 @@ export default function ClientPortal() {
             </Link>
             <div style={styles.planBadge}>
               <span style={{ ...styles.planDot, background: tenant.status === 'active' ? '#22c55e' : '#ef4444' }} />
-              {plan.label}
+              {effectiveLabel}
             </div>
           </div>
 
@@ -269,6 +336,7 @@ export default function ClientPortal() {
               { key: 'bots',          icon: '🤖', label: 'Meus Bots', count: bots.length },
               { key: 'catalog',       icon: '🛍️', label: 'Catálogo' },
             { key: 'whatsapp',       icon: '📶', label: 'WhatsApp' },
+            { key: 'planos',        icon: '📋', label: 'Planos' },
             { key: 'finance',       icon: '💰', label: 'Financeiro' },
             { key: 'usage',         icon: '📊', label: 'Uso & Plano' }
             ].map(n => (
@@ -594,53 +662,182 @@ export default function ClientPortal() {
               )}
             </div>
           )}
+          {tab === 'planos' && (
+            <div style={styles.tabContent}>
+              <h2 style={styles.sectionTitle}>Planos Disponíveis</h2>
+              <p style={styles.sectionSub}>Escolha um plano e pague via PIX ou Mercado Pago. A ativação é automática.</p>
+
+              {/* Assinatura atual */}
+              {currentSub && currentSub.status === 'active' && (
+                <div style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', borderRadius: 12, padding: 16, marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20 }}>✅</span>
+                    <div>
+                      <div style={{ color: '#22c55e', fontWeight: 700, fontSize: 15 }}>Plano Ativo: {currentSub.plan_name || currentSub.plan}</div>
+                      {currentSub.expires_at && (
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                          {currentSub.expires_at === null || currentSub.billing_cycle === 'lifetime' ? 'Vitalício' : 'Expira em: ' + new Date(currentSub.expires_at).toLocaleDateString('pt-BR')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {currentSub.limits?.features && currentSub.limits.features.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {currentSub.limits.features.map((f, i) => (
+                        <span key={i} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)' }}>{f}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Lista de planos */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+                {availablePlans.length === 0 && (
+                  <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14, padding: 40, textAlign: 'center' }}>
+                    Nenhum plano disponível no momento.
+                  </div>
+                )}
+                {availablePlans.map((p, i) => (
+                  <div key={i} style={{
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    borderRadius: 16,
+                    padding: 20,
+                    position: 'relative',
+                  }}>
+                    {p.billing_cycle === 'monthly' && (
+                      <div style={{ position: 'absolute', top: -8, right: 16, background: '#4f8ef7', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6 }}>POPULAR</div>
+                    )}
+                    <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{p.name}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: '#4f8ef7', marginBottom: 12 }}>
+                      R$ {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : p.price}
+                      <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', fontWeight: 400 }}>
+                        {p.billing_cycle === 'monthly' ? '/mês' : p.billing_cycle === 'yearly' ? '/ano' : p.billing_cycle === 'lifetime' ? ' vitalício' : ''}
+                      </span>
+                    </div>
+
+                    {p.description && <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 12 }}>{p.description}</p>}
+
+                    {p.resources && p.resources.length > 0 && (
+                      <ul style={{ margin: '0 0 16px 0', paddingLeft: 18, color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 1.8 }}>
+                        {p.resources.map((r, j) => <li key={j}>{r.name} — <span style={{ color: 'rgba(255,255,255,0.4)' }}>R$ {r.price.toFixed(2).replace('.', ',')}</span></li>)}
+                      </ul>
+                    )}
+                    {p.features && p.features.length > 0 && (
+                      <ul style={{ margin: '0 0 16px 0', paddingLeft: 18, color: 'rgba(255,255,255,0.7)', fontSize: 12, lineHeight: 1.8 }}>
+                        {p.features.map((f, j) => <li key={j}>{f}</li>)}
+                      </ul>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => subscribePlan(p.id, 'pix')} disabled={subscribing === p.id}
+                        style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: subscribing === p.id ? 0.5 : 1 }}>
+                        {subscribing === p.id ? 'Gerando...' : 'PIX'}
+                      </button>
+                      <button onClick={() => subscribePlan(p.id, 'mercadopago')} disabled={subscribing === p.id}
+                        style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer', opacity: subscribing === p.id ? 0.5 : 1 }}>
+                        Cartão
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Modal de pagamento */}
+              {paymentModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }} onClick={() => setPaymentModal(null)}>
+                  <div onClick={e => e.stopPropagation()} style={{ background: '#1a1a1a', borderRadius: 16, padding: 24, maxWidth: 400, width: '100%' }}>
+                    <h3 style={{ color: '#fff', fontSize: 18, fontWeight: 700, marginBottom: 16, textAlign: 'center' }}>
+                      💰 {paymentModal.plan_name} — R$ {paymentModal.amount.toFixed(2).replace('.', ',')}
+                    </h3>
+
+                    {paymentModal.qr_url && (
+                      <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                        <img src={paymentModal.qr_url} alt="QR Code PIX" style={{ width: 220, height: 220, borderRadius: 8, background: '#fff', padding: 8 }} />
+                      </div>
+                    )}
+
+                    {paymentModal.pix_code && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: 11, marginBottom: 4 }}>Código PIX (Copia e Cola):</div>
+                        <div style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 10, fontSize: 11, color: 'rgba(255,255,255,0.7)', wordBreak: 'break-all', fontFamily: 'monospace', cursor: 'pointer' }}
+                          onClick={() => { navigator.clipboard.writeText(paymentModal.pix_code); alert('Código copiado!') }}>
+                          {paymentModal.pix_code}
+                        </div>
+                      </div>
+                    )}
+
+                    {paymentModal.checkout_url && (
+                      <a href={paymentModal.checkout_url} target="_blank" rel="noreferrer"
+                        style={{ display: 'block', textAlign: 'center', padding: '12px', borderRadius: 8, background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 14, textDecoration: 'none', marginBottom: 12 }}>
+                        Pagar no Mercado Pago →
+                      </a>
+                    )}
+
+                    <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 11, textAlign: 'center', marginBottom: 16 }}>
+                      ✅ Após o pagamento, seu plano será ativado automaticamente.
+                    </div>
+
+                    <button onClick={() => setPaymentModal(null)}
+                      style={{ width: '100%', padding: '12px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: 'rgba(255,255,255,0.5)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {tab === 'usage' && (
             <div style={styles.tabContent}>
               <h2 style={styles.sectionTitle}>Uso & Plano</h2>
-              <p style={styles.sectionSub}>Acompanhe o consumo do seu plano {plan.label} este mês.</p>
+              <p style={styles.sectionSub}>Acompanhe o consumo do seu plano {effectiveLabel} este mês.</p>
               <div style={styles.usageGrid}>
                 <div style={styles.usageCard}>
                   <div style={styles.usageLabel}>Plano atual</div>
-                  <div style={styles.usageValue}>{plan.label}</div>
-                  <div style={styles.usageSub}>{tenant.billing_provider === 'google_play' ? '✓ Google Play' : 'Direto'}</div>
+                  <div style={styles.usageValue}>{effectiveLabel}</div>
+                  <div style={styles.usageSub}>{hasDynSub ? '✓ Ativado via pagamento' : (tenant.billing_provider === 'google_play' ? '✓ Google Play' : 'Direto')}</div>
                 </div>
                 <div style={styles.usageCard}>
                   <div style={styles.usageLabel}>Mensagens este mês</div>
                   <div style={styles.usageValue}>{usage?.messages || 0}</div>
-                  <div style={styles.usageSub}>de {plan.max_messages_month.toLocaleString()} incluídas</div>
+                  <div style={styles.usageSub}>de {effectiveMaxMsg >= 999999 ? '∞' : effectiveMaxMsg.toLocaleString()} incluídas</div>
                   <div style={styles.usageBar}>
                     <div style={{ ...styles.usageBarFill, width: `${usagePct}%`, background: usagePct > 85 ? '#ef4444' : '#4f8ef7' }} />
                   </div>
-                  <div style={styles.usagePct}>{usagePct}% utilizado</div>
+                  <div style={styles.usagePct}>{usagePct === 0 && effectiveMaxMsg >= 999999 ? 'Ilimitado' : usagePct + '% utilizado'}</div>
                 </div>
                 <div style={styles.usageCard}>
                   <div style={styles.usageLabel}>Bots ativos</div>
                   <div style={styles.usageValue}>{bots.filter(b => b.status === 'active').length}</div>
-                  <div style={styles.usageSub}>de {plan.max_bots} permitidos</div>
+                  <div style={styles.usageSub}>de {effectiveMaxBots >= 999 ? '∞' : effectiveMaxBots} permitidos</div>
                 </div>
                 <div style={styles.usageCard}>
                   <div style={styles.usageLabel}>Status</div>
                   <div style={{ ...styles.usageValue, color: tenant.status === 'active' ? '#22c55e' : '#ef4444' }}>
                     {tenant.status === 'active' ? 'Ativo' : 'Suspenso'}
                   </div>
-                  {tenant.plan_expires_at && (
-                    <div style={styles.usageSub}>Expira: {new Date(tenant.plan_expires_at).toLocaleDateString('pt-BR')}</div>
+                  {effectiveExpires && (
+                    <div style={styles.usageSub}>Expira: {new Date(effectiveExpires).toLocaleDateString('pt-BR')}</div>
+                  )}
+                  {hasDynSub && !effectiveExpires && (
+                    <div style={styles.usageSub}>Vitalício ♾️</div>
                   )}
                 </div>
               </div>
               <div style={styles.featuresSection}>
                 <h3 style={styles.featuresTitle}>Incluído no seu plano</h3>
                 <div style={styles.featuresList}>
-                  {plan.features.map(f => (
+                  {effectiveFeatures.map(f => (
                     <div key={f} style={styles.featureItem}>
                       <span style={{ color: '#22c55e' }}>✓</span> {f}
                     </div>
                   ))}
                 </div>
-                <a href="https://play.google.com/store/apps/details?id=com.arkiel.assistenteark"
-                   target="_blank" rel="noreferrer" style={styles.upgradeBtn}>
-                  Fazer upgrade via Google Play →
-                </a>
+                <button onClick={() => setTab('planos')} style={styles.upgradeBtn}>
+                  Ver planos disponíveis →
+                </button>
               </div>
             </div>
           )}

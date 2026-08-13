@@ -226,7 +226,7 @@ async function processWebhook(body) {
   // Bot
   const { data: botArr, error: botErr } = await db
     .from('bots')
-    .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,flow,tenants(id,plan,status,max_messages_month)')
+    .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,flow,tenants(id,plan,status,max_messages_month,subscription,plan_expires_at)')
     .eq('phone_number_id', phoneNumberId)
     .eq('status', 'active')
     .limit(1)
@@ -271,6 +271,59 @@ async function processWebhook(body) {
   try {
     await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) })
   } catch(e) { await savelog(db, 'increment_err', e?.message) }
+
+  // ── Verificar limites do plano (dinâmico ou hardcoded) ──
+  try {
+    const tenantData = bot.tenants || {}
+    let sub = null
+    try { sub = JSON.parse(tenantData.subscription || '{}') } catch {}
+
+    let maxMessages = 500 // default free
+    let planActive = false
+
+    if (sub && sub.status === 'active') {
+      if (sub.expires_at && new Date(sub.expires_at) < new Date()) {
+        // Expirou
+        planActive = false
+      } else {
+        maxMessages = sub.limits?.max_messages_month || 500
+        planActive = true
+      }
+    }
+
+    if (!planActive && tenantData.status === 'active' && tenantData.plan !== 'free') {
+      maxMessages = tenantData.max_messages_month || 500
+      planActive = true
+    }
+
+    if (tenantData.plan === 'free' && !sub) planActive = true
+
+    if (!planActive && tenantData.status !== 'active') {
+      // Tenant suspenso
+      await savelog(db, 'tenant_suspended', tenantData.status)
+      try {
+        await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+          method: 'POST', headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: '⚠️ Este serviço está temporariamente indisponível. Entre em contato com o responsável.' } })
+        })
+      } catch {}
+      return
+    }
+
+    // Verificar cota de mensagens
+    const { data: usageData } = await db.rpc('get_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) }).single()
+    const currentMessages = usageData?.message_count || 0
+    if (maxMessages < 999999 && currentMessages >= maxMessages) {
+      await savelog(db, 'quota_exceeded', null, { current: currentMessages, max: maxMessages })
+      try {
+        await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+          method: 'POST', headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: '⚠️ Limite de mensagens do plano atingido. Entre em contato para fazer upgrade.' } })
+        })
+      } catch {}
+      return
+    }
+  } catch(e) { await savelog(db, 'limit_check_err', e?.message) }
 
   // Mark read
   try {
