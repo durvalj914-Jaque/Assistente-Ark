@@ -38,6 +38,8 @@ export default function PainelAdminPage() {
   const [selectedTenantContacts, setSelectedTenantContacts] = useState('')
   const [syncingContacts, setSyncingContacts] = useState(false)
   const [contactsMsg, setContactsMsg] = useState('')
+  const [uploadingContacts, setUploadingContacts] = useState(false)
+  const [uploadResult, setUploadResult] = useState(null)
   const [loadingBots, setLoadingBots] = useState(true)
 
   const [logs, setLogs] = useState([])
@@ -168,6 +170,47 @@ export default function PainelAdminPage() {
       setContactsMsg('❌ ' + e.message)
     }
     setSyncingContacts(false)
+  }
+
+  async function uploadContactsFile(files, tenantId) {
+    if (!files || !files.length) return
+    if (!tenantId) { setContactsMsg('❌ Selecione um cliente primeiro'); return }
+    setUploadingContacts(true)
+    setContactsMsg('')
+    setUploadResult(null)
+    try {
+      const h = await authHeader()
+      let totalImported = 0, totalSkipped = 0, totalErrors = 0, totalProcessed = 0
+
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('tenant_id', tenantId)
+
+        const res = await fetch('/api/contacts/import-device', {
+          method: 'POST',
+          headers: { Authorization: h.Authorization },
+          body: formData,
+        })
+        const json = await res.json()
+        if (json.ok) {
+          totalImported += json.imported || 0
+          totalSkipped += json.skipped || 0
+          totalErrors += json.errors || 0
+          totalProcessed += json.total || 0
+        } else {
+          totalErrors++
+          console.error('Upload error for', file.name, ':', json.error)
+        }
+      }
+
+      setUploadResult({ imported: totalImported, skipped: totalSkipped, errors: totalErrors, total: totalProcessed })
+      setContactsMsg(`✅ ${totalImported} contatos importados! ${totalSkipped} duplicados ignorados. ${totalErrors > 0 ? totalErrors + ' erros.' : ''}`)
+      loadContacts(tenantId)
+    } catch (e) {
+      setContactsMsg('❌ Erro no upload: ' + e.message)
+    }
+    setUploadingContacts(false)
   }
 
   async function loadPayConfig() {
@@ -737,6 +780,46 @@ export default function PainelAdminPage() {
                 {syncingContacts ? '🔄 Sincronizando...' : '🔄 Sincronizar Contatos'}
               </button>
             </div>
+          </div>
+
+          {/* Upload de arquivos */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
+                borderRadius: 10, border: '1px dashed rgba(79,142,247,0.3)',
+                background: 'var(--bg-secondary)', cursor: 'pointer', transition: 'all 0.15s',
+              }}>
+                <span style={{ fontSize: 20 }}>📂</span>
+                <div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+                    {uploadingContacts ? 'Enviando...' : 'Importar contatos (.vcf, .csv)'}
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                    Selecione um ou mais arquivos de contatos do dispositivo
+                  </div>
+                </div>
+                <input
+                  type="file"
+                  accept=".vcf,.csv,text/vcard,text/csv"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    if (e.target.files?.length) uploadContactsFile(Array.from(e.target.files), selectedTenantContacts)
+                    e.target.value = ''
+                  }}
+                  disabled={uploadingContacts || !selectedTenantContacts}
+                />
+              </label>
+            </div>
+            {uploadResult && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', fontSize: 12 }}>
+                <div style={{ color: '#22c55e', fontWeight: 700 }}>✅ {uploadResult.imported} importados</div>
+                <div style={{ color: 'var(--text-muted)', marginTop: 2 }}>
+                  {uploadResult.skipped} duplicados · {uploadResult.total} processados
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Mensagem de status */}

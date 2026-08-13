@@ -33,6 +33,38 @@ function parseVCard(text) {
   }).filter(c => c.name || c.phone || c.email)
 }
 
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim())
+  if (lines.length < 2) return []
+
+  // Detectar delimitador (vírgula, ponto e vírgula ou tab)
+  const firstLine = lines[0]
+  let delim = ','
+  if (firstLine.includes(';')) delim = ';'
+  else if (firstLine.includes('\t')) delim = '\t'
+
+  // Parse header
+  const headers = firstLine.split(delim).map(h => h.trim().toLowerCase().replace(/"/g, ''))
+
+  // Mapear colunas comuns
+  const nameIdx = headers.findIndex(h => h.match(/nome|name|fullname|full_name|nome completo/))
+  const phoneIdx = headers.findIndex(h => h.match(/telefone|phone|celular|whats|mobile|numero/))
+  const emailIdx = headers.findIndex(h => h.match(/email|e-mail|mail/))
+  const orgIdx = headers.findIndex(h => h.match(/empresa|organization|org|company/))
+
+  const contacts = []
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(delim).map(c => c.trim().replace(/^"|"$/g, ''))
+    contacts.push({
+      name: nameIdx >= 0 ? cols[nameIdx] || '' : '',
+      phone: phoneIdx >= 0 ? cols[phoneIdx] || '' : '',
+      email: emailIdx >= 0 ? cols[emailIdx] || '' : '',
+      organization: orgIdx >= 0 ? cols[orgIdx] || '' : '',
+    })
+  }
+  return contacts.filter(c => c.name || c.phone || c.email)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -61,8 +93,21 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!vcardText) return res.status(400).json({ error: 'Nenhum vCard encontrado no arquivo' })
-    contactsList = parseVCard(vcardText)
+    // Detectar tipo de arquivo
+    let csvText = ''
+    for (const part of parts) {
+      if (part.includes('text/csv') || (part.includes('.csv') && !part.includes('BEGIN:VCARD'))) {
+        csvText += part.substring(part.indexOf('\r\n\r\n') >= 0 ? part.indexOf('\r\n\r\n') + 4 : 0)
+      }
+    }
+
+    if (vcardText) {
+      contactsList = parseVCard(vcardText)
+    } else if (csvText) {
+      contactsList = parseCSV(csvText)
+    } else {
+      return res.status(400).json({ error: 'Nenhum contato válido encontrado. Use .vcf ou .csv' })
+    }
   } else {
     // JSON do Contact Picker API
     const body = req.body
@@ -106,6 +151,7 @@ export default async function handler(req, res) {
       full_name: c.name || '',
       phone,
       email: c.email || '',
+      organization: c.organization || '',
       source: 'device',
       synced_at: new Date().toISOString(),
     }
