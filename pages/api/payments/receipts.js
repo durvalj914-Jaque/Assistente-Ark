@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     const { payment_id, conversation_id, contact_id, file_url, file_type, file_name, notes } = req.body
     if (!file_url) return res.status(400).json({ error: 'file_url é obrigatório' })
 
-    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).maybeSingle()
+    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
     const tenantId = member?.tenant_id || null
 
     const { data, error } = await db.from('payment_receipts').insert({

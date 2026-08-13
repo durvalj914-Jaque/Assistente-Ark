@@ -8,10 +8,21 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ error: 'Sessão inválida' })
 
   const db = supabaseAdmin()
-  const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).maybeSingle()
+
+  // Resolver tenant da MESMA forma que o useTenant hook
+  const { data: member } = await db.from('tenant_members')
+    .select('tenant_id')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
   if (!member) return res.status(403).json({ error: 'Sem tenant' })
 
-  const { data: tenant } = await db.from('tenants').select('id, name, mp_access_token').eq('id', member.tenant_id).maybeSingle()
+  const { data: tenant } = await db.from('tenants')
+    .select('id, name, mp_access_token')
+    .eq('id', member.tenant_id)
+    .maybeSingle()
 
   const hasOwnToken = !!tenant?.mp_access_token
   let tokenInfo = null

@@ -18,7 +18,7 @@ export default async function handler(req, res) {
 
   let tenantId
   if (!profile?.is_platform_admin) {
-    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).maybeSingle()
+    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
     if (!member) return res.status(403).json({ error: 'Sem permissão' })
     tenantId = member.tenant_id
   }

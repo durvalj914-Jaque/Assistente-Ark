@@ -1,6 +1,9 @@
 /**
  * GET  /api/payments/config  — Retorna a configuração de pagamento do tenant
  * POST /api/payments/config  — Salva a configuração
+ *
+ * Resolve o tenant da mesma forma que o hook useTenant:
+ * ordena tenant_members por created_at ASC e pega o primeiro.
  */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
@@ -12,12 +15,23 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ error: 'Sessão inválida' })
 
   const db = supabaseAdmin()
-  const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).maybeSingle()
+
+  // Resolver tenant da MESMA forma que o useTenant hook
+  const { data: member } = await db.from('tenant_members')
+    .select('tenant_id, role')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
   const tenantId = member?.tenant_id
 
   if (req.method === 'GET') {
     if (!tenantId) return res.status(200).json({ config: {} })
-    const { data: tenant } = await db.from('tenants').select('id, pix_key, merchant_name, merchant_city, mp_access_token').eq('id', tenantId).maybeSingle()
+    const { data: tenant } = await db.from('tenants')
+      .select('id, pix_key, merchant_name, merchant_city, mp_access_token')
+      .eq('id', tenantId)
+      .maybeSingle()
     return res.status(200).json({ config: tenant || {} })
 
   } else if (req.method === 'POST') {

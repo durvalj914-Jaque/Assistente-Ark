@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const db = supabaseAdmin()
 
   // Buscar tenant_id do usuário
-  const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).maybeSingle()
+  const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
   const tenantId = member?.tenant_id
 
   if (req.method === 'GET') {

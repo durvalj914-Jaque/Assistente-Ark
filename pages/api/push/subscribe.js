@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   if (authError || !user) return res.status(401).json({ error: 'Não autorizado' })
 
   const { data: member } = await db
-    .from('tenant_members').select('tenant_id').eq('user_id', user.id).maybeSingle()
+    .from('tenant_members').select('tenant_id').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
   if (!member) return res.status(403).json({ error: 'Usuário sem tenant' })
 
   const { error } = await db.from('push_subscriptions').upsert({
