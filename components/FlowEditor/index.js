@@ -337,28 +337,34 @@ export default function FlowEditor({ flow, onChange }) {
     const editingNode = nodes.find(n => n.id === editing.id)
     if (!editingNode) { setEditing(null); return }
 
-    // Determinar children: manter os que existem, adicionar novos para botões novos, remover os que sumiram
     const oldChildren = editingNode.children || []
     const oldButtons = editingNode.buttons || []
 
-    // Map old buttons to their children
-    const newChildren = form.buttons.map((btn, i) => {
-      // Se já existe um child nesta posição, manter
+    // Para cada botão no form, decidir: reusar child existente ou criar novo
+    const newChildren = []
+    const newNodesToAdd = []
+
+    for (let i = 0; i < form.buttons.length; i++) {
+      const btn = form.buttons[i]
+      // Se já existe um child nesta posição com o mesmo button id, manter
       if (i < oldChildren.length && oldButtons[i] && oldButtons[i].id === btn.id) {
-        return oldChildren[i]
+        newChildren.push(oldChildren[i])
+        continue
       }
-      // Se é um botão que existia antes mas mudou de posição, tentar reusar
+      // Se é um botão que existia antes (mesmo id), reusar o child
       const oldIdx = oldButtons.findIndex(ob => ob.id === btn.id)
       if (oldIdx > -1 && oldChildren[oldIdx]) {
-        return oldChildren[oldIdx]
+        newChildren.push(oldChildren[oldIdx])
+        continue
       }
-      // Novo botão — criar novo bloco filho
+      // Novo botão — criar novo bloco filho UMA VEZ
       const child = createNode(editingNode.id)
-      child.text = btn.label ? btn.label : ''
-      return child.id
-    })
+      child.text = btn.label || ''
+      newChildren.push(child.id)
+      newNodesToAdd.push(child)
+    }
 
-    // Encontrar nós filhos removidos (que não estão mais em newChildren)
+    // Encontrar filhos removidos
     const removedChildIds = oldChildren.filter(cid => !newChildren.includes(cid))
 
     // Construir novo array de nós
@@ -377,17 +383,8 @@ export default function FlowEditor({ flow, onChange }) {
       children: newChildren,
     }
 
-    // Adicionar novos nós filhos
-    for (const btn of form.buttons) {
-      const oldIdx = oldButtons.findIndex(ob => ob.id === btn.id)
-      const hasChild = oldIdx > -1 && oldChildren[oldIdx]
-      if (!hasChild) {
-        // Criar novo bloco filho com o nome do botão
-        const child = createNode(editingNode.id)
-        child.text = btn.label || ''
-        updatedNodes.push(child)
-      }
-    }
+    // Adicionar os novos nós filhos criados (uma única vez)
+    updatedNodes.push(...newNodesToAdd)
 
     // Remover nós filhos removidos (e seus descendentes)
     if (removedChildIds.length > 0) {
