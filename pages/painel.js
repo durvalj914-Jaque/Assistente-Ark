@@ -347,19 +347,29 @@ export default function PainelAdminPage() {
     setFeeMsg('')
     try {
       const h = await authHeader()
+      // Ensure values are numbers
+      const cleanConfig = {}
+      for (const [k, v] of Object.entries(feeConfig)) {
+        cleanConfig[k] = parseFloat(v) || 0
+      }
       const res = await fetch('/api/admin/fee-config', {
         method: 'POST',
         headers: h,
-        body: JSON.stringify({ fee_config: feeConfig })
+        body: JSON.stringify({ fee_config: cleanConfig })
       })
       const json = await res.json()
       if (json.ok) {
-        setFeeMsg('✅ Taxas salvas! Aplicadas em todas as transações B2B.')
-        setTimeout(() => setFeeMsg(''), 3000)
+        setFeeConfig(json.fee_config || cleanConfig)
+        setFeeMsg('✅ Taxas salvas! Armazenado em: ' + (json.stored_in || 'banco'))
+        setTimeout(() => setFeeMsg(''), 4000)
       } else {
         setFeeMsg('❌ ' + (json.error || 'Erro ao salvar'))
+        console.error('[saveFeeConfig] Error:', json)
       }
-    } catch (e) { setFeeMsg('❌ ' + e.message) }
+    } catch (e) {
+      setFeeMsg('❌ ' + e.message)
+      console.error('[saveFeeConfig] Exception:', e)
+    }
     finally { setSavingFees(false) }
   }
 
