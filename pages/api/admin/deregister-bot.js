@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
   // 2. Deregister na Meta (se tiver phone_number_id)
   if (phoneNumberId) {
-    const metaToken = process.env.META_SYSTEM_USER_TOKEN
+    const metaToken = process.env.META_SYSTEM_USER_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
     if (metaToken) {
       try {
         const metaResp = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/deregister`, {
@@ -57,11 +57,15 @@ export default async function handler(req, res) {
           headers: { 'Authorization': `Bearer ${metaToken}` },
         })
         const metaData = await metaResp.json()
-        results.steps.push({ 
-          step: 'meta_deregister', 
-          success: metaData.success === true, 
-          result: metaData 
-        })
+        
+        if (metaData.success === true) {
+          results.steps.push({ step: 'meta_deregister', success: true, message: 'Número descadastrado da Meta' })
+        } else if (metaData.error?.error_subcode === 133010) {
+          // Já estava descadastrado — tudo bem
+          results.steps.push({ step: 'meta_deregister', success: true, message: 'Número já estava descadastrado da Meta', already_deregistered: true })
+        } else {
+          results.steps.push({ step: 'meta_deregister', success: false, error: metaData.error?.message || 'Erro na Meta', result: metaData })
+        }
       } catch (e) {
         results.steps.push({ step: 'meta_deregister', error: e.message })
       }
