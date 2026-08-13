@@ -54,6 +54,10 @@ export default function PainelAdminPage() {
   const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   const [savingFees, setSavingFees] = useState(false)
   const [feeMsg, setFeeMsg] = useState('')
+  const [plans, setPlans] = useState([])
+  const [planModal, setPlanModal] = useState(null) // null | 'new' | {editing plan}
+  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '' })
+  const [planSaving, setPlanSaving] = useState(false)
   const [mpDiag, setMpDiag] = useState(null)
   const [mpDiagLoading, setMpDiagLoading] = useState(false)
   const [mpClearing, setMpClearing] = useState(false)
@@ -119,6 +123,7 @@ export default function PainelAdminPage() {
   useEffect(() => {
     if (tab === 'payments') { loadPayments() }
     if (tab === 'receipts') { loadReceipts('all') }
+    if (tab === 'planos') { loadPlans() }
   }, [tab])
 
   async function loadContacts(tenantId) {
@@ -206,6 +211,72 @@ export default function PainelAdminPage() {
       const json = await res.json()
       if (json.fee_config) setFeeConfig(json.fee_config)
     } catch (e) { console.error('loadFeeConfig', e) }
+  }
+
+  async function loadPlans() {
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/plans', { headers: h })
+      const json = await res.json()
+      if (json.plans) setPlans(json.plans)
+    } catch (e) { console.error('loadPlans', e) }
+  }
+
+  async function savePlan(isEdit) {
+    setPlanSaving(true)
+    try {
+      const h = await authHeader()
+      const features = planForm.features ? planForm.features.split('\n').filter(f => f.trim()) : []
+      const body = {
+        name: planForm.name,
+        price: parseFloat(planForm.price) || 0,
+        billing_cycle: planForm.billing_cycle,
+        duration_days: planForm.duration_days ? parseInt(planForm.duration_days) : null,
+        description: planForm.description,
+        features,
+      }
+      const res = await fetch('/api/admin/plans', {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify(isEdit ? { id: planModal.id, ...body } : body)
+      })
+      const json = await res.json()
+      if (json.ok) {
+        setPlanModal(null)
+        setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '' })
+        loadPlans()
+      } else {
+        alert('Erro: ' + (json.error || 'Desconhecido'))
+      }
+    } catch (e) { alert('Erro: ' + e.message) }
+    finally { setPlanSaving(false) }
+  }
+
+  async function deletePlan(id) {
+    if (!confirm('Confirmar exclusão deste plano?')) return
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/plans', {
+        method: 'DELETE',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      })
+      const json = await res.json()
+      if (json.ok) loadPlans()
+      else alert('Erro: ' + (json.error || 'Desconhecido'))
+    } catch (e) { alert('Erro: ' + e.message) }
+  }
+
+  async function togglePlanActive(plan) {
+    try {
+      const h = await authHeader()
+      await fetch('/api/admin/plans', {
+        method: 'PATCH',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: plan.id, active: !plan.active })
+      })
+      loadPlans()
+    } catch (e) {}
   }
 
   async function saveFeeConfig() {
@@ -345,6 +416,7 @@ export default function PainelAdminPage() {
     { key: 'clients',   icon: '\uD83C\uDFE2', label: 'Clientes' },
     { key: 'bots',      icon: '\uD83E\uDD16', label: 'Bots' },
     { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
+    { key: 'planos',    icon: '\uD83D\uDCC4', label: 'Planos' },
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
     { key: 'activity',  icon: '\uD83D\uDCE0', label: 'Atividade' },
@@ -727,6 +799,159 @@ export default function PainelAdminPage() {
         </div>
       )}
       {/* ── ABA PAGAMENTOS ── */}
+      {tab === 'planos' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <div>
+              <h2 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>📋 Planos da Plataforma</h2>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Crie e gerencie planos disponíveis para os clientes.</p>
+            </div>
+            <button onClick={() => { setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '' }); setPlanModal('new') }}
+              style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+              ➕ Novo Plano
+            </button>
+          </div>
+
+          {plans.length === 0 && (
+            <div className="ark-card" style={{ padding: 40, textAlign: 'center' }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Nenhum plano criado ainda.</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 4 }}>Clique em "Novo Plano" para começar.</div>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+            {plans.map((p, i) => (
+              <div key={i} className="ark-card" style={{ padding: 20, position: 'relative', opacity: p.active === false ? 0.6 : 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>{p.name}</div>
+                    <div style={{ color: '#4f8ef7', fontSize: 22, fontWeight: 800, marginTop: 4 }}>
+                      R$ {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : p.price}
+                    </div>
+                  </div>
+                  <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
+                    background: p.active === false ? 'var(--bg-secondary)' : 'rgba(34,197,94,0.1)',
+                    color: p.active === false ? 'var(--text-dim)' : '#22c55e'
+                  }}>
+                    {p.active === false ? 'INATIVO' : 'ATIVO'}
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+                  <span style={{ padding: '3px 8px', borderRadius: 6, background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>
+                    {p.billing_cycle === 'monthly' ? '🔄 Mensal' :
+                     p.billing_cycle === 'quarterly' ? '🔄 Trimestral' :
+                     p.billing_cycle === 'yearly' ? '🔄 Anual' :
+                     p.billing_cycle === 'lifetime' ? '♾️ Vitalício' :
+                     p.billing_cycle === 'custom' ? `⏱️ ${p.duration_days || 0} dias` : p.billing_cycle}
+                  </span>
+                </div>
+
+                {p.description && (
+                  <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 10 }}>{p.description}</p>
+                )}
+
+                {p.features && p.features.length > 0 && (
+                  <ul style={{ margin: '0 0 12px 0', paddingLeft: 18, color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.6 }}>
+                    {p.features.map((f, j) => <li key={j} style={{ marginBottom: 2 }}>{f}</li>)}
+                  </ul>
+                )}
+
+                <div style={{ display: 'flex', gap: 6, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
+                  <button onClick={() => togglePlanActive(p)}
+                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                    {p.active === false ? '▶️ Ativar' : '⏸️ Pausar'}
+                  </button>
+                  <button onClick={() => { setPlanForm({ name: p.name, price: String(p.price), billing_cycle: p.billing_cycle, duration_days: p.duration_days ? String(p.duration_days) : '', description: p.description || '', features: (p.features || []).join('\n') }); setPlanModal(p) }}
+                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                    ✏️ Editar
+                  </button>
+                  <button onClick={() => deletePlan(p.id)}
+                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                    🗑️ Excluir
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Modal de criar/editar plano */}
+          {planModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <div className="ark-card" style={{ width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'auto', padding: 24 }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, marginBottom: 20 }}>
+                  {planModal === 'new' ? '📋 Novo Plano' : '✏️ Editar Plano'}
+                </h3>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome do Plano *</label>
+                  <input type="text" value={planForm.name} onChange={e => setPlanForm({ ...planForm, name: e.target.value })}
+                    placeholder="Ex: Plano Starter, Plano Pro..."
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                  <div>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Valor (R$) *</label>
+                    <input type="number" step="0.01" value={planForm.price} onChange={e => setPlanForm({ ...planForm, price: e.target.value })}
+                      placeholder="99.90"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Ciclo de Cobrança</label>
+                    <select value={planForm.billing_cycle} onChange={e => setPlanForm({ ...planForm, billing_cycle: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
+                      <option value="monthly">Mensal</option>
+                      <option value="quarterly">Trimestral</option>
+                      <option value="yearly">Anual</option>
+                      <option value="lifetime">Vitalício</option>
+                      <option value="custom">Personalizado (dias)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {planForm.billing_cycle === 'custom' && (
+                  <div style={{ marginBottom: 14 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Duração (em dias)</label>
+                    <input type="number" value={planForm.duration_days} onChange={e => setPlanForm({ ...planForm, duration_days: e.target.value })}
+                      placeholder="30, 90, 180..."
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição</label>
+                  <textarea value={planForm.description} onChange={e => setPlanForm({ ...planForm, description: e.target.value })}
+                    placeholder="Descrição do plano..."
+                    rows={2}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', resize: 'vertical' }} />
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Recursos (um por linha)</label>
+                  <textarea value={planForm.features} onChange={e => setPlanForm({ ...planForm, features: e.target.value })}
+                    placeholder={"Ex:\n1 bot ativo\n1000 mensagens/mês\nSuporte por email"}
+                    rows={4}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none', resize: 'vertical' }} />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setPlanModal(null)}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    Cancelar
+                  </button>
+                  <button onClick={() => savePlan(planModal !== 'new')} disabled={planSaving || !planForm.name}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: (planSaving || !planForm.name) ? 0.5 : 1 }}>
+                    {planSaving ? 'Salvando...' : (planModal === 'new' ? 'Criar Plano' : 'Salvar')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {tab === 'payments' && (
         <div>
           <div className="ark-card" style={{ padding: 20, marginBottom: 20 }}>
