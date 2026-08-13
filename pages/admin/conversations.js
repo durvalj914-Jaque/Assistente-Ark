@@ -262,7 +262,7 @@ export default function ConversationsPage() {
     if (!selected?.tenant_id) return
     setLoadingChargeMethods(true)
     try {
-      const res = await fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}`)
+      const res = await fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}&platform_fallback=true`)
       const json = await res.json()
       if (json.connected && json.methods) setMpChargeMethods(json.methods)
       if (json.account) setMpChargeAccount(json.account)

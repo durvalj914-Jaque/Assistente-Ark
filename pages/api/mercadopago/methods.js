@@ -27,13 +27,15 @@ export default async function handler(req, res) {
       }
     }
 
-    // Fallback para token da plataforma se tenant não tem proprio token
-    if (!token) {
+    // Fallback para token da plataforma APENAS quando platform_fallback=true
+    const allowPlatformFallback = req.query.platform_fallback === 'true'
+    if (!token && allowPlatformFallback) {
       token = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
       usingPlatform = true
     }
 
-    if (!token) return res.status(200).json({ connected: false, methods: [] })
+    // Sem token proprio e sem fallback = desconectado
+    if (!token) return res.status(200).json({ connected: false, methods: [], using_platform_token: false })
 
     // Fetch payment methods and account info in parallel
     const [mpRes, userRes] = await Promise.all([

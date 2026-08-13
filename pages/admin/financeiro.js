@@ -125,8 +125,9 @@ export default function FinanceiroPage() {
             if (parsed.mp_methods) setMpMethods(parsed.mp_methods)
           } catch {}
         }
-        // Sempre buscar formas disponiveis (usando token do tenant ou fallback da plataforma)
-        if (json.config.id) fetchMPMethods(json.config.id)
+        // So buscar formas de MP se o tenant tem conta propria conectada
+        if (status.mp_connected && json.config.id) fetchMPMethods(json.config.id)
+        else { setMpAvailableMethods([]); setMpAccount(null); setMpUser('') }
       }
     } catch (e) {}
   }
@@ -138,8 +139,10 @@ export default function FinanceiroPage() {
       const res = await fetch(`/api/mercadopago/methods?tenant_id=${tenantId}`, { headers: h })
       const json = await res.json()
       if (json.connected && json.methods) setMpAvailableMethods(json.methods)
+      else setMpAvailableMethods([])
       if (json.account) setMpAccount(json.account)
-    } catch (e) { console.error('fetchMPMethods:', e) }
+      else setMpAccount(null)
+    } catch (e) { console.error('fetchMPMethods:', e); setMpAvailableMethods([]); setMpAccount(null) }
     finally { setLoadingMpMethods(false) }
   }
 
@@ -440,7 +443,8 @@ export default function FinanceiroPage() {
                 </div>
               )}
 
-              {/* Formas de cobrança vinculadas à conta */}
+              {/* Formas de cobrança vinculadas à conta - so quando MP conectado */}
+              {mpConnected && (
               <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 14 }}>
                     <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Formas de cobrança vinculadas à conta
