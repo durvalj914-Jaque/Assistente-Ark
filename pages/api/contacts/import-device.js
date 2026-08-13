@@ -5,14 +5,13 @@
  */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
-// Desabilita bodyParser do Next.js para ler o raw body do multipart
 export const config = { api: { bodyParser: false } }
 
 function parseVCard(text) {
   const cards = text.split('BEGIN:VCARD').slice(1)
   return cards.map(cardText => {
     const block = cardText.split('END:VCARD')[0]
-    let name = '', phone = '', email = ''
+    let name = '', phone = '', email = '', org = ''
 
     const fnMatch = block.match(/^FN:(.+)$/m)
     if (fnMatch) name = fnMatch[1].trim()
@@ -23,6 +22,9 @@ function parseVCard(text) {
     const emailMatch = block.match(/^EMAIL[^:]*:(.+)$/m)
     if (emailMatch) email = emailMatch[1].trim()
 
+    const orgMatch = block.match(/^ORG[^:]*:(.+)$/m)
+    if (orgMatch) org = orgMatch[1].trim()
+
     if (!name) {
       const nMatch = block.match(/^N:(.+)$/m)
       if (nMatch) {
@@ -31,7 +33,7 @@ function parseVCard(text) {
       }
     }
 
-    return { name, phone, email }
+    return { name, phone, email, organization: org }
   }).filter(c => c.name || c.phone || c.email)
 }
 
@@ -65,7 +67,7 @@ function parseCSV(text) {
 }
 
 /**
- * Parser manual de multipart/form-data robusto usando Buffer.
+ * Parser robusto de multipart/form-data usando Buffer.
  */
 function parseMultipart(rawBuffer, boundary) {
   const fields = {}
@@ -73,7 +75,6 @@ function parseMultipart(rawBuffer, boundary) {
   const boundaryStr = '--' + boundary
   const boundaryBuf = Buffer.from(boundaryStr)
 
-  // Encontrar todas as posições do boundary no buffer
   const positions = []
   for (let i = 0; i <= rawBuffer.length - boundaryBuf.length; i++) {
     let match = true
@@ -90,18 +91,15 @@ function parseMultipart(rawBuffer, boundary) {
     let partStart = positions[p] + boundaryBuf.length
     let partEnd = positions[p + 1]
 
-    // Skip CRLF após boundary
     if (partStart < rawBuffer.length - 1 && rawBuffer[partStart] === 0x0D && rawBuffer[partStart + 1] === 0x0A) {
       partStart += 2
     }
 
     let partBuffer = rawBuffer.slice(partStart, partEnd)
-    // Remover trailing CRLF
     if (partBuffer.length >= 2 && partBuffer[partBuffer.length - 2] === 0x0D && partBuffer[partBuffer.length - 1] === 0x0A) {
       partBuffer = partBuffer.slice(0, -2)
     }
 
-    // Separar headers do body (double CRLF = \r\n\r\n)
     const sep = Buffer.from('\r\n\r\n')
     const sepIdx = partBuffer.indexOf(sep)
     if (sepIdx === -1) continue
@@ -140,39 +138,33 @@ export default async function handler(req, res) {
   let tenantId, contactsList = []
 
   if (contentType.includes('multipart/form-data')) {
-    // Ler raw body
     const chunks = []
     for await (const chunk of req) chunks.push(chunk)
     const rawBuffer = Buffer.concat(chunks)
 
-    // Extrair boundary
     const boundaryMatch = contentType.match(/boundary=([^\s;]+)/)
     if (!boundaryMatch) return res.status(400).json({ error: 'Boundary não encontrado' })
     const boundary = boundaryMatch[1].replace(/"/g, '')
 
-    // Parse multipart
     const { fields, files } = parseMultipart(rawBuffer, boundary)
     tenantId = fields.tenant_id || ''
 
     if (!tenantId) return res.status(400).json({ error: 'tenant_id é obrigatório' })
 
-    // Processar cada arquivo
     for (const [fieldName, file] of Object.entries(files)) {
       const text = file.data.toString('utf-8')
       const filename = (file.filename || '').toLowerCase()
 
       if (text.includes('BEGIN:VCARD')) {
-        const parsed = parseVCard(text)
-        contactsList.push(...parsed)
+        contactsList.push(...parseVCard(text))
       } else if (filename.endsWith('.csv') || file.contentType.includes('csv') || text.includes(',') || text.includes(';')) {
-        const parsed = parseCSV(text)
-        contactsList.push(...parsed)
+        contactsList.push(...parseCSV(text))
       }
     }
 
     if (!contactsList.length) {
       return res.status(400).json({
-        error: 'Nenhum contato válido encontrado no arquivo. Verifique se o formato é .vcf ou .csv',
+        error: 'Nenhum contato válido encontrado. Verifique se é .vcf ou .csv',
         debug: {
           filesReceived: Object.keys(files).length,
           fileNames: Object.values(files).map(f => f.filename),
@@ -181,7 +173,6 @@ export default async function handler(req, res) {
       })
     }
   } else {
-    // JSON do Contact Picker API
     let body = req.body
     if (typeof body === 'string') body = JSON.parse(body)
     tenantId = body.tenant_id
@@ -196,32 +187,41 @@ export default async function handler(req, res) {
   const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return res.status(401).json({ error: 'Sessão inválida' })
 
+  const db = supabaseAdmin()
+
   // Verificar permissão
-  const { data: profile } = await supabaseAdmin()
-    .from('profiles').select('is_platform_admin').eq('id', user.id).maybeSingle()
+  const { data: profile } = await db.from('profiles').select('is_platform_admin').eq('id', user.id).maybeSingle()
   const isPlatformAdmin = profile?.is_platform_admin || false
 
   if (!isPlatformAdmin) {
-    const { data: member } = await supabaseAdmin()
-      .from('tenant_members').select('tenant_id').eq('user_id', user.id).eq('tenant_id', tenantId).maybeSingle()
+    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).eq('tenant_id', tenantId).maybeSingle()
     if (!member) return res.status(403).json({ error: 'Sem permissão' })
   }
 
-  // Importar contatos
-  const db = supabaseAdmin()
+  // IMPORTANTE: Verificar se a tabela contacts existe antes de inserir
+  const { error: tableCheck } = await db.from('contacts').select('id').limit(1)
+  if (tableCheck) {
+    return res.status(500).json({
+      error: 'Tabela de contatos não existe. Clique em "Inicializar" primeiro.',
+      detail: tableCheck.message
+    })
+  }
+
+  // Importar contatos — SÓ colunas que existem na tabela
   let imported = 0, skipped = 0, errors = 0
+  const errorMessages = []
 
   for (const c of contactsList) {
     let phone = (c.phone || '').replace(/[^\d+]/g, '')
     if (phone && !phone.startsWith('+')) phone = '+' + phone
 
+    // Só colunas que existem na tabela contacts (sem 'source')
     const contactData = {
       tenant_id: tenantId,
       full_name: c.name || '',
       phone,
       email: c.email || '',
       organization: c.organization || '',
-      source: 'device',
       synced_at: new Date().toISOString(),
     }
 
@@ -230,6 +230,7 @@ export default async function handler(req, res) {
       continue
     }
 
+    // Verificar se já existe
     let existingQuery = db.from('contacts').select('id').eq('tenant_id', tenantId).limit(1)
     if (contactData.phone) existingQuery = existingQuery.eq('phone', contactData.phone)
     else if (contactData.email) existingQuery = existingQuery.eq('email', contactData.email)
@@ -241,11 +242,17 @@ export default async function handler(req, res) {
       const { error } = await db.from('contacts')
         .update({ ...contactData, updated_at: new Date().toISOString() })
         .eq('id', existing.id)
-      if (error) errors++
+      if (error) {
+        errors++
+        if (errorMessages.length < 3) errorMessages.push(error.message)
+      }
       else imported++
     } else {
       const { error } = await db.from('contacts').insert(contactData)
-      if (error) errors++
+      if (error) {
+        errors++
+        if (errorMessages.length < 3) errorMessages.push(error.message)
+      }
       else imported++
     }
   }
@@ -256,5 +263,6 @@ export default async function handler(req, res) {
     skipped,
     errors,
     total: contactsList.length,
+    errorMessages: errors > 0 ? errorMessages : undefined,
   })
 }

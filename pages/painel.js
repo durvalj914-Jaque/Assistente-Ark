@@ -181,6 +181,7 @@ export default function PainelAdminPage() {
     try {
       const h = await authHeader()
       let totalImported = 0, totalSkipped = 0, totalErrors = 0, totalProcessed = 0
+      let lastErrorMessages = null
 
       for (const file of files) {
         const formData = new FormData()
@@ -198,14 +199,22 @@ export default function PainelAdminPage() {
           totalSkipped += json.skipped || 0
           totalErrors += json.errors || 0
           totalProcessed += json.total || 0
+          if (json.errorMessages) lastErrorMessages = json.errorMessages
         } else {
-          totalErrors++
+          lastErrorMessages = lastErrorMessages || []
+          lastErrorMessages.push(json.error || 'erro')
           console.error('Upload error for', file.name, ':', json.error)
         }
       }
 
       setUploadResult({ imported: totalImported, skipped: totalSkipped, errors: totalErrors, total: totalProcessed })
-      setContactsMsg(`✅ ${totalImported} contatos importados! ${totalSkipped} duplicados ignorados. ${totalErrors > 0 ? totalErrors + ' erros.' : ''}`)
+      if (totalErrors > 0 && totalImported === 0) {
+        setContactsMsg('❌ Falha ao salvar. Verifique se a tabela foi inicializada. Erro: ' + (json.error || 'erro desconhecido'))
+      } else if (totalErrors > 0) {
+        setContactsMsg(`✅ ${totalImported} importados! ${totalSkipped} duplicados. ⚠️ ${totalErrors} erros: ${json.errorMessages ? json.errorMessages.join('; ') : 'erro desconhecido'}`)
+      } else {
+        setContactsMsg(`✅ ${totalImported} contatos importados! ${totalSkipped} duplicados ignorados.`)
+      }
       loadContacts(tenantId)
     } catch (e) {
       setContactsMsg('❌ Erro no upload: ' + e.message)
