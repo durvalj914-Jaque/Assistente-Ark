@@ -54,6 +54,9 @@ export default function PainelAdminPage() {
   const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   const [savingFees, setSavingFees] = useState(false)
   const [feeMsg, setFeeMsg] = useState('')
+  const [mpDiag, setMpDiag] = useState(null)
+  const [mpDiagLoading, setMpDiagLoading] = useState(false)
+  const [mpClearing, setMpClearing] = useState(false)
 
   // ── Receipts ──
   const [receipts, setReceipts] = useState([])
@@ -224,6 +227,39 @@ export default function PainelAdminPage() {
       }
     } catch (e) { setFeeMsg('❌ ' + e.message) }
     finally { setSavingFees(false) }
+  }
+
+  async function runMpDiagnostic() {
+    setMpDiagLoading(true)
+    setMpDiag(null)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/mp-diagnostic', { headers: h })
+      const json = await res.json()
+      setMpDiag(json)
+    } catch (e) { setMpDiag({ error: e.message }) }
+    finally { setMpDiagLoading(false) }
+  }
+
+  async function clearMpFromTenant(tenantId, tenantName) {
+    if (!confirm('Confirma remover o Mercado Pago do tenant: ' + tenantName + '?')) return
+    setMpClearing(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/mp-diagnostic', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clear_tenant_id: tenantId })
+      })
+      const json = await res.json()
+      if (json.ok) {
+        alert('✅ MP removido do tenant: ' + tenantName)
+        runMpDiagnostic() // refresh
+      } else {
+        alert('❌ ' + (json.error || 'Erro'))
+      }
+    } catch (e) { alert('❌ ' + e.message) }
+    finally { setMpClearing(false) }
   }
 
   async function loadReceipts(cat) {
