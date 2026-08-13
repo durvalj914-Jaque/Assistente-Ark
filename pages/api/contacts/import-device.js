@@ -2,8 +2,9 @@
  * POST /api/contacts/import-device
  * Importa contatos enviados pelo dispositivo (vCard .vcf, .csv, ou JSON).
  * Body: FormData com file (.vcf/.csv) + tenant_id  OU  JSON { tenant_id, contacts: [...] }
+ * Usa o client autenticado do usuário (não service role) — a tabela contacts tem RLS permissiva.
  */
-import { supabase, supabaseAdmin } from '../../../lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 
 export const config = { api: { bodyParser: false } }
 
@@ -135,6 +136,8 @@ export default async function handler(req, res) {
   const authHeader = req.headers.authorization
   if (!authHeader) return res.status(401).json({ error: 'Não autenticado' })
 
+  const userToken = authHeader.replace('Bearer ', '')
+
   let tenantId, contactsList = []
 
   if (contentType.includes('multipart/form-data')) {
@@ -182,23 +185,19 @@ export default async function handler(req, res) {
   if (!tenantId) return res.status(400).json({ error: 'tenant_id é obrigatório' })
   if (!contactsList.length) return res.status(400).json({ error: 'Nenhum contato válido encontrado' })
 
-  // Autenticar
-  const token = authHeader.replace('Bearer ', '')
-  const { data: { user } } = await supabase.auth.getUser(token)
-  if (!user) return res.status(401).json({ error: 'Sessão inválida' })
+  // Cliente autenticado com o token do usuário (RLS da tabela contacts é permissiva)
+  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const db = createClient(supaUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${userToken}` } }
+  })
 
-  const db = supabaseAdmin()
+  // Verificar autenticação
+  const { data: { user }, error: authErr } = await db.auth.getUser(userToken)
+  if (authErr || !user) return res.status(401).json({ error: 'Sessão inválida' })
 
-  // Verificar permissão
-  const { data: profile } = await db.from('profiles').select('is_platform_admin').eq('id', user.id).maybeSingle()
-  const isPlatformAdmin = profile?.is_platform_admin || false
-
-  if (!isPlatformAdmin) {
-    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).eq('tenant_id', tenantId).maybeSingle()
-    if (!member) return res.status(403).json({ error: 'Sem permissão' })
-  }
-
-  // IMPORTANTE: Verificar se a tabela contacts existe antes de inserir
+  // Verificar se a tabela contacts existe
   const { error: tableCheck } = await db.from('contacts').select('id').limit(1)
   if (tableCheck) {
     return res.status(500).json({
@@ -215,7 +214,6 @@ export default async function handler(req, res) {
     let phone = (c.phone || '').replace(/[^\d+]/g, '')
     if (phone && !phone.startsWith('+')) phone = '+' + phone
 
-    // Só colunas que existem na tabela contacts (sem 'source')
     const contactData = {
       tenant_id: tenantId,
       full_name: c.name || '',
@@ -230,13 +228,13 @@ export default async function handler(req, res) {
       continue
     }
 
-    // Verificar se já existe
+    // Verificar se já existe (por phone ou email)
     let existingQuery = db.from('contacts').select('id').eq('tenant_id', tenantId).limit(1)
     if (contactData.phone) existingQuery = existingQuery.eq('phone', contactData.phone)
     else if (contactData.email) existingQuery = existingQuery.eq('email', contactData.email)
     else { skipped++; continue }
 
-    const { data: existing } = await existingQuery.maybeSingle()
+    const { data: existing, error: existErr } = await existingQuery.maybeSingle()
 
     if (existing) {
       const { error } = await db.from('contacts')
@@ -244,14 +242,14 @@ export default async function handler(req, res) {
         .eq('id', existing.id)
       if (error) {
         errors++
-        if (errorMessages.length < 3) errorMessages.push(error.message)
+        if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message}`)
       }
       else imported++
     } else {
       const { error } = await db.from('contacts').insert(contactData)
       if (error) {
         errors++
-        if (errorMessages.length < 3) errorMessages.push(error.message)
+        if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message}`)
       }
       else imported++
     }

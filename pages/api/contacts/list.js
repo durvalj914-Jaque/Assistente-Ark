@@ -1,18 +1,28 @@
 /**
  * GET /api/contacts/list?tenant_id=xxx
- * Lista contatos de um tenant. Requer platform admin.
+ * Lista contatos de um tenant. Usa client autenticado do usuário.
  */
-import { requirePlatformAdmin } from '../../../lib/adminAuth'
+import { createClient } from '@supabase/supabase-js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
-  
-  const ctx = await requirePlatformAdmin(req, res)
-  if (!ctx) return
-  const { db } = ctx
+
+  const authHeader = req.headers.authorization
+  if (!authHeader) return res.status(401).json({ error: 'Não autenticado' })
+  const userToken = authHeader.replace('Bearer ', '')
 
   const { tenant_id } = req.query
   if (!tenant_id) return res.status(400).json({ error: 'tenant_id é obrigatório' })
+
+  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const db = createClient(supaUrl, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { headers: { Authorization: `Bearer ${userToken}` } }
+  })
+
+  const { data: { user } } = await db.auth.getUser(userToken)
+  if (!user) return res.status(401).json({ error: 'Sessão inválida' })
 
   const { data, error, count } = await db
     .from('contacts')
