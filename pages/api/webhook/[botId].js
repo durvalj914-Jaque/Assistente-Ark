@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../../../lib/supabase'
-import { sendText } from '../../../lib/meta'
-import { getRootNode, getNextNode, processMessage } from '../../../lib/flowEngine'
+import { sendText, sendButtons, sendList } from '../../../lib/meta'
+import { getRootNode, getNextNode, processMessage, processFlow, getNodeButtons } from '../../../lib/flowEngine'
 import { sendProductList, sendSingleProduct, sendProductRich, sendProductListFallback, retailerIdFor } from '../../../lib/metaCatalog'
 
 
@@ -115,8 +115,15 @@ export default async function handler(req, res) {
       meta_message_id: msg.id
     })
 
-    // ── Botão "Comprar" do catálogo (fallback rico) ──
+    // ── Determinar input para o fluxo ──
+    // Se é botão interativo do fluxo (não do catálogo), usar o ID do botão
     const buttonId = msg.interactive?.button_reply?.id || msg.interactive?.list_reply?.id || ''
+    let flowInput = userText
+    if (buttonId && !buttonId.startsWith('buy_') && !buttonId.startsWith('prod_')) {
+      flowInput = buttonId  // Usa o ID exato do botão para match perfeito
+    }
+
+    // ── Botão "Comprar" do catálogo (fallback rico) ──
     if (buttonId.startsWith('buy_') || buttonId.startsWith('prod_')) {
       const productId = buttonId.replace('buy_', '').replace('prod_', '')
       const { data: product } = await db.from('products')
@@ -159,7 +166,7 @@ export default async function handler(req, res) {
     }
 
     // Processa fluxo
-    const result = await processMessage(bot, conv, userText, {
+    const result = await processMessage(bot, conv, flowInput, {
       supabase: db,
       sendFn: (text) => sendText(bot.phone_number_id, bot.access_token, from, text)
     })
@@ -247,13 +254,33 @@ export default async function handler(req, res) {
       // Por agora, só envia o texto do nó
     }
 
-    // ── Resposta padrão (texto) ──
+    // ── Resposta padrão (texto + botões interativos) ──
     if (result.reply) {
-      await sendText(phoneId, waToken, from, result.reply)
-      await db.from('messages').insert({
-        tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
-        contact_id: contact.id, direction: 'outbound', type: 'text', content: result.reply
-      })
+      const targetNode = result.node
+      const buttons = targetNode ? getNodeButtons(targetNode) : []
+      
+      if (buttons.length >= 1 && buttons.length <= 3) {
+        // WhatsApp interactive buttons (max 3)
+        await sendButtons(phoneId, waToken, from, result.reply, buttons.map(b => ({ id: b.id, title: b.label })))
+        await db.from('messages').insert({
+          tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+          contact_id: contact.id, direction: 'outbound', type: 'interactive', content: result.reply + ' [botões: ' + buttons.map(b => b.label).join(', ') + ']'
+        })
+      } else if (buttons.length >= 4 && buttons.length <= 10) {
+        // WhatsApp list message (4-10 options)
+        await sendList(phoneId, waToken, from, result.reply, [{ title: 'Opções', rows: buttons.map(b => ({ id: b.id, title: b.label.substring(0, 24), description: '' })) }])
+        await db.from('messages').insert({
+          tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+          contact_id: contact.id, direction: 'outbound', type: 'interactive', content: result.reply + ' [lista: ' + buttons.map(b => b.label).join(', ') + ']'
+        })
+      } else {
+        // Sem botões — texto simples
+        await sendText(phoneId, waToken, from, result.reply)
+        await db.from('messages').insert({
+          tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
+          contact_id: contact.id, direction: 'outbound', type: 'text', content: result.reply
+        })
+      }
       await db.from('bots').update({
         total_messages: (bot.total_messages || 0) + 2,
         updated_at: new Date().toISOString()
