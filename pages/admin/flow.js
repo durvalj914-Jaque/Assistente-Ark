@@ -19,7 +19,7 @@ export default function FlowPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/assistente-ark')
+    if (!loading && !user) router.replace('/assistente-ark/entrar')
   }, [user, loading])
 
   useEffect(() => {

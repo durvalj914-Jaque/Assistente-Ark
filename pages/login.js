@@ -4,7 +4,7 @@ import { useRouter } from 'next/router'
 export default function Login() {
   const router = useRouter()
   useEffect(() => {
-    router.replace('/assistente-ark')
+    router.replace('/assistente-ark/entrar')
   }, [])
   return null
 }

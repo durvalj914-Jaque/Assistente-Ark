@@ -183,7 +183,7 @@ export default function ClientPortal() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) load(session.user)
-      else router.replace('/assistente-ark')
+      else router.replace('/assistente-ark/entrar')
     })
   }, [])
 
@@ -349,7 +349,7 @@ export default function ClientPortal() {
             ))}
           </nav>
 
-          <button onClick={() => supabase.auth.signOut().then(() => router.replace('/assistente-ark'))}
+          <button onClick={() => supabase.auth.signOut().then(() => router.replace('/assistente-ark/entrar'))}
             style={styles.logoutBtn}>
             ← Sair
           </button>

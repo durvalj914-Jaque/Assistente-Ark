@@ -83,7 +83,7 @@ export default function PainelAdminPage() {
   const [migrating, setMigrating] = useState(false)
   const [migrateMsg, setMigrateMsg] = useState('')
 
-  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
   useEffect(() => { if (!loading && user && profile && !profile.is_platform_admin) router.replace('/admin') }, [loading, user, profile])
 
   const authHeader = useCallback(async () => {

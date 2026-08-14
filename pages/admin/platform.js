@@ -53,7 +53,7 @@ export default function PlatformAdminPage() {
   const [clients, setClients] = useState([])
   const [loadingClients, setLoadingClients] = useState(true)
 
-  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
   useEffect(() => { if (!loading && user && profile && !profile.is_platform_admin) router.replace('/admin') }, [loading, user, profile])
 
   async function loadRequests() {

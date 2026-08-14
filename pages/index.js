@@ -99,8 +99,8 @@ export default function Home() {
           <li><a href="#contato">Contato</a></li>
         </ul>
         <div className="nav-cta">
-          <Link href="/assistente-ark" className="btn-ghost">Entrar</Link>
-          <Link href="/assistente-ark" className="btn-primary">Começar agora</Link>
+          <Link href="/assistente-ark/entrar" className="btn-ghost">Entrar</Link>
+          <Link href="/assistente-ark" className="btn-primary">Conhecer o Ark</Link>
         </div>
       </nav>
 
@@ -178,7 +178,7 @@ export default function Home() {
         <h2>Pronto para automatizar?</h2>
         <p>Fale com a gente e descubra como a Arkiel pode transformar o seu atendimento.</p>
         <div className="hero-cta">
-          <Link href="/assistente-ark" className="btn-hero-primary">Acessar plataforma</Link>
+          <Link href="/assistente-ark/entrar" className="btn-hero-primary">Entrar na plataforma</Link>
           <a href="https://wa.me/5511913751590" target="_blank" rel="noopener" className="btn-hero-ghost">Falar no WhatsApp</a>
         </div>
       </section>
