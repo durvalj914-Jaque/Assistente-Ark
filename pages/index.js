@@ -142,6 +142,15 @@ export default function Home() {
         .product-icon { width: 64px; height: 64px; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 30px; margin-bottom: 28px; }
         .product-icon.green { background: rgba(37,211,102,0.1); box-shadow: 0 0 24px rgba(37,211,102,0.1); }
         .product-icon.cyan { background: rgba(0,212,255,0.1); box-shadow: 0 0 24px rgba(0,212,255,0.1); }
+        .product-icon.mascot { width: 76px; height: 76px; background: transparent; box-shadow: 0 0 30px rgba(37,211,102,0.2); border-radius: 20px; overflow: hidden; }
+        .product-icon.mascot img { width: 100%; height: 100%; object-fit: contain; }
+        .product-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: auto; flex-wrap: wrap; }
+        .product-cta {
+          display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 100px;
+          background: linear-gradient(135deg, #25D366, #1eb857); color: #06140a; font-size: 14px; font-weight: 700;
+          text-decoration: none; transition: all .2s; box-shadow: 0 4px 20px rgba(37,211,102,0.25);
+        }
+        .product-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 26px rgba(37,211,102,0.4); }
         .product-card h3 { font-size: 26px; font-weight: 700; margin-bottom: 14px; }
         .product-card p { color: rgba(255,255,255,0.45); font-size: 15px; line-height: 1.65; margin-bottom: 24px; }
         .product-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
@@ -251,7 +260,7 @@ export default function Home() {
         </div>
         <div className="product-grid">
           <div className="product-card">
-            <div className="product-icon green">💬</div>
+            <div className="product-icon mascot"><img src="/assistente-ark-mascot.png" alt="Assistente Ark" /></div>
             <h3>Assistente Ark</h3>
             <p>Plataforma SaaS multi-tenant para automação de WhatsApp Business com IA. Crie chatbots sem código, gerencie catálogo de produtos, processe pagamentos e atenda clientes 24/7.</p>
             <div className="product-tags">
@@ -260,9 +269,12 @@ export default function Home() {
               <span className="product-tag">IA</span>
               <span className="product-tag">Pagamentos</span>
             </div>
-            <div className="product-status">
-              <span className="dot"></span>
-              Disponível
+            <div className="product-card-footer">
+              <div className="product-status">
+                <span className="dot"></span>
+                Disponível
+              </div>
+              <Link href="/assistente-ark" className="product-cta">Conhecer o Ark →</Link>
             </div>
           </div>
           <div className="product-card">
