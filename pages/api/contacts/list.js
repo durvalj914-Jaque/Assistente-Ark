@@ -26,7 +26,7 @@ export default async function handler(req, res) {
 
   const { data, error, count } = await db
     .from('contacts')
-    .select('id, full_name, email, phone, phone_e164, photo_url, organization, job_title, synced_at', { count: 'exact' })
+    .select('id, full_name, name, email, phone, phone_e164, photo_url, organization, job_title, source, google_resource_name, opt_in, synced_at, created_at', { count: 'exact' })
     .eq('tenant_id', tenant_id)
     .order('full_name', { ascending: true })
     .limit(500)

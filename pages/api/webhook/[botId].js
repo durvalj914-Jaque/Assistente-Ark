@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
     // Upsert contato
     const { data: contact } = await db.from('contacts')
-      .upsert({ tenant_id: tenantId, phone: from, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,phone' })
+      .upsert({ tenant_id: tenantId, phone: from, full_name: (change?.contacts?.[0]?.profile?.name || undefined), updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,phone' })
       .select().single()
 
     // Busca ou cria conversa
@@ -304,7 +304,7 @@ async function handleCatalogOrder(db, botId, order, from) {
 
   // Upsert contato
   const { data: contact } = await db.from('contacts')
-    .upsert({ tenant_id: tenantId, phone: from, updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,phone' })
+    .upsert({ tenant_id: tenantId, phone: from, full_name: (change?.contacts?.[0]?.profile?.name || undefined), updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,phone' })
     .select().single()
 
   // Buscar/criar conversa

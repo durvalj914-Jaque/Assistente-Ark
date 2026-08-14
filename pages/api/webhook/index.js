@@ -33,7 +33,7 @@ async function handleOrder(db, msg, from, phoneNumberId) {
   const bot = botArr?.[0]
   if (!bot) return
 
-  const { data: contact } = await db.from('contacts').select('id,phone,name').eq('tenant_id', bot.tenant_id).eq('phone', from).maybeSingle()
+  const { data: contact } = await db.from('contacts').select('id,phone,name,full_name').eq('tenant_id', bot.tenant_id).eq('phone', from).maybeSingle()
 
   const total = (order.product_items || []).reduce((sum, it) => sum + (Number(it.item_price || 0) * Number(it.quantity || 1)), 0)
   const currency = order.product_items?.[0]?.currency || 'BRL'
@@ -345,7 +345,7 @@ async function processWebhook(body) {
   } else {
     const contactName = change?.contacts?.[0]?.profile?.name || ''
     const { data: newContact, error: contactErr } = await db
-      .from('contacts').insert({ tenant_id: tenantId, phone: from, name: contactName || null }).select('id,phone').single()
+      .from('contacts').insert({ tenant_id: tenantId, phone: from, name: contactName || null, full_name: contactName || null }).select('id,phone').single()
     if (contactErr) { await savelog(db, 'contact_error', contactErr.message); return }
     contact = newContact
   }

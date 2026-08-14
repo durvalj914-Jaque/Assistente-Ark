@@ -25,6 +25,7 @@ export default function ContactsPage() {
   const [editingName, setEditingName] = useState(false)
   const [nameDraft, setNameDraft] = useState('')
   const [savingName, setSavingName] = useState(false)
+  const [startingChat, setStartingChat] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -189,17 +190,18 @@ export default function ContactsPage() {
     if (!selected || !nameDraft.trim()) return
     setSavingName(true)
     const newName = nameDraft.trim()
-    // Salvar no campo correto (name ou full_name dependendo da origem)
-    const field = selected.full_name !== undefined ? 'full_name' : 'name'
-    await supabase.from('contacts').update({ [field]: newName }).eq('id', selected.id)
-    setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, [field]: newName } : c))
-    setSelected(c => ({ ...c, [field]: newName }))
+    // Sempre salva em full_name (campo padrao da tabela)
+    const { error } = await supabase.from('contacts').update({ full_name: newName, name: newName }).eq('id', selected.id)
+    if (!error) {
+      setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, full_name: newName, name: newName } : c))
+      setSelected(c => ({ ...c, full_name: newName, name: newName }))
+    }
     setEditingName(false)
     setSavingName(false)
   }
 
   function startEditName() {
-    setNameDraft(selected.name || selected.full_name || '')
+    setNameDraft(selected.full_name || selected.name || '')
     setEditingName(true)
   }
 
@@ -210,9 +212,30 @@ export default function ContactsPage() {
     if (selected?.id === contact.id) setSelected(c => ({ ...c, opt_in: newVal }))
   }
 
+  async function startConversation() {
+    if (!selected || startingChat) return
+    setStartingChat(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/conversations/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contact_id: selected.id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        router.push(`/admin/conversations?conv=${data.conversation_id}`)
+      } else {
+        alert('Erro: ' + (data.error || 'Falha ao iniciar conversa'))
+      }
+    } catch (e) {
+      alert('Erro: ' + e.message)
+    } finally { setStartingChat(false) }
+  }
+
   const filtered = search
     ? contacts.filter(c =>
-        (c.name || c.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.full_name || c.name || '').toLowerCase().includes(search.toLowerCase()) ||
         (c.phone || '').includes(search) ||
         (c.email || '').toLowerCase().includes(search.toLowerCase())
       )
@@ -340,7 +363,7 @@ export default function ContactsPage() {
                 </td></tr>
               )}
               {filtered.map(c => {
-                const name = c.name || c.full_name || ''
+                const name = c.full_name || c.name || ''
                 return (
                   <tr key={c.id} onClick={() => setSelected(s => s?.id === c.id ? null : c)}
                     style={{ cursor: 'pointer', background: selected?.id === c.id ? 'rgba(79,142,247,0.07)' : undefined }}>
@@ -419,7 +442,7 @@ export default function ContactsPage() {
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
-                      {selected.name || selected.full_name || 'Sem nome'}
+                      {selected.full_name || selected.name || 'Sem nome'}
                     </span>
                     <button onClick={startEditName}
                       title="Editar nome"
@@ -441,8 +464,13 @@ export default function ContactsPage() {
                   <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{val}</span>
                 </div>
               ))}
+              <button onClick={startConversation} disabled={startingChat || !selected.phone}
+                className="ark-btn" style={{ width: '100%', justifyContent: 'center', marginTop: 4, fontSize: 13, padding: '10px', opacity: (startingChat || !selected.phone) ? 0.5 : 1 }}
+                title={selected.phone ? 'Iniciar nova conversa no WhatsApp' : 'Contato sem telefone'}>
+                {startingChat ? '⏳ Iniciando...' : '💬 Iniciar conversa'}
+              </button>
               <button onClick={() => router.push(`/admin/conversations?contact=${selected.id}`)}
-                className="ark-btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+                className="ark-btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 6 }}>
                 Ver conversas →
               </button>
             </div>
