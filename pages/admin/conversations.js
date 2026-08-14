@@ -109,6 +109,7 @@ export default function ConversationsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [togglingNoBot, setTogglingNoBot] = useState(false)
+  const togglingNoBotRef = useRef(false)
   const [showPayModal, setShowPayModal] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [payDesc, setPayDesc] = useState('')
@@ -147,7 +148,16 @@ export default function ConversationsPage() {
       .order('last_message_at', { ascending: false })
       .limit(50)
     setConversations(data || [])
-    setSelected(prev => prev ? { ...prev, ...(data || []).find(c => c.id === prev.id) } : prev)
+    setSelected(prev => {
+      if (!prev) return prev
+      const fresh = (data || []).find(c => c.id === prev.id)
+      if (!fresh) return prev
+      // Nao sobrescreve status enquanto toggle do checkbox esta em andamento
+      if (togglingNoBotRef.current) {
+        return { ...prev, ...fresh, status: prev.status }
+      }
+      return { ...prev, ...fresh }
+    })
   }
 
   // ── Realtime + Polling fallback ──
@@ -293,20 +303,30 @@ export default function ConversationsPage() {
   async function toggleNoBot() {
     if (!selected || togglingNoBot) return
     setTogglingNoBot(true)
-    const newNoBot = selected.status !== 'no_bot'
+    togglingNoBotRef.current = true
+    const oldStatus = selected.status
+    const newNoBot = oldStatus !== 'no_bot'
+    const newStatus = newNoBot ? 'no_bot' : 'bot'
+    // Update otimista ANTES da API — evita que o polling sobrescreva
+    setSelected(c => ({ ...c, status: newStatus }))
+    setConversations(prev => prev.map(c => c.id === selected.id ? { ...c, status: newStatus } : c))
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/conversations/toggle-bot', {
+      const res = await fetch('/api/conversations/toggle-bot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ conversation_id: selected.id, no_bot: newNoBot }),
       })
-      const newStatus = newNoBot ? 'no_bot' : 'bot'
-      setSelected(c => ({ ...c, status: newStatus }))
-      setConversations(prev => prev.map(c => c.id === selected.id ? { ...c, status: newStatus } : c))
+      if (!res.ok) throw new Error('Falha ao atualizar')
     } catch (e) {
       console.error('Erro:', e)
-    } finally { setTogglingNoBot(false) }
+      // Reverte em caso de erro
+      setSelected(c => ({ ...c, status: oldStatus }))
+      setConversations(prev => prev.map(c => c.id === selected.id ? { ...c, status: oldStatus } : c))
+    } finally {
+      setTogglingNoBot(false)
+      togglingNoBotRef.current = false
+    }
   }
 
   async function selectConversation(conv) {
@@ -334,6 +354,7 @@ export default function ConversationsPage() {
   const STATUS_MAP = {
     open: { label: 'Aberta', color: '#4f8ef7' },
     bot: { label: 'Bot', color: '#8b5cf6' },
+    no_bot: { label: 'Sem bot', color: '#6b7280' },
     human: { label: 'Humano', color: '#f59e0b' },
     closed: { label: 'Encerrada', color: '#475569' }
   }
@@ -516,7 +537,7 @@ export default function ConversationsPage() {
                   style={{
                     padding: '12px 16px', cursor: 'pointer',
                     borderBottom: '1px solid var(--border-white)',
-                    background: active ? 'var(--blue-tint)' : 'transparent',
+                    background: active ? 'var(--blue-tint)' : conv.status === 'no_bot' ? 'var(--no-bot-tint)' : 'transparent',
                     display: 'flex', gap: 12, alignItems: 'center',
                     transition: 'background 0.1s',
                   }}>
@@ -548,6 +569,7 @@ export default function ConversationsPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {conv.contacts?.name || conv.contacts?.phone || 'Desconhecido'}
+                        {conv.status === 'no_bot' && <span style={{ marginLeft: 4, fontSize: 11 }}>🔇</span>}
                       </span>
                       <span style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
                         {conv.last_message_at ? new Date(conv.last_message_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}
@@ -643,10 +665,10 @@ export default function ConversationsPage() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
-                      background: selected.status === 'no_bot' ? 'rgba(107,114,128,0.15)' : 'transparent',
-                      border: `1px solid ${selected.status === 'no_bot' ? 'rgba(107,114,128,0.3)' : 'transparent'}`,
+                      background: selected.status === 'no_bot' ? 'var(--no-bot-tint)' : 'transparent',
+                      border: `1px solid ${selected.status === 'no_bot' ? 'rgba(107,114,128,0.4)' : 'transparent'}`,
                       fontSize: 11, fontWeight: 600,
-                      color: selected.status === 'no_bot' ? '#6b7280' : 'var(--text-muted)',
+                      color: selected.status === 'no_bot' ? 'var(--text-secondary)' : 'var(--text-muted)',
                       transition: 'all .15s',
                       opacity: togglingNoBot ? 0.5 : 1,
                       userSelect: 'none',

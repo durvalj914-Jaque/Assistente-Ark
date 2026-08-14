@@ -27,6 +27,7 @@
   --shadow-card: none;
   --blue-tint: rgba(79,142,247,0.12);
   --blue-border: rgba(79,142,247,0.2);
+  --no-bot-tint: rgba(255,255,255,0.08);
 }
 
 [data-theme="light"] {
@@ -52,6 +53,7 @@
   --shadow-card: 0 1px 3px rgba(0,0,0,0.08);
   --blue-tint: rgba(79,142,247,0.08);
   --blue-border: rgba(79,142,247,0.2);
+  --no-bot-tint: rgba(0,0,0,0.06);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
