@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { processFlow } from '../../../lib/flowEngine'
+import { processFlow, getNodeButtons } from '../../../lib/flowEngine'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
 import { sendProductList } from '../../../lib/metaCatalog'
@@ -769,6 +769,15 @@ Obrigado! 🎉`)
         }
       }
     } else {
+      // ── Menu numerado em texto plano ──
+      const targetNode = result.node
+      const buttons = targetNode ? getNodeButtons(targetNode) : []
+
+      if (buttons.length > 0) {
+        // Monta menu numerado: texto do nó + opções numeradas
+        const menuText = buttons.map((b, i) => `${i + 1}️⃣ ${b.label || b.title || ''}`).join('\n')
+        reply = `${reply}\n\n${menuText}`
+      }
       await sendText(phoneNumberId, tkn, from, reply)
     }
     await savelog(db, 'send_ok', null, { to: from })
