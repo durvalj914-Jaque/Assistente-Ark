@@ -695,6 +695,7 @@ export default function PainelAdminPage() {
 
       {/* BOTS */}
       {tab === 'bots' && (
+        <>
         <div>
           {loadingBots ? (
             <p style={{ color: 'var(--text-muted)' }}>Carregando bots...</p>
@@ -833,6 +834,7 @@ export default function PainelAdminPage() {
             </div>
           )}
         </div>
+        </>
       )}
 
       {deregisterTarget && (
