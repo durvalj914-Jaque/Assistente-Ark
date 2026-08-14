@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
-import { useRouter } from 'next/router'
+// This page redirects to the institutional site
+export async function getServerSideProps() {
+  return {
+    redirect: {
+      destination: 'https://www.arkiel.com.br',
+      permanent: false,
+    }
+  }
+}
 
 export default function Home() {
-  const router = useRouter()
-  useEffect(() => {
-    window.location.href = 'https://www.arkiel.com.br'
-  }, [])
   return null
 }
