@@ -191,21 +191,31 @@ export default function ContactsPage() {
     setSavingName(true)
     const newName = nameDraft.trim()
     
-    // Salvar no campo name (unica coluna que existe na tabela)
-    const { data, error } = await supabase.from('contacts').update({ name: newName }).eq('id', selected.id).select()
-    
-    if (error) {
-      alert('Erro ao salvar: ' + (error.message || error.code))
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/contacts/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contact_id: selected.id, name: newName }),
+      })
+      const data = await res.json()
+      
+      if (!data.ok) {
+        alert('Erro ao salvar: ' + (data.error || 'Falha desconhecida'))
+        setSavingName(false)
+        return
+      }
+      
+      // Atualizar UI com o retorno real do banco
+      const updated = data.contact || { name: newName }
+      setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, ...updated } : c))
+      setSelected(c => ({ ...c, ...updated }))
+      setEditingName(false)
+    } catch (e) {
+      alert('Erro: ' + e.message)
+    } finally {
       setSavingName(false)
-      return
     }
-    
-    // Atualizar UI com o retorno real do banco
-    const updated = data?.[0] || { name: newName }
-    setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, ...updated } : c))
-    setSelected(c => ({ ...c, ...updated }))
-    setEditingName(false)
-    setSavingName(false)
   }
 
   function startEditName() {
@@ -215,7 +225,14 @@ export default function ContactsPage() {
 
   async function toggleOptIn(contact) {
     const newVal = !contact.opt_in
-    await supabase.from('contacts').update({ opt_in: newVal }).eq('id', contact.id)
+    try {
+      const token = await getToken()
+      await fetch('/api/contacts/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contact_id: contact.id, opt_in: newVal }),
+      })
+    } catch (e) { /* ignore */ }
     setContacts(prev => prev.map(c => c.id === contact.id ? { ...c, opt_in: newVal } : c))
     if (selected?.id === contact.id) setSelected(c => ({ ...c, opt_in: newVal }))
   }
