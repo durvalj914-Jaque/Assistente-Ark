@@ -76,6 +76,12 @@ export default function PainelAdminPage() {
   const [receiptModal, setReceiptModal] = useState(false)
   const [receiptNotes, setReceiptNotes] = useState('')
   const [receiptAmount, setReceiptAmount] = useState('')
+  const [wabaNumbers, setWabaNumbers] = useState([])
+  const [loadingWabaNumbers, setLoadingWabaNumbers] = useState(false)
+  const [migrateNumber, setMigrateNumber] = useState('')
+  const [migrateTenant, setMigrateTenant] = useState('')
+  const [migrating, setMigrating] = useState(false)
+  const [migrateMsg, setMigrateMsg] = useState('')
 
   useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
   useEffect(() => { if (!loading && user && profile && !profile.is_platform_admin) router.replace('/admin') }, [loading, user, profile])
@@ -460,6 +466,50 @@ export default function PainelAdminPage() {
     finally { setMpClearing(false) }
   }
 
+  async function loadWabaNumbers() {
+    setLoadingWabaNumbers(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/whatsapp/list-numbers', { headers: h })
+      const json = await res.json()
+      if (json.numbers) setWabaNumbers(json.numbers)
+    } catch (e) {}
+    finally { setLoadingWabaNumbers(false) }
+  }
+
+  async function handleMigrateNumber() {
+    if (!migrateNumber || !migrateTenant) {
+      setMigrateMsg('❌ Selecione o número e o cliente de destino')
+      return
+    }
+    setMigrating(true)
+    setMigrateMsg('')
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/whatsapp/migrate-number', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone_number_id: migrateNumber,
+          target_tenant_id: migrateTenant,
+        })
+      })
+      const json = await res.json()
+      if (json.ok) {
+        setMigrateMsg('✅ ' + json.message)
+        setMigrateNumber('')
+        setMigrateTenant('')
+        loadAll()
+      } else {
+        setMigrateMsg('❌ ' + (json.error || 'Erro ao migrar'))
+      }
+    } catch (e) {
+      setMigrateMsg('❌ ' + e.message)
+    }
+    setMigrating(false)
+    setTimeout(() => setMigrateMsg(''), 6000)
+  }
+
   async function loadReceipts(cat) {
     setLoadingReceipts(true)
     try {
@@ -535,6 +585,10 @@ export default function PainelAdminPage() {
   useEffect(() => {
     if (selectedTenantContacts) loadContacts(selectedTenantContacts)
   }, [selectedTenantContacts])
+
+  useEffect(() => {
+    if (tab === 'bots' && !wabaNumbers.length) loadWabaNumbers()
+  }, [tab])
 
   if (loading || !user || !tenant || !profile?.is_platform_admin) return null
 
@@ -691,6 +745,89 @@ export default function PainelAdminPage() {
                       🗑️ Descadastrar
                     </button>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Migração de Números */}
+        <div className="ark-card" style={{ marginTop: 20, padding: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+            <span style={{ fontSize: 20 }}>🔄</span>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>Migrar Número WhatsApp</h3>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: 'var(--text-muted)' }}>
+                Associe um número da WABA compartilhada a um cliente específico
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+            <div style={{ flex: '1 1 200px' }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>Número</label>
+              <select
+                value={migrateNumber}
+                onChange={e => setMigrateNumber(e.target.value)}
+                className="ark-input"
+                style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}
+              >
+                <option value="">Selecione um número...</option>
+                {loadingWabaNumbers && <option disabled>Carregando...</option>}
+                {wabaNumbers.map(n => (
+                  <option key={n.id} value={n.id}>
+                    {n.display_phone_number} ({n.verified_name}) {n.code_verification_status === 'VERIFIED' ? '✓' : '⚠'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ flex: '1 1 200px' }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6, display: 'block' }}>Cliente destino</label>
+              <select
+                value={migrateTenant}
+                onChange={e => setMigrateTenant(e.target.value)}
+                className="ark-input"
+                style={{ width: '100%', padding: '10px 12px', fontSize: 13 }}
+              >
+                <option value="">Selecione um cliente...</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={handleMigrateNumber}
+              disabled={migrating || !migrateNumber || !migrateTenant}
+              className="ark-btn"
+              style={{ fontSize: 13, padding: '10px 20px', whiteSpace: 'nowrap' }}
+            >
+              {migrating ? '⏳ Migrando...' : '🔄 Migrar'}
+            </button>
+          </div>
+
+          {migrateMsg && (
+            <div style={{
+              marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: 13,
+              background: migrateMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+              color: migrateMsg.startsWith('✅') ? '#22c55e' : '#ef4444'
+            }}>
+              {migrateMsg}
+            </div>
+          )}
+
+          {wabaNumbers.length > 0 && (
+            <div style={{ marginTop: 16, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {wabaNumbers.map(n => (
+                <div key={n.id} style={{
+                  padding: '8px 12px', borderRadius: 8, fontSize: 12,
+                  background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                  display: 'flex', alignItems: 'center', gap: 8
+                }}>
+                  <span>{n.status === 'active' ? '🟢' : '⚪'}</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{n.display_phone_number}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>{n.verified_name}</span>
                 </div>
               ))}
             </div>

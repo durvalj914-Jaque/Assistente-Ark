@@ -35,8 +35,8 @@ export default async function handler(req, res) {
     .eq('tenant_id', bot.tenant_id).eq('user_id', user.id).maybeSingle()
   if (!member) return res.status(403).json({ error: 'Acesso negado a este bot' })
 
-  const systemToken = process.env.META_SYSTEM_USER_TOKEN
-  if (!systemToken) return res.status(500).json({ error: 'META_SYSTEM_USER_TOKEN não configurado no servidor' })
+  const systemToken = process.env.META_SYSTEM_USER_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
+  if (!systemToken || systemToken === '[SENSITIVE]') return res.status(500).json({ error: 'Token da Meta não configurado no servidor' })
 
   const digitsOnly = (s) => (s || '').replace(/\D/g, '')
   const targetDigits = digitsOnly(cc) + digitsOnly(phone_number)
@@ -63,6 +63,36 @@ export default async function handler(req, res) {
     }
 
     if (!phoneNumberId) throw new Error('Meta não retornou um ID pro número informado')
+
+    // Verificar se o número já está verificado antes de pedir código
+    let alreadyVerified = false
+    try {
+      const checkResp = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}?fields=code_verification_status`, {
+        headers: { Authorization: `Bearer ${systemToken}` }
+      })
+      const checkData = await checkResp.json()
+      alreadyVerified = checkData.code_verification_status === 'VERIFIED'
+    } catch (e) { /* ignora */ }
+
+    if (alreadyVerified) {
+      // Número já verificado — registra direto e ativa o bot
+      await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/register`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${systemToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', pin: '123456' })
+      })
+
+      await db.from('bots').update({
+        phone_number_id: phoneNumberId,
+        waba_id: SHARED_WABA_ID,
+        status: 'active',
+        pending_phone_number_id: null,
+        pending_display_number: null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', bot_id)
+
+      return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, already_verified: true })
+    }
 
     await requestVerificationCode(phoneNumberId, systemToken, 'SMS')
 
