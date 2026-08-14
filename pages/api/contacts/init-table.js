@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
         tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE,
         google_resource_name TEXT UNIQUE,
-        full_name TEXT, email TEXT, phone TEXT, phone_e164 TEXT,
+        name TEXT, full_name TEXT, email TEXT, phone TEXT, phone_e164 TEXT,
         photo_url TEXT, organization TEXT, job_title TEXT, notes TEXT,
         raw_data JSONB, synced_at TIMESTAMPTZ DEFAULT now(),
         created_at TIMESTAMPTZ DEFAULT now(), created_by UUID

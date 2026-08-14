@@ -52,7 +52,7 @@ export default async function handler(req, res) {
   // Test 2: INSERT com client do usuário
   const testData = {
     tenant_id: tenantId,
-    full_name: 'TESTE DEBUG',
+    name: 'TESTE DEBUG',
     phone: '+5511999999999',
     email: 'teste@debug.com',
     synced_at: new Date().toISOString(),
@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
   // Test 3: INSERT com service role (se disponível)
   if (dbAdmin) {
-    const { data: insertData2, error: insertErr2 } = await dbAdmin.from('contacts').insert({ ...testData, full_name: 'TESTE ADMIN' }).select()
+    const { data: insertData2, error: insertErr2 } = await dbAdmin.from('contacts').insert({ ...testData, name: 'TESTE ADMIN' }).select()
     results.insertAdmin = insertErr2 ? `ERRO: ${insertErr2.message} (${insertErr2.code})` : `OK: ${JSON.stringify(insertData2?.[0]?.id || 'no id')}`
   }
 

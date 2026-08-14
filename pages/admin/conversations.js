@@ -157,7 +157,7 @@ export default function ConversationsPage() {
     if (!tenant) return
     const { data } = await supabase
       .from('conversations')
-      .select('*, contacts(id, name, full_name, phone), bots(name)')
+      .select('*, contacts(id, name, phone), bots(name)')
       .eq('tenant_id', tenant.id)
       .order('last_message_at', { ascending: false })
       .limit(50)
@@ -374,7 +374,7 @@ export default function ConversationsPage() {
   }
 
   const filtered = conversations.filter(c => {
-    const name = c.contacts?.full_name || c.contacts?.name || c.contacts?.phone || ''
+    const name = c.contacts?.name || c.contacts?.phone || ''
     const matchSearch = name.toLowerCase().includes(search.toLowerCase()) || c.contacts?.phone?.includes(search)
     const matchFilter = filter === 'all' || c.status === filter
     return matchSearch && matchFilter
@@ -567,7 +567,7 @@ export default function ConversationsPage() {
                       color: conv.status === 'human' && !active ? '#f59e0b' : '#4f8ef7',
                       border: conv.status === 'human' && !active ? '2px solid rgba(245,158,11,0.4)' : 'none',
                     }}>
-                      {(conv.contacts?.full_name || conv.contacts?.name || conv.contacts?.phone || '?')[0].toUpperCase()}
+                      {(conv.contacts?.name || conv.contacts?.phone || '?')[0].toUpperCase()}
                     </div>
                     {conv.status === 'human' && !active && (
                       <div style={{
@@ -582,7 +582,7 @@ export default function ConversationsPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {conv.contacts?.full_name || conv.contacts?.name || conv.contacts?.phone || 'Desconhecido'}
+                        {conv.contacts?.name || conv.contacts?.phone || 'Desconhecido'}
                         {conv.status === 'no_bot' && <span style={{ marginLeft: 4, fontSize: 11 }}>🔇</span>}
                       </span>
                       <span style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap', flexShrink: 0 }}>
@@ -636,10 +636,10 @@ export default function ConversationsPage() {
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 16, fontWeight: 700, color: '#4f8ef7',
                   }}>
-                    {(selected.contacts?.full_name || selected.contacts?.full_name || selected.contacts?.name || selected.contacts?.phone || '?')[0].toUpperCase()}
+                    {(selected.contacts?.name || selected.contacts?.phone || '?')[0].toUpperCase()}
                   </div>
                   <div>
-                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{selected.contacts?.full_name || selected.contacts?.name || selected.contacts?.phone}</div>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{selected.contacts?.name || selected.contacts?.phone}</div>
                     <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>{selected.contacts?.phone}</div>
                   </div>
                 </div>
@@ -877,7 +877,7 @@ export default function ConversationsPage() {
               <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cliente</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
                 <span style={{ fontSize: 18 }}>👤</span>
-                <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{selected.contacts?.full_name || selected.contacts?.name || selected.contacts?.phone}</span>
+                <span style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{selected.contacts?.name || selected.contacts?.phone}</span>
               </div>
             </div>
 
@@ -1068,7 +1068,7 @@ export default function ConversationsPage() {
           }}>
             <h3 style={{ margin: '0 0 12px', fontSize: 17, color: 'var(--text-primary)' }}>🗑️ Deletar conversa?</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 8, lineHeight: 1.5 }}>
-              Todas as mensagens trocadas com <b style={{ color: 'var(--text-primary)' }}>{selected.contacts?.full_name || selected.contacts?.name || selected.contacts?.phone}</b> serão permanentemente apagadas.
+              Todas as mensagens trocadas com <b style={{ color: 'var(--text-primary)' }}>{selected.contacts?.name || selected.contacts?.phone}</b> serão permanentemente apagadas.
             </p>
             <p style={{ color: '#f59e0b', fontSize: 12, marginBottom: 16 }}>
               ⚠️ Esta ação não pode ser desfeita.

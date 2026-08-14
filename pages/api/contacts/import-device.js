@@ -49,7 +49,7 @@ function parseCSV(text) {
 
   const headers = firstLine.split(delim).map(h => h.trim().toLowerCase().replace(/"/g, ''))
 
-  const nameIdx = headers.findIndex(h => h.match(/nome|name|fullname|full_name|nome completo/))
+  const nameIdx = headers.findIndex(h => h.match(/nome|name|fullname|name|nome completo/))
   const phoneIdx = headers.findIndex(h => h.match(/telefone|phone|celular|whats|mobile|numero/))
   const emailIdx = headers.findIndex(h => h.match(/email|e-mail|mail/))
   const orgIdx = headers.findIndex(h => h.match(/empresa|organization|org|company/))
@@ -216,14 +216,14 @@ export default async function handler(req, res) {
 
     const contactData = {
       tenant_id: tenantId,
-      full_name: c.name || '',
+      name: c.name || '',
       phone,
       email: c.email || '',
       organization: c.organization || '',
       synced_at: new Date().toISOString(),
     }
 
-    if (!contactData.full_name && !contactData.phone && !contactData.email) {
+    if (!contactData.name && !contactData.phone && !contactData.email) {
       skipped++
       continue
     }

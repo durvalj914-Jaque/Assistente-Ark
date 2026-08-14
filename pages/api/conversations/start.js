@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   }
 
   // Buscar o contato
-  let contactQuery = db.from('contacts').select('id, tenant_id, phone, full_name, name').eq('id', contact_id)
+  let contactQuery = db.from('contacts').select('id, tenant_id, phone, name').eq('id', contact_id)
   if (tenantId) contactQuery = contactQuery.eq('tenant_id', tenantId)
 
   const { data: contact, error: contactErr } = await contactQuery.maybeSingle()

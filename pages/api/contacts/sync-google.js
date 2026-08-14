@@ -129,7 +129,7 @@ export default async function handler(req, res) {
       return {
         tenant_id,
         google_resource_name: person.resourceName,
-        full_name: name,
+        name: name,
         email,
         phone,
         phone_e164: phoneE164,
@@ -140,7 +140,7 @@ export default async function handler(req, res) {
         raw_data: person,
         synced_at: new Date().toISOString(),
       }
-    }).filter(c => c.full_name || c.email || c.phone)
+    }).filter(c => c.name || c.email || c.phone)
 
     // Upsert contatos
     let synced = 0

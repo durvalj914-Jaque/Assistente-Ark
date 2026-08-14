@@ -65,18 +65,6 @@ export default function ContactsPage() {
     return session?.access_token || ''
   }
 
-  // Auto-migrar colunas ao carregar (garante full_name existe)
-  useEffect(() => {
-    if (!tenant) return
-    getToken().then(token => {
-      if (!token) return
-      fetch('/api/contacts/migrate', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => {})
-    })
-  }, [tenant])
-
   async function handleSyncGoogle() {
     if (!tenant || syncing) return
     setShowSyncMenu(false)
@@ -203,28 +191,25 @@ export default function ContactsPage() {
     setSavingName(true)
     const newName = nameDraft.trim()
     
-    // Tentar salvar em full_name (campo principal)
-    let { error } = await supabase.from('contacts').update({ full_name: newName }).eq('id', selected.id)
+    // Salvar no campo name (unica coluna que existe na tabela)
+    const { data, error } = await supabase.from('contacts').update({ name: newName }).eq('id', selected.id).select()
     
     if (error) {
-      // Se full_name nao existir, tentar name
-      const fallback = await supabase.from('contacts').update({ name: newName }).eq('id', selected.id)
-      if (fallback.error) {
-        alert('Erro ao salvar: ' + (fallback.error.message || fallback.error.code))
-        setSavingName(false)
-        return
-      }
+      alert('Erro ao salvar: ' + (error.message || error.code))
+      setSavingName(false)
+      return
     }
     
-    // Atualizar UI
-    setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, full_name: newName, name: newName } : c))
-    setSelected(c => ({ ...c, full_name: newName, name: newName }))
+    // Atualizar UI com o retorno real do banco
+    const updated = data?.[0] || { name: newName }
+    setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, ...updated } : c))
+    setSelected(c => ({ ...c, ...updated }))
     setEditingName(false)
     setSavingName(false)
   }
 
   function startEditName() {
-    setNameDraft(selected.full_name || selected.name || '')
+    setNameDraft(selected.name || selected.full_name || '')
     setEditingName(true)
   }
 
@@ -258,7 +243,7 @@ export default function ContactsPage() {
 
   const filtered = search
     ? contacts.filter(c =>
-        (c.full_name || c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (c.name || c.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
         (c.phone || '').includes(search) ||
         (c.email || '').toLowerCase().includes(search.toLowerCase())
       )
@@ -386,7 +371,7 @@ export default function ContactsPage() {
                 </td></tr>
               )}
               {filtered.map(c => {
-                const name = c.full_name || c.name || ''
+                const name = c.name || c.full_name || ''
                 return (
                   <tr key={c.id} onClick={() => setSelected(s => s?.id === c.id ? null : c)}
                     style={{ cursor: 'pointer', background: selected?.id === c.id ? 'rgba(79,142,247,0.07)' : undefined }}>
@@ -465,7 +450,7 @@ export default function ContactsPage() {
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 0 }}>
                     <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)' }}>
-                      {selected.full_name || selected.name || 'Sem nome'}
+                      {selected.name || selected.full_name || 'Sem nome'}
                     </span>
                     <button onClick={startEditName}
                       title="Editar nome"

@@ -996,7 +996,7 @@ export default function PainelAdminPage() {
                 .filter(c => {
                   if (!contactSearch) return true
                   const s = contactSearch.toLowerCase()
-                  return (c.full_name || '').toLowerCase().includes(s) || (c.email || '').toLowerCase().includes(s) || (c.phone || '').includes(s)
+                  return (c.name || '').toLowerCase().includes(s) || (c.email || '').toLowerCase().includes(s) || (c.phone || '').includes(s)
                 })
                 .map(c => (
                   <div key={c.id} className="ark-card" style={{ padding: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -1007,12 +1007,12 @@ export default function PainelAdminPage() {
                         width: 44, height: 44, borderRadius: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 18, fontWeight: 700, background: 'rgba(79,142,247,0.15)', color: '#4f8ef7',
                       }}>
-                        {(c.full_name || '?')[0]?.toUpperCase()}
+                        {(c.name || '?')[0]?.toUpperCase()}
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {c.full_name || 'Sem nome'}
+                        {c.name || 'Sem nome'}
                       </div>
                       {c.email && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>✉️ {c.email}</div>}
                       {c.phone && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 1 }}>📱 {c.phone}</div>}
