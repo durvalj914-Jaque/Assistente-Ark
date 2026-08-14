@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS conversations (
   tenant_id       uuid REFERENCES tenants(id) ON DELETE CASCADE,
   bot_id          uuid REFERENCES bots(id) ON DELETE CASCADE,
   contact_id      uuid REFERENCES contacts(id) ON DELETE CASCADE,
-  status          text DEFAULT 'bot' CHECK (status IN ('open','bot','human','closed')),
+  status          text DEFAULT 'bot' CHECK (status IN ('open','bot','no_bot','human','closed','awaiting_payment_amount')),
   current_node_id text,
   session_data    jsonb DEFAULT '{}',
   last_message    text,
