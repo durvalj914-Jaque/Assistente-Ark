@@ -51,10 +51,10 @@ export default function App({ Component, pageProps }) {
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
-        <title>Assistente Ark — Automação Inteligente para WhatsApp Business</title>
-        <meta name="description" content="Plataforma SaaS para chatbots WhatsApp com IA. Multi-tenant, sem código, escalável." />
+        <title>Arkiel — Tecnologia Inteligente</title>
+        <meta name="description" content="Arkiel — Soluções em IA e automação para WhatsApp Business e indústria." />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-        <meta property="og:title" content="Assistente Ark — Automação Inteligente" />
+        <meta property="og:title" content="Arkiel — Tecnologia Inteligente" />
         <meta property="og:description" content="Automatize seu atendimento WhatsApp com inteligência artificial." />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="website" />
