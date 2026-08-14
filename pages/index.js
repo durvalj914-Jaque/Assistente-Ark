@@ -143,6 +143,7 @@ export default function Home() {
         .product-icon.green { background: rgba(37,211,102,0.1); box-shadow: 0 0 24px rgba(37,211,102,0.1); }
         .product-icon.cyan { background: rgba(0,212,255,0.1); box-shadow: 0 0 24px rgba(0,212,255,0.1); }
         .product-icon.mascot { width: 76px; height: 76px; background: transparent; box-shadow: 0 0 30px rgba(37,211,102,0.2); border-radius: 20px; overflow: hidden; }
+        .product-icon.mascot.cyan-glow { box-shadow: 0 0 30px rgba(0,212,255,0.2); }
         .product-icon.mascot img { width: 100%; height: 100%; object-fit: contain; }
         .product-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: auto; flex-wrap: wrap; }
         .product-cta {
@@ -278,13 +279,13 @@ export default function Home() {
             </div>
           </div>
           <div className="product-card">
-            <div className="product-icon cyan">🔍</div>
-            <h3>Ark AOI</h3>
-            <p>Sistema de inspeção óptica automatizada (Automated Optical Inspection) para controle de qualidade industrial. Detecta defeitos em tempo real usando visão computacional e deep learning.</p>
+            <div className="product-icon mascot cyan-glow"><img src="/azura-icon.png" alt="Azura" /></div>
+            <h3>Azura</h3>
+            <p>Agente autônomo para smartphones Android. Executa tarefas, automatiza ações e toma decisões no seu dispositivo sem intervenção manual — sua IA pessoal rodando direto no bolso.</p>
             <div className="product-tags">
-              <span className="product-tag cyan">Indústria 4.0</span>
-              <span className="product-tag cyan">Visão Computacional</span>
-              <span className="product-tag cyan">Deep Learning</span>
+              <span className="product-tag cyan">Agente Autônomo</span>
+              <span className="product-tag cyan">Android</span>
+              <span className="product-tag cyan">IA</span>
             </div>
             <div className="product-status soon">
               <span className="dot"></span>
