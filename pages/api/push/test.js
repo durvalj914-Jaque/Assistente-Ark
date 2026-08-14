@@ -1,10 +1,19 @@
 /**
  * POST /api/push/test
  * Manda uma notificação de teste pro próprio tenant do usuário logado.
- * Header: Authorization: Bearer <supabase_session_token>
+ * Body opcional: { type: 'human_handoff' | 'no_bot_message' | ... }
  */
 import { supabaseAdmin } from '../../../lib/supabase'
 import { sendPushToTenant } from '../../../lib/webpush'
+import { sendFcmToTenant } from '../../../lib/fcm'
+
+const TEST_PAYLOADS = {
+  human_handoff: { title: '👤 Cliente pediu atendimento humano', body: 'Teste: cliente pediu atendimento humano', icon: '👤' },
+  no_bot_message: { title: '🔇 Mensagem de "Sem bot"', body: 'Teste: fornecedor/familiar enviou mensagem', icon: '🔇' },
+  new_order: { title: '🛒 Novo pedido recebido!', body: 'Teste: novo pedido no carrinho', icon: '🛒' },
+  receipt: { title: '📄 Comprovante recebido', body: 'Teste: comprovante de pagamento', icon: '📄' },
+  loop_detected: { title: '⏸️ Loop detectado — bot pausado', body: 'Teste: bot pausado por excesso de mensagens', icon: '⏸️' },
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -20,12 +29,13 @@ export default async function handler(req, res) {
     .from('tenant_members').select('tenant_id').eq('user_id', user.id).order('created_at', { ascending: true }).limit(1).maybeSingle()
   if (!member) return res.status(403).json({ error: 'Usuário sem tenant' })
 
-  await sendPushToTenant(member.tenant_id, {
-    title: '🔔 Notificação de teste',
-    body: 'Se você recebeu isso com som e vibração, tá tudo funcionando!',
-    url: '/admin/settings',
-    tag: 'ark-test',
-  })
+  const type = (req.body?.type) || 'human_handoff'
+  const payload = TEST_PAYLOADS[type] || TEST_PAYLOADS.human_handoff
 
-  return res.status(200).json({ ok: true })
+  await Promise.all([
+    sendPushToTenant(member.tenant_id, { ...payload, type, url: '/admin/conversations', tag: `ark-test-${type}-${Date.now()}` }),
+    sendFcmToTenant(member.tenant_id, { ...payload, type, url: '/admin/conversations', tag: `ark-test-${type}-${Date.now()}` }),
+  ])
+
+  return res.status(200).json({ ok: true, type })
 }

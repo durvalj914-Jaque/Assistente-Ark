@@ -70,6 +70,7 @@ async function handleOrder(db, msg, from, phoneNumberId) {
       body: `${contact?.name || from} enviou um carrinho de R$ ${total.toFixed(2)} pelo ${bot.name}`,
       url: '/painel?tab=receipts',
       tag: `ark-order-${from}-${Date.now()}`,
+      type: 'new_order',
     }
     await Promise.all([sendPushToTenant(bot.tenant_id, pushPayload), sendFcmToTenant(bot.tenant_id, pushPayload)])
   } catch (_) {}
@@ -483,6 +484,7 @@ Obrigado! 🎉`)
               title: '📄 Comprovante recebido',
               body: `${contact.name || contact.phone} enviou comprovante de R$ ${parseFloat(payment.amount).toFixed(2)}`,
               url: '/painel?tab=receipts', tag: `ark-receipt-${payment.id}`,
+              type: 'receipt',
             }
             await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
           } catch (_) {}
@@ -567,6 +569,7 @@ Obrigado! 🎉`)
         body: `Possível bot conversando com ${contact.name || contact.phone}. Bot pausado automaticamente.`,
         url: '/admin/conversations',
         tag: `ark-loop-${conv.id}`,
+        type: 'loop_detected',
       }
       await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
     } catch (_) {}
@@ -583,6 +586,17 @@ Obrigado! 🎉`)
     } else {
       await db.from('conversations').update({ last_message: userText || '[mídia]', last_message_at: new Date().toISOString() }).eq('id', conv.id)
       await savelog(db, conv.status === 'human' ? 'human_mode' : 'no_bot_mode')
+      // Push notification para mensagens em modo humano ou sem bot
+      try {
+        const pushPayload = {
+          title: conv.status === 'no_bot' ? '🔇 Mensagem de \'Sem bot\'' : '👤 Cliente em atendimento humano',
+          body: `${contact.name || contact.phone}: ${userText ? userText.substring(0, 60) : '[mídia]'}`,
+          url: '/admin/conversations',
+          tag: `ark-${conv.status}-${conv.id}`,
+          type: conv.status === 'no_bot' ? 'no_bot_message' : 'human_handoff',
+        }
+        await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
+      } catch (_) {}
       return
     }
   }
@@ -599,6 +613,7 @@ Obrigado! 🎉`)
         body: `${contact.name || contact.phone} está esperando no ${bot.name}`,
         url: '/admin/conversations',
         tag: `ark-human-${conv.id}`,
+        type: 'human_handoff',
       }
       await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
     } catch (_) {}
@@ -808,6 +823,7 @@ Obrigado! 🎉`)
         body: `${contact.name || contact.phone} está esperando no ${bot.name}`,
         url: '/admin/conversations',
         tag: `ark-human-${conv.id}`,
+        type: 'human_handoff',
       }
       await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
     } catch (_) {}
