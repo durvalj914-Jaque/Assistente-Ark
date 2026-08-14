@@ -575,10 +575,16 @@ Obrigado! 🎉`)
 
   // Human mode ou Sem bot (checkbox do painel)
   if (conv.status === 'human' || conv.status === 'no_bot') {
-    // Ainda salva a mensagem (já salvou acima), mas não responde com bot
-    await db.from('conversations').update({ last_message: userText || '[mídia]', last_message_at: new Date().toISOString() }).eq('id', conv.id)
-    await savelog(db, conv.status === 'human' ? 'human_mode' : 'no_bot_mode')
-    return
+    // "0" reseta pro modo bot
+    if (userText?.trim() === '0') {
+      await db.from('conversations').update({ status: 'bot', current_node_id: null, last_message: '0', last_message_at: new Date().toISOString() }).eq('id', conv.id)
+      await savelog(db, 'reset_from_human')
+      // Continua pro fluxo abaixo
+    } else {
+      await db.from('conversations').update({ last_message: userText || '[mídia]', last_message_at: new Date().toISOString() }).eq('id', conv.id)
+      await savelog(db, conv.status === 'human' ? 'human_mode' : 'no_bot_mode')
+      return
+    }
   }
 
   // Human takeover keyword (atalho direto, sem depender do fluxo)
