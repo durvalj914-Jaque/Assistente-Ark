@@ -34,7 +34,14 @@ export default function AssistenteArk() {
     setLoading(false)
   }
 
-  if (checking) return <div style={{ background: '#0a0a0a', minHeight: '100vh' }} />
+  if (checking) return (
+    <>
+      <Head>
+        <title>Assistente Ark — Plataforma de Automação WhatsApp</title>
+      </Head>
+      <div style={{ background: '#0a0a0a', minHeight: '100vh' }} />
+    </>
+  )
 
   return (
     <>
