@@ -60,8 +60,7 @@ export default function Entrar() {
         .back-link:hover { color: #fff; }
 
         .login-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-        .login-logo img { width: 48px; height: 48px; }
-        .login-logo span { font-size: 16px; font-weight: 800; letter-spacing: 4px; color: #fff; text-transform: uppercase; }
+        .login-logo img { height: 56px; width: auto; }
 
         .login-badge { font-size: 12px; color: #25D366; font-weight: 600; margin-bottom: 32px; letter-spacing: 1px; }
 
@@ -85,7 +84,6 @@ export default function Entrar() {
 
         <div className="login-logo">
           <img src="/logo-arkiel.png" alt="Arkiel" />
-          <span>ARKIEL</span>
         </div>
         <div className="login-badge">ASSISTENTE ARK</div>
 

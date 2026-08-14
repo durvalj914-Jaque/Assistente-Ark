@@ -58,9 +58,8 @@ export default function Home() {
           background: rgba(8,8,10,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
           border-bottom: 1px solid rgba(255,255,255,0.06);
         }
-        .nav-logo { display: flex; align-items: center; gap: 14px; cursor: pointer; }
-        .nav-logo img { width: 38px; height: 38px; object-fit: contain; filter: drop-shadow(0 0 12px rgba(37,211,102,0.3)); }
-        .nav-logo span { font-size: 16px; font-weight: 800; letter-spacing: 4px; color: #fff; text-transform: uppercase; }
+        .nav-logo { display: flex; align-items: center; cursor: pointer; }
+        .nav-logo img { height: 40px; width: auto; object-fit: contain; }
 
         .nav-tabs { display: flex; gap: 2px; list-style: none; }
         .nav-tab {
@@ -193,10 +192,9 @@ export default function Home() {
         /* ===== FOOTER ===== */
         .footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 56px 24px 32px; }
         .footer-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 32px; }
-        .footer-brand { display: flex; flex-direction: column; gap: 12px; }
-        .footer-brand .logo { display: flex; align-items: center; gap: 10px; }
-        .footer-brand .logo img { width: 32px; height: 32px; }
-        .footer-brand .logo span { font-size: 14px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; }
+        .footer-brand { display: flex; flex-direction: column; gap: 14px; }
+        .footer-brand .logo { display: flex; align-items: center; }
+        .footer-brand .logo img { height: 34px; width: auto; }
         .footer-brand p { font-size: 13px; color: rgba(255,255,255,0.3); max-width: 280px; line-height: 1.5; }
         .footer-links { display: flex; gap: 48px; flex-wrap: wrap; }
         .footer-col h6 { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.5); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 14px; }
@@ -210,7 +208,6 @@ export default function Home() {
       <nav className={`nav ${scrolled ? 'scrolled' : ''}`}>
         <div className="nav-logo" onClick={() => scrollTo('inicio')}>
           <img src="/arkiel-logo.png" alt="Arkiel" />
-          <span>ARKIEL</span>
         </div>
         <div className="nav-tabs">
           {navTabs.map(t => (
@@ -397,7 +394,6 @@ export default function Home() {
           <div className="footer-brand">
             <div className="logo">
               <img src="/arkiel-logo.png" alt="Arkiel" />
-              <span>ARKIEL</span>
             </div>
             <p>Tecnologia inteligente para automação e inteligência artificial. Do WhatsApp à indústria.</p>
           </div>

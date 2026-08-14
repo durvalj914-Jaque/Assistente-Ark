@@ -33,8 +33,7 @@ export default function AssistenteArkPage() {
           display: flex; align-items: center; padding: 0 40px; justify-content: space-between;
         }
         .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        .nav-logo img { width: 32px; height: 32px; }
-        .nav-logo span { font-size: 14px; font-weight: 800; letter-spacing: 3px; color: #fff; text-transform: uppercase; }
+        .nav-logo img { height: 36px; width: auto; }
         .nav-back { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; text-decoration: none; transition: all .15s; background: transparent; }
         .nav-back:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
         .nav-login { padding: 8px 20px; border-radius: 8px; background: #25D366; color: #0a0a0a; font-size: 13px; font-weight: 700; text-decoration: none; transition: all .15s; }
@@ -67,8 +66,7 @@ export default function AssistenteArkPage() {
 
         .footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 48px 24px; text-align: center; }
         .footer-logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px; }
-        .footer-logo img { width: 28px; height: 28px; }
-        .footer-logo span { font-size: 13px; font-weight: 800; letter-spacing: 3px; color: #fff; text-transform: uppercase; }
+        .footer-logo img { height: 32px; width: auto; }
         .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
         .footer-links a { color: rgba(255,255,255,0.4); font-size: 13px; text-decoration: none; transition: color .15s; }
         .footer-links a:hover { color: #fff; }
@@ -84,7 +82,6 @@ export default function AssistenteArkPage() {
       <nav className="nav">
         <Link href="/" className="nav-logo">
           <img src="/logo-arkiel.png" alt="Arkiel" />
-          <span>ARKIEL</span>
         </Link>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Link href="/" className="nav-back">← Site</Link>
@@ -145,7 +142,6 @@ export default function AssistenteArkPage() {
       <footer className="footer">
         <div className="footer-logo">
           <img src="/logo-arkiel.png" alt="Arkiel" />
-          <span>ARKIEL</span>
         </div>
         <div className="footer-links">
           <Link href="/">Arkiel</Link>
