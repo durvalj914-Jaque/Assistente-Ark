@@ -38,7 +38,7 @@ export default function Home() {
     <>
       <Head>
         <title>Arkiel — Tecnologia Inteligente para o Seu Negócio</title>
-        <meta name="description" content="Arkiel é uma empresa de tecnologia que desenvolve soluções de automação, IA e inspeção óptica para WhatsApp Business e indústria 4.0." />
+        <meta name="description" content="Arkiel é uma empresa de tecnologia que desenvolve soluções de automação e IA — do atendimento via WhatsApp Business a agentes autônomos para Android." />
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -347,8 +347,8 @@ export default function Home() {
         <div className="sobre-grid">
           <div className="sobre-text">
             <p>A Arkiel é uma empresa de tecnologia focada em criar soluções inteligentes que automatizam processos e conectam empresas aos seus clientes de forma eficiente.</p>
-            <p>Nascemos da visão de que automação não precisa ser complexa. Com produtos que combinam inteligência artificial, visão computacional e plataformas SaaS, entregamos ferramentas que funcionam — e que qualquer pessoa pode usar.</p>
-            <p>Do atendimento no WhatsApp à inspeção óptica na indústria, desenvolvemos tecnologia que trabalha por você.</p>
+            <p>Nascemos da visão de que automação não precisa ser complexa. Com produtos que combinam inteligência artificial, automação e plataformas SaaS, entregamos ferramentas que funcionam — e que qualquer pessoa pode usar.</p>
+            <p>Do atendimento no WhatsApp aos agentes autônomos no seu smartphone, desenvolvemos tecnologia que trabalha por você.</p>
           </div>
           <div className="sobre-values">
             <div className="sobre-value">
@@ -408,13 +408,13 @@ export default function Home() {
             <div className="logo">
               <img src="/arkiel-logo.png" alt="Arkiel" />
             </div>
-            <p>Tecnologia inteligente para automação e inteligência artificial. Do WhatsApp à indústria.</p>
+            <p>Tecnologia inteligente para automação e inteligência artificial. Do WhatsApp ao seu bolso.</p>
           </div>
           <div className="footer-links">
             <div className="footer-col">
               <h6>Produtos</h6>
               <Link href="/assistente-ark">Assistente Ark</Link>
-              <a href="/#produtos">Ark AOI</a>
+              <a href="/#produtos">Azura</a>
             </div>
             <div className="footer-col">
               <h6>Empresa</h6>

@@ -41,7 +41,7 @@ export default function Termos() {
           <p>Ao acessar ou utilizar a plataforma Assistente Ark ("Plataforma"), você concorda em cumprir e estar vinculado a estes Termos de Uso. Caso não concorde com qualquer parte destes termos, não utilize a Plataforma.</p>
 
           <h2>2. Descrição do Serviço</h2>
-          <p>A Arkiel Tecnologia LTDA disponibiliza uma plataforma SaaS (Software as a Service) para automação de atendimento via WhatsApp Business, incluindo os produtos Assistente Ark e Ark AOI. Os serviços incluem:</p>
+          <p>A Arkiel Tecnologia LTDA disponibiliza uma plataforma SaaS (Software as a Service) para automação de atendimento via WhatsApp Business, incluindo os produtos Assistente Ark e Azura. Os serviços incluem:</p>
           <ul>
             <li>Criação e gestão de chatbots para WhatsApp Business</li>
             <li>Editor visual de fluxos de conversa</li>
