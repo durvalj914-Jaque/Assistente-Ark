@@ -17,7 +17,7 @@ export default function WhatsappSetupPage() {
   const [disconnecting, setDisconnecting] = useState(false)
   const [disconnectResult, setDisconnectResult] = useState(null)
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   useEffect(() => {
     if (tenant && user) {

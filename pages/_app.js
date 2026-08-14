@@ -5,7 +5,7 @@ import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import ErrorBoundary from '../components/ErrorBoundary'
 
-const PUBLIC_PAGES = ['/', '/login', '/termos', '/privacidade', '/cookies']
+const PUBLIC_PAGES = ['/', '/login', '/assistente-ark', '/termos', '/privacidade', '/cookies']
 
 export default function App({ Component, pageProps }) {
   const router = useRouter()
@@ -13,13 +13,13 @@ export default function App({ Component, pageProps }) {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        if (router.pathname === '/login') {
-          router.replace('/admin')
+        if (router.pathname === '/login' || router.pathname === '/assistente-ark') {
+          router.replace('/painel')
         }
       }
       if (event === 'SIGNED_OUT') {
         if (!PUBLIC_PAGES.includes(router.pathname)) {
-          router.replace('/login')
+          router.replace('/assistente-ark')
         }
       }
     })

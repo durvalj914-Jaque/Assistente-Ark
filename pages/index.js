@@ -1,502 +1,201 @@
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
-import { supabase } from '../lib/supabase'
 import Link from 'next/link'
 import Head from 'next/head'
-import Navbar from '../components/Navbar'
-import Footer from '../components/Footer'
 
 export default function Home() {
-  const router = useRouter()
-  const [checking, setChecking] = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace('/admin')
-      else setChecking(false)
-    })
-  }, [])
-
-  if (checking) return <div style={{ background: '#000', minHeight: '100vh' }} />
-
   return (
     <>
       <Head>
-        <title>Arkiel — Automação Inteligente para WhatsApp Business</title>
-        <meta name="description" content="Plataforma SaaS multi-tenant para automação de WhatsApp com IA. Gerencie chatbots, conversas e atendimentos sem código." />
+        <title>Arkiel — Tecnologia Inteligente para o Seu Negócio</title>
+        <meta name="description" content="Arkiel é uma empresa de tecnologia que cria soluções de automação e IA para WhatsApp Business. Conheça o Assistente Ark e o Ark AOI." />
+        <link rel="icon" href="/logo-arkiel.png" />
       </Head>
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { background: #000; color: #fff; font-family: 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; }
 
-        .home-root { background: #000; }
-
-        /* Background elements */
-        .bg-grid {
-          position: fixed; inset: 0; z-index: 0; pointer-events: none;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
-          background-size: 72px 72px;
+        .nav {
+          position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+          background: rgba(10,10,10,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+          border-bottom: 1px solid rgba(255,255,255,0.06); height: 68px;
+          display: flex; align-items: center; padding: 0 40px; justify-content: space-between;
         }
-        .bg-glow-top {
-          position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
-          width: 1000px; height: 800px; z-index: 0; pointer-events: none;
-          background: radial-gradient(ellipse at top, rgba(79,142,247,0.07) 0%, transparent 60%);
-        }
-
-        /* HERO */
-        .hero {
-          position: relative; z-index: 1;
-          padding: 160px 80px 120px;
-          text-align: center;
-          max-width: 1200px; margin: 0 auto;
-        }
-        .hero-badge {
-          display: inline-flex; align-items: center; gap: 8px;
-          border: 1px solid rgba(255,255,255,0.1); border-radius: 100px;
-          padding: 6px 16px; font-size: 12px; font-weight: 500;
-          color: rgba(255,255,255,0.5); margin-bottom: 32px;
-          background: rgba(255,255,255,0.03);
-          letter-spacing: 0.3px;
-        }
-        .hero-badge-dot {
-          width: 6px; height: 6px; border-radius: 50%;
-          background: #22c55e; box-shadow: 0 0 8px #22c55e;
-          animation: blink 2s ease-in-out infinite;
-        }
-        @keyframes blink {
-          0%,100% { opacity: 1; } 50% { opacity: 0.4; }
-        }
-        .hero-title {
-          font-size: clamp(44px, 7vw, 80px);
-          font-weight: 900; line-height: 1.03;
-          letter-spacing: -3px; margin-bottom: 28px; color: #fff;
-        }
-        .hero-title .g {
-          background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.5) 100%);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .hero-title .accent {
-          background: linear-gradient(135deg, #4f8ef7, #06b6d4);
-          -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-        .hero-sub {
-          font-size: 18px; color: rgba(255,255,255,0.38);
-          max-width: 540px; margin: 0 auto 48px;
-          line-height: 1.75; font-weight: 400;
-        }
-        .hero-actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-        .btn-primary {
-          padding: 15px 36px; border-radius: 10px;
-          background: #fff; color: #000;
-          font-size: 15px; font-weight: 700;
-          text-decoration: none; transition: all 0.2s;
-          letter-spacing: -0.3px;
-        }
-        .btn-primary:hover { background: rgba(255,255,255,0.88); transform: translateY(-2px); box-shadow: 0 16px 40px rgba(255,255,255,0.15); }
-        .btn-ghost {
-          padding: 15px 36px; border-radius: 10px;
-          border: 1px solid rgba(255,255,255,0.12);
-          color: rgba(255,255,255,0.55); font-size: 15px; font-weight: 500;
-          text-decoration: none; transition: all 0.2s;
-        }
+        .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .nav-logo img { width: 36px; height: 36px; object-fit: contain; }
+        .nav-logo span { font-size: 15px; font-weight: 800; letter-spacing: 4px; color: #fff; text-transform: uppercase; }
+        .nav-links { display: flex; align-items: center; gap: 4px; list-style: none; }
+        .nav-links a { padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.55); text-decoration: none; transition: all .15s; }
+        .nav-links a:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .nav-cta { display: flex; align-items: center; gap: 10px; }
+        .btn-ghost { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; text-decoration: none; transition: all .15s; background: transparent; }
         .btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
+        .btn-primary { padding: 8px 20px; border-radius: 8px; background: #25D366; color: #0a0a0a; font-size: 13px; font-weight: 700; text-decoration: none; transition: all .15s; }
+        .btn-primary:hover { background: #1fb855; transform: translateY(-1px); }
 
-        /* HERO STATS */
-        .hero-stats {
-          display: flex; justify-content: center; gap: 0;
-          margin-top: 80px; border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 16px; overflow: hidden; max-width: 700px; margin-left: auto; margin-right: auto;
-          background: rgba(255,255,255,0.02);
-        }
-        .hero-stat {
-          flex: 1; padding: 28px 20px; text-align: center;
-          border-right: 1px solid rgba(255,255,255,0.06);
-        }
-        .hero-stat:last-child { border-right: none; }
-        .hero-stat-num { font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
-        .hero-stat-lbl { font-size: 11px; color: rgba(255,255,255,0.3); font-weight: 500; margin-top: 4px; letter-spacing: 0.3px; }
+        .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 24px 80px; text-align: center; position: relative; overflow: hidden; }
+        .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(37,211,102,0.12), transparent 60%); pointer-events: none; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 100px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.2); color: #25D366; font-size: 12px; font-weight: 600; margin-bottom: 28px; }
+        .hero h1 { font-size: clamp(40px, 6vw, 76px); font-weight: 800; letter-spacing: -2px; line-height: 1.05; max-width: 820px; margin-bottom: 24px; }
+        .hero h1 span { background: linear-gradient(135deg, #25D366, #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero p { font-size: clamp(16px, 2vw, 20px); color: rgba(255,255,255,0.55); max-width: 580px; line-height: 1.6; margin-bottom: 40px; }
+        .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+        .btn-hero-primary { padding: 14px 32px; border-radius: 12px; background: #25D366; color: #0a0a0a; font-size: 15px; font-weight: 700; text-decoration: none; transition: all .2s; }
+        .btn-hero-primary:hover { background: #1fb855; transform: translateY(-2px); box-shadow: 0 12px 32px rgba(37,211,102,0.3); }
+        .btn-hero-ghost { padding: 14px 32px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 15px; font-weight: 500; text-decoration: none; transition: all .2s; background: transparent; }
+        .btn-hero-ghost:hover { border-color: rgba(255,255,255,0.25); background: rgba(255,255,255,0.04); }
 
-        /* SECTION BASE */
-        .section { position: relative; z-index: 1; padding: 100px 80px; max-width: 1200px; margin: 0 auto; }
-        .section-tag {
-          font-size: 11px; font-weight: 700; letter-spacing: 2px;
-          color: #4f8ef7; text-transform: uppercase; margin-bottom: 14px;
-        }
-        .section-title {
-          font-size: clamp(28px, 4vw, 48px); font-weight: 800;
-          letter-spacing: -1.5px; color: #fff; line-height: 1.1;
-          margin-bottom: 18px;
-        }
-        .section-sub {
-          font-size: 16px; color: rgba(255,255,255,0.35);
-          max-width: 520px; line-height: 1.7; margin-bottom: 56px;
-        }
-        .section-divider {
-          height: 1px; background: rgba(255,255,255,0.05);
-          margin: 0 80px; position: relative; z-index: 1;
-        }
+        .products { padding: 100px 24px; max-width: 1100px; margin: 0 auto; }
+        .section-title { font-size: 14px; font-weight: 700; color: #25D366; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; text-align: center; }
+        .section-sub { font-size: clamp(28px, 4vw, 44px); font-weight: 800; text-align: center; margin-bottom: 56px; letter-spacing: -1px; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; }
+        .product-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 20px; padding: 40px 32px; transition: all .2s; text-decoration: none; color: inherit; display: flex; flex-direction: column; }
+        .product-card:hover { border-color: rgba(37,211,102,0.3); background: rgba(37,211,102,0.04); transform: translateY(-4px); }
+        .product-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 28px; margin-bottom: 24px; }
+        .product-icon.green { background: rgba(37,211,102,0.12); }
+        .product-icon.blue { background: rgba(0,212,255,0.12); }
+        .product-card h3 { font-size: 22px; font-weight: 700; margin-bottom: 12px; }
+        .product-card p { color: rgba(255,255,255,0.5); font-size: 15px; line-height: 1.6; margin-bottom: 20px; }
+        .product-card .tag { display: inline-block; padding: 4px 12px; border-radius: 100px; font-size: 11px; font-weight: 600; background: rgba(37,211,102,0.1); color: #25D366; border: 1px solid rgba(37,211,102,0.15); }
+        .product-link { color: #25D366; font-size: 14px; font-weight: 600; text-decoration: none; margin-top: auto; display: inline-flex; align-items: center; gap: 6px; }
+        .product-link:hover { gap: 10px; transition: gap .15s; }
 
-        /* PRODUTOS */
-        .products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-        .product-card {
-          border: 1px solid rgba(255,255,255,0.07); border-radius: 20px;
-          padding: 40px 36px; background: rgba(255,255,255,0.02);
-          transition: all 0.25s; cursor: default; position: relative; overflow: hidden;
-        }
-        .product-card::before {
-          content: ''; position: absolute; inset: 0; border-radius: 20px;
-          background: linear-gradient(135deg, rgba(79,142,247,0.04), transparent);
-          opacity: 0; transition: opacity 0.25s;
-        }
-        .product-card:hover { border-color: rgba(79,142,247,0.2); transform: translateY(-4px); }
-        .product-card:hover::before { opacity: 1; }
-        .product-icon {
-          width: 52px; height: 52px; border-radius: 14px;
-          border: 1px solid rgba(255,255,255,0.08);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 22px; margin-bottom: 24px;
-          background: rgba(255,255,255,0.03);
-        }
-        .product-name { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 12px; letter-spacing: -0.5px; }
-        .product-desc { font-size: 14px; color: rgba(255,255,255,0.38); line-height: 1.7; margin-bottom: 24px; }
-        .product-features { display: flex; flex-direction: column; gap: 10px; }
-        .product-feat {
-          display: flex; align-items: center; gap: 10px;
-          font-size: 13px; color: rgba(255,255,255,0.45);
-        }
-        .product-feat-dot { width: 5px; height: 5px; border-radius: 50%; background: #4f8ef7; flex-shrink: 0; }
-        .product-badge {
-          display: inline-block; font-size: 10px; font-weight: 700;
-          letter-spacing: 1.5px; text-transform: uppercase;
-          padding: 4px 10px; border-radius: 100px;
-          border: 1px solid rgba(79,142,247,0.3); color: #4f8ef7;
-          margin-bottom: 16px;
-        }
+        .features { padding: 100px 24px; background: rgba(255,255,255,0.02); }
+        .features-inner { max-width: 1100px; margin: 0 auto; }
+        .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 32px; }
+        .feature { text-align: left; }
+        .feature-num { font-size: 32px; font-weight: 800; background: linear-gradient(135deg, #25D366, #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; }
+        .feature h4 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+        .feature p { color: rgba(255,255,255,0.45); font-size: 14px; line-height: 1.6; }
 
-        /* SOLUÇÕES */
-        .solutions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-        .solution-card {
-          border: 1px solid rgba(255,255,255,0.06); border-radius: 16px;
-          padding: 32px 28px; background: rgba(255,255,255,0.015);
-          transition: all 0.2s;
-        }
-        .solution-card:hover { border-color: rgba(255,255,255,0.12); background: rgba(255,255,255,0.03); }
-        .solution-icon { font-size: 28px; margin-bottom: 18px; display: block; }
-        .solution-name { font-size: 17px; font-weight: 700; color: #fff; margin-bottom: 10px; letter-spacing: -0.3px; }
-        .solution-desc { font-size: 13px; color: rgba(255,255,255,0.35); line-height: 1.65; }
+        .cta-section { padding: 120px 24px; text-align: center; }
+        .cta-section h2 { font-size: clamp(32px, 5vw, 52px); font-weight: 800; letter-spacing: -1px; margin-bottom: 20px; }
+        .cta-section p { color: rgba(255,255,255,0.5); font-size: 18px; margin-bottom: 36px; }
 
-        /* PREÇOS */
-        .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; align-items: start; }
-        .pricing-card {
-          border: 1px solid rgba(255,255,255,0.07); border-radius: 20px;
-          padding: 36px 32px; background: rgba(255,255,255,0.02);
-          position: relative;
-        }
-        .pricing-card.featured {
-          border-color: rgba(79,142,247,0.35);
-          background: rgba(79,142,247,0.04);
-        }
-        .pricing-popular {
-          position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
-          background: linear-gradient(135deg, #4f8ef7, #06b6d4);
-          color: #fff; font-size: 10px; font-weight: 800; letter-spacing: 1.5px;
-          text-transform: uppercase; padding: 4px 14px; border-radius: 100px;
-          white-space: nowrap;
-        }
-        .pricing-plan { font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.35); margin-bottom: 12px; }
-        .pricing-price { font-size: 42px; font-weight: 900; color: #fff; letter-spacing: -2px; margin-bottom: 4px; }
-        .pricing-price sup { font-size: 20px; font-weight: 700; vertical-align: top; margin-top: 10px; }
-        .pricing-price sub { font-size: 14px; font-weight: 400; color: rgba(255,255,255,0.35); vertical-align: baseline; }
-        .pricing-desc { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 28px; line-height: 1.5; }
-        .pricing-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
-        .pricing-feat {
-          display: flex; align-items: center; gap: 10px;
-          font-size: 13px; color: rgba(255,255,255,0.5);
-        }
-        .pricing-check { color: #22c55e; font-size: 14px; flex-shrink: 0; }
-        .btn-pricing {
-          width: 100%; padding: 13px; border-radius: 10px;
-          font-size: 14px; font-weight: 700; text-decoration: none;
-          display: block; text-align: center; transition: all 0.2s;
-        }
-        .btn-pricing-ghost {
-          border: 1px solid rgba(255,255,255,0.12);
-          color: rgba(255,255,255,0.65); background: transparent;
-        }
-        .btn-pricing-ghost:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
-        .btn-pricing-solid {
-          background: linear-gradient(135deg, #4f8ef7, #06b6d4);
-          color: #fff; border: none;
-          box-shadow: 0 8px 24px rgba(79,142,247,0.3);
-        }
-        .btn-pricing-solid:hover { transform: translateY(-1px); box-shadow: 0 12px 32px rgba(79,142,247,0.4); }
+        .footer { border-top: 1px solid rgba(255,255,255,0.06); padding: 48px 24px; text-align: center; }
+        .footer-logo { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 16px; }
+        .footer-logo img { width: 28px; height: 28px; }
+        .footer-logo span { font-size: 13px; font-weight: 800; letter-spacing: 3px; color: #fff; text-transform: uppercase; }
+        .footer-links { display: flex; justify-content: center; gap: 24px; margin-bottom: 20px; flex-wrap: wrap; }
+        .footer-links a { color: rgba(255,255,255,0.4); font-size: 13px; text-decoration: none; transition: color .15s; }
+        .footer-links a:hover { color: #fff; }
+        .footer-copy { color: rgba(255,255,255,0.25); font-size: 12px; }
 
-        /* EMPRESA */
-        .empresa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-        .empresa-text .section-title { margin-bottom: 20px; }
-        .empresa-body { font-size: 15px; color: rgba(255,255,255,0.4); line-height: 1.8; margin-bottom: 32px; }
-        .empresa-contact { display: flex; flex-direction: column; gap: 12px; }
-        .empresa-contact-item {
-          display: flex; align-items: center; gap: 12px;
-          font-size: 13px; color: rgba(255,255,255,0.45);
-        }
-        .empresa-contact-icon {
-          width: 34px; height: 34px; border-radius: 8px;
-          border: 1px solid rgba(255,255,255,0.08);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 14px; background: rgba(255,255,255,0.02); flex-shrink: 0;
-        }
-        .empresa-visual {
-          display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-        }
-        .empresa-stat-card {
-          border: 1px solid rgba(255,255,255,0.07); border-radius: 16px;
-          padding: 28px 24px; background: rgba(255,255,255,0.02);
-        }
-        .empresa-stat-n { font-size: 32px; font-weight: 900; color: #fff; letter-spacing: -1px; margin-bottom: 6px; }
-        .empresa-stat-l { font-size: 12px; color: rgba(255,255,255,0.3); line-height: 1.4; }
-
-        /* CTA FINAL */
-        .cta-section {
-          position: relative; z-index: 1;
-          text-align: center; padding: 100px 80px;
-          max-width: 800px; margin: 0 auto;
-        }
-        .cta-title { font-size: clamp(32px, 5vw, 56px); font-weight: 900; letter-spacing: -2px; color: #fff; margin-bottom: 20px; }
-        .cta-sub { font-size: 16px; color: rgba(255,255,255,0.35); margin-bottom: 40px; line-height: 1.7; }
-
-        /* RESPONSIVE */
-        @media (max-width: 900px) {
-          .hero { padding: 120px 24px 80px; }
-          .section { padding: 70px 24px; }
-          .section-divider { margin: 0 24px; }
-          .products-grid { grid-template-columns: 1fr; }
-          .solutions-grid { grid-template-columns: 1fr 1fr; }
-          .pricing-grid { grid-template-columns: 1fr; }
-          .empresa-grid { grid-template-columns: 1fr; }
-          .cta-section { padding: 70px 24px; }
-          .hero-stats { flex-direction: column; border-radius: 12px; }
-          .hero-stat { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); }
-          .hero-stat:last-child { border-bottom: none; }
-        }
-        @media (max-width: 600px) {
-          .solutions-grid { grid-template-columns: 1fr; }
+        @media (max-width: 768px) {
+          .nav { padding: 0 16px; }
+          .nav-links { display: none; }
+          .hero { padding: 80px 20px 60px; }
+          .products, .features { padding: 60px 20px; }
         }
       `}</style>
 
-      <div className="home-root">
-        <div className="bg-grid" />
-        <div className="bg-glow-top" />
+      <nav className="nav">
+        <Link href="/" className="nav-logo">
+          <img src="/logo-arkiel.png" alt="Arkiel" />
+          <span>ARKIEL</span>
+        </Link>
+        <ul className="nav-links">
+          <li><a href="#produtos">Produtos</a></li>
+          <li><a href="#solucoes">Soluções</a></li>
+          <li><a href="#contato">Contato</a></li>
+        </ul>
+        <div className="nav-cta">
+          <Link href="/assistente-ark" className="btn-ghost">Entrar</Link>
+          <Link href="/assistente-ark" className="btn-primary">Começar agora</Link>
+        </div>
+      </nav>
 
-        <Navbar />
+      <section className="hero">
+        <div className="hero-badge">🟢 Tecnologia que trabalha por você</div>
+        <h1>Automação <span>inteligente</span> para o seu negócio</h1>
+        <p>A Arkiel desenvolve soluções de IA e automação para WhatsApp Business que reduzem custos, aumentam vendas e melhoram o atendimento dos seus clientes.</p>
+        <div className="hero-cta">
+          <Link href="/assistente-ark" className="btn-hero-primary">Conhecer o Assistente Ark</Link>
+          <a href="#produtos" className="btn-hero-ghost">Ver produtos</a>
+        </div>
+      </section>
 
-        {/* ── HERO ── */}
-        <section className="hero">
-          <div className="hero-badge">
-            <span className="hero-badge-dot" />
-            Plataforma ativa · Novo: Ark AOI disponível
+      <section className="products" id="produtos">
+        <div className="section-title">Nossos produtos</div>
+        <h2 className="section-sub">Soluções que entregam resultado</h2>
+        <div className="product-grid">
+          <Link href="/assistente-ark" className="product-card">
+            <div className="product-icon green">💬</div>
+            <h3>Assistente Ark</h3>
+            <p>Plataforma SaaS para criar e gerenciar chatbots de WhatsApp com IA, catálogo de produtos, pagamentos integrados e painel administrativo completo.</p>
+            <span className="tag">WhatsApp Business</span>
+            <span className="product-link">Acessar plataforma →</span>
+          </Link>
+          <div className="product-card">
+            <div className="product-icon blue">🔍</div>
+            <h3>Ark AOI</h3>
+            <p>Solução de inspeção óptica automatizada (Automated Optical Inspection) para controle de qualidade industrial com visão computacional.</p>
+            <span className="tag">Indústria 4.0</span>
+            <span className="product-link">Em breve →</span>
           </div>
-          <h1 className="hero-title">
-            <span className="g">Automatize seu</span><br />
-            <span className="accent">atendimento</span><br />
-            <span className="g">com IA.</span>
-          </h1>
-          <p className="hero-sub">
-            Gerencie chatbots de WhatsApp, conversas e equipes em uma plataforma unificada. Multi-tenant, escalável e sem código.
-          </p>
-          <div className="hero-actions">
-            <Link href="/login" className="btn-primary">Começar gratuitamente →</Link>
-            <Link href="#produtos" className="btn-ghost">Ver produtos</Link>
-          </div>
-          <div className="hero-stats">
-            <div className="hero-stat">
-              <div className="hero-stat-num">10k+</div>
-              <div className="hero-stat-lbl">Mensagens / dia</div>
-            </div>
-            <div className="hero-stat">
-              <div className="hero-stat-num">99.9%</div>
-              <div className="hero-stat-lbl">Uptime garantido</div>
-            </div>
-            <div className="hero-stat">
-              <div className="hero-stat-num">&lt; 1s</div>
-              <div className="hero-stat-lbl">Tempo de resposta</div>
-            </div>
-            <div className="hero-stat">
-              <div className="hero-stat-num">Multi</div>
-              <div className="hero-stat-lbl">Tenant isolado</div>
-            </div>
-          </div>
-        </section>
+        </div>
+      </section>
 
-        <div className="section-divider" />
-
-        {/* ── PRODUTOS ── */}
-        <section className="section" id="produtos">
-          <div className="section-tag">Produtos</div>
-          <h2 className="section-title">Uma plataforma,<br />dois produtos.</h2>
-          <p className="section-sub">Soluções complementares para automação completa do seu atendimento digital.</p>
-          <div className="products-grid">
-            <div className="product-card">
-              <div className="product-badge">Principal</div>
-              <div className="product-icon">💬</div>
-              <div className="product-name">Assistente Ark</div>
-              <p className="product-desc">Plataforma completa para criação e gestão de chatbots WhatsApp Business com painel administrativo multi-tenant, editor visual de fluxos e analytics em tempo real.</p>
-              <div className="product-features">
-                <div className="product-feat"><span className="product-feat-dot" />Editor de fluxos sem código</div>
-                <div className="product-feat"><span className="product-feat-dot" />Painel multi-tenant com isolamento</div>
-                <div className="product-feat"><span className="product-feat-dot" />Histórico completo de conversas</div>
-                <div className="product-feat"><span className="product-feat-dot" />Gestão de contatos e tags</div>
-                <div className="product-feat"><span className="product-feat-dot" />Relatórios e analytics avançados</div>
-              </div>
+      <section className="features" id="solucoes">
+        <div className="features-inner">
+          <div className="section-title">Por que Arkiel</div>
+          <h2 className="section-sub">Tecnologia que simplifica o seu dia</h2>
+          <div className="feature-grid">
+            <div className="feature">
+              <div className="feature-num">01</div>
+              <h4>Automação real</h4>
+              <p>Bots que atendem, vendem e gerenciam pedidos sem intervenção humana. Seu time foca no que importa.</p>
             </div>
-            <div className="product-card">
-              <div className="product-badge" style={{ borderColor: 'rgba(139,92,246,0.3)', color: '#8b5cf6' }}>Em breve</div>
-              <div className="product-icon">🧠</div>
-              <div className="product-name">Ark AOI</div>
-              <p className="product-desc">Agente Operacional Inteligente — IA autônoma que aprende com seus dados, responde com contexto e age proativamente para resolver demandas complexas sem intervenção humana.</p>
-              <div className="product-features">
-                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />IA com memória de contexto longa</div>
-                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Integração com CRM e ERP</div>
-                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Aprendizado contínuo</div>
-                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Ações autônomas e agendadas</div>
-                <div className="product-feat"><span className="product-feat-dot" style={{ background: '#8b5cf6' }} />Escalonamento humano inteligente</div>
-              </div>
+            <div className="feature">
+              <div className="feature-num">02</div>
+              <h4>Pagamentos integrados</h4>
+              <p>PIX e cartões via Mercado Pago direto no WhatsApp. Split automático de taxas e comprovantes.</p>
             </div>
-          </div>
-        </section>
-
-        <div className="section-divider" />
-
-        {/* ── SOLUÇÕES ── */}
-        <section className="section" id="solucoes">
-          <div className="section-tag">Soluções</div>
-          <h2 className="section-title">Tudo que você precisa<br />em um só lugar.</h2>
-          <p className="section-sub">Ferramentas poderosas para automação, análise e gestão de atendimento.</p>
-          <div className="solutions-grid">
-            {[
-              { icon: '⚡', name: 'Automação de Fluxos', desc: 'Crie fluxos de conversa visuais com condições, ramificações e ações automatizadas — sem uma linha de código.' },
-              { icon: '📊', name: 'Analytics em Tempo Real', desc: 'Dashboards completos com métricas de atendimento, taxa de resposta, conversões e performance dos agentes.' },
-              { icon: '👥', name: 'Gestão Multi-Tenant', desc: 'Isole dados por empresa com arquitetura multi-tenant robusta. Cada cliente tem seu ambiente seguro e independente.' },
-              { icon: '🔗', name: 'Integrações Nativas', desc: 'Conecte com CRM, ERP, plataformas de pagamento e qualquer API via webhooks configuráveis.' },
-              { icon: '🛡️', name: 'Segurança Enterprise', desc: 'Autenticação OAuth, criptografia de dados, backups automáticos e conformidade com LGPD.' },
-              { icon: '📱', name: 'WhatsApp Business API', desc: 'Integração oficial com a API do WhatsApp Business para alto volume de mensagens sem restrições.' },
-            ].map(s => (
-              <div key={s.name} className="solution-card">
-                <span className="solution-icon">{s.icon}</span>
-                <div className="solution-name">{s.name}</div>
-                <p className="solution-desc">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <div className="section-divider" />
-
-        {/* ── PREÇOS ── */}
-        <section className="section" id="precos">
-          <div className="section-tag">Preços</div>
-          <h2 className="section-title">Planos para todos<br />os tamanhos.</h2>
-          <p className="section-sub">Comece gratuitamente e escale conforme seu negócio cresce.</p>
-          <div className="pricing-grid">
-            <div className="pricing-card">
-              <div className="pricing-plan">Starter</div>
-              <div className="pricing-price"><sup>R$</sup>0<sub>/mês</sub></div>
-              <p className="pricing-desc">Ideal para testar e validar sua operação.</p>
-              <div className="pricing-features">
-                {['1 chatbot ativo', '500 mensagens/mês', 'Painel básico', 'Suporte por e-mail'].map(f => (
-                  <div key={f} className="pricing-feat"><span className="pricing-check">✓</span>{f}</div>
-                ))}
-              </div>
-              <Link href="/login" className="btn-pricing btn-pricing-ghost">Começar grátis</Link>
+            <div className="feature">
+              <div className="feature-num">03</div>
+              <h4>Catálogo nativo</h4>
+              <p>Sincronização com o catálogo oficial do WhatsApp. Produtos, preços e pedidos em um só lugar.</p>
             </div>
-            <div className="pricing-card featured">
-              <span className="pricing-popular">Mais popular</span>
-              <div className="pricing-plan">Pro</div>
-              <div className="pricing-price"><sup>R$</sup>297<sub>/mês</sub></div>
-              <p className="pricing-desc">Para negócios que querem escalar o atendimento.</p>
-              <div className="pricing-features">
-                {['Chatbots ilimitados', '10.000 mensagens/mês', 'Analytics avançado', 'Editor visual de fluxos', 'Integrações via webhook', 'Suporte prioritário'].map(f => (
-                  <div key={f} className="pricing-feat"><span className="pricing-check">✓</span>{f}</div>
-                ))}
-              </div>
-              <Link href="/login" className="btn-pricing btn-pricing-solid">Assinar Pro →</Link>
+            <div className="feature">
+              <div className="feature-num">04</div>
+              <h4>Multi-tenant</h4>
+              <p>Cada cliente tem seu próprio bot, número e dados isolados. Gerencie tudo de um painel central.</p>
             </div>
-            <div className="pricing-card">
-              <div className="pricing-plan">Enterprise</div>
-              <div className="pricing-price" style={{ fontSize: 32 }}>Sob consulta</div>
-              <p className="pricing-desc">Para operações de grande escala e necessidades específicas.</p>
-              <div className="pricing-features">
-                {['Mensagens ilimitadas', 'SLA garantido 99.9%', 'Ark AOI incluso', 'Onboarding dedicado', 'Gerente de conta', 'Conformidade LGPD'].map(f => (
-                  <div key={f} className="pricing-feat"><span className="pricing-check">✓</span>{f}</div>
-                ))}
-              </div>
-              <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="btn-pricing btn-pricing-ghost">Falar com vendas</a>
+            <div className="feature">
+              <div className="feature-num">05</div>
+              <h4>Conexão por SMS</h4>
+              <p>Ative números sem precisar de conta no Facebook. Cadastre o telefone e receba o código por SMS.</p>
+            </div>
+            <div className="feature">
+              <div className="feature-num">06</div>
+              <h4>Identidade visual</h4>
+              <p>Interface no padrão WhatsApp. Logo e cores da Arkiel em todos os pontos de contato.</p>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        <div className="section-divider" />
+      <section className="cta-section" id="contato">
+        <h2>Pronto para automatizar?</h2>
+        <p>Fale com a gente e descubra como a Arkiel pode transformar o seu atendimento.</p>
+        <div className="hero-cta">
+          <Link href="/assistente-ark" className="btn-hero-primary">Acessar plataforma</Link>
+          <a href="https://wa.me/5511913751590" target="_blank" rel="noopener" className="btn-hero-ghost">Falar no WhatsApp</a>
+        </div>
+      </section>
 
-        {/* ── EMPRESA ── */}
-        <section className="section" id="empresa">
-          <div className="empresa-grid">
-            <div className="empresa-text">
-              <div className="section-tag">Empresa</div>
-              <h2 className="section-title">Tecnologia brasileira<br />de alta performance.</h2>
-              <p className="empresa-body">
-                A Arkiel nasceu com a missão de democratizar a automação inteligente para empresas brasileiras. Desenvolvemos soluções SaaS de alto desempenho que transformam o atendimento ao cliente em vantagem competitiva.<br /><br />
-                Nossa equipe combina expertise em inteligência artificial, desenvolvimento de software e experiência do usuário para entregar produtos que realmente funcionam.
-              </p>
-              <div className="empresa-contact">
-                <div className="empresa-contact-item">
-                  <div className="empresa-contact-icon">✉️</div>
-                  <a href="mailto:arkieltech@gmail.com" style={{ color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}>arkieltech@gmail.com</a>
-                </div>
-                <div className="empresa-contact-item">
-                  <div className="empresa-contact-icon">📱</div>
-                  <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" style={{ color: 'rgba(255,255,255,0.45)', textDecoration: 'none' }}>+55 11 91375-1590</a>
-                </div>
-                <div className="empresa-contact-item">
-                  <div className="empresa-contact-icon">📍</div>
-                  <span>São Paulo, Brasil</span>
-                </div>
-              </div>
-            </div>
-            <div className="empresa-visual">
-              {[
-                { n: '10k+', l: 'Mensagens processadas por dia' },
-                { n: '99.9%', l: 'Uptime da plataforma' },
-                { n: '2024', l: 'Fundação da empresa' },
-                { n: '24/7', l: 'Monitoramento ativo' },
-              ].map(s => (
-                <div key={s.n} className="empresa-stat-card">
-                  <div className="empresa-stat-n">{s.n}</div>
-                  <div className="empresa-stat-l">{s.l}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <div className="section-divider" />
-
-        {/* ── CTA FINAL ── */}
-        <section className="cta-section">
-          <h2 className="cta-title">Pronto para transformar seu atendimento?</h2>
-          <p className="cta-sub">Junte-se a empresas que já automatizaram seu WhatsApp com a Arkiel. Comece gratuitamente, sem cartão de crédito.</p>
-          <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="/login" className="btn-primary">Criar conta grátis →</Link>
-            <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="btn-ghost">Falar com especialista</a>
-          </div>
-        </section>
-
-        <Footer />
-      </div>
+      <footer className="footer">
+        <div className="footer-logo">
+          <img src="/logo-arkiel.png" alt="Arkiel" />
+          <span>ARKIEL</span>
+        </div>
+        <div className="footer-links">
+          <Link href="/assistente-ark">Assistente Ark</Link>
+          <Link href="/termos">Termos de Uso</Link>
+          <Link href="/privacidade">Privacidade</Link>
+          <a href="mailto:arkieltech@gmail.com">Contato</a>
+        </div>
+        <div className="footer-copy">© {new Date().getFullYear()} Arkiel Tecnologia. Todos os direitos reservados.</div>
+      </footer>
     </>
   )
 }

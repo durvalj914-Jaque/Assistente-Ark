@@ -11,7 +11,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState({ messages: 0, conversations: 0, contacts: 0, monthMessages: 0 })
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login')
+    if (!loading && !user) router.replace('/assistente-ark')
   }, [user, loading])
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function AdminDashboard() {
       </p>
       <p style={{ color: "#334155", fontSize: 12 }}>user: {user?.email}</p>
       <button
-        onClick={async () => { await supabase.auth.signOut(); router.replace('/login') }}
+        onClick={async () => { await supabase.auth.signOut(); router.replace('/assistente-ark') }}
         className="ark-btn"
         style={{ marginTop: 8 }}
       >

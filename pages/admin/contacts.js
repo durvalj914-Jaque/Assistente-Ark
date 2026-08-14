@@ -26,7 +26,7 @@ export default function ContactsPage() {
   const [nameDraft, setNameDraft] = useState('')
   const [savingName, setSavingName] = useState(false)
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   const loadContacts = useCallback(async (reset = false) => {
     if (!tenant) return

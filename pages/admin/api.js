@@ -11,7 +11,7 @@ export default function ApiPage() {
   const [copied, setCopied] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
   useEffect(() => { if (tenant) setApiKey(tenant.api_key || '') }, [tenant])
 
   async function regenerate() {

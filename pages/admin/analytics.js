@@ -12,7 +12,7 @@ export default function AnalyticsPage() {
   const [topContacts, setTopContacts] = useState([])
   const [convStats, setConvStats] = useState({ open: 0, bot: 0, human: 0, closed: 0 })
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   useEffect(() => {
     if (!tenant) return

@@ -167,7 +167,7 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   useEffect(() => {
     if (!tenant) return

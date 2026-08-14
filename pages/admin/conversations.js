@@ -120,7 +120,7 @@ export default function ConversationsPage() {
   const endRef = useRef(null)
   const listEndRef = useRef(null)
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   // Remover padding do layout container pra chat ocupar tela cheia
   useEffect(() => {

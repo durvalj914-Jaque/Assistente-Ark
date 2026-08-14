@@ -219,7 +219,7 @@ export default function BotsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)  // bot object being confirmed for deletion
   const [deleteError, setDeleteError] = useState(null)
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
   useEffect(() => { setBots(initialBots) }, [initialBots])
 
   const plan = PLANS[tenant?.plan] || PLANS.free

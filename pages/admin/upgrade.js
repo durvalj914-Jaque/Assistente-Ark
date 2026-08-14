@@ -12,7 +12,7 @@ export default function Upgrade() {
   const [verifyMsg, setVerifyMsg] = useState('')
   const [token, setToken] = useState({ purchaseToken: '', productId: '', orderId: '' })
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   const currentPlan = PLANS[tenant?.plan] || PLANS.free
   const plans = [

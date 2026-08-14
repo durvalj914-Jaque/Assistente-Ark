@@ -22,7 +22,7 @@ export default function SettingsPage() {
   const [disconnectResult, setDisconnectResult] = useState(null)
   const [disconnectConfirm, setDisconnectConfirm] = useState('')
 
-  useEffect(() => { if (!loading && !user) router.replace('/login') }, [user, loading])
+  useEffect(() => { if (!loading && !user) router.replace('/assistente-ark') }, [user, loading])
 
   useEffect(() => {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'dark' : 'dark'
