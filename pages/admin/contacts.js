@@ -65,6 +65,18 @@ export default function ContactsPage() {
     return session?.access_token || ''
   }
 
+  // Auto-migrar colunas ao carregar (garante full_name existe)
+  useEffect(() => {
+    if (!tenant) return
+    getToken().then(token => {
+      if (!token) return
+      fetch('/api/contacts/migrate', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {})
+    })
+  }, [tenant])
+
   async function handleSyncGoogle() {
     if (!tenant || syncing) return
     setShowSyncMenu(false)
@@ -190,12 +202,23 @@ export default function ContactsPage() {
     if (!selected || !nameDraft.trim()) return
     setSavingName(true)
     const newName = nameDraft.trim()
-    // Sempre salva em full_name (campo padrao da tabela)
-    const { error } = await supabase.from('contacts').update({ full_name: newName, name: newName }).eq('id', selected.id)
-    if (!error) {
-      setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, full_name: newName, name: newName } : c))
-      setSelected(c => ({ ...c, full_name: newName, name: newName }))
+    
+    // Tentar salvar em full_name (campo principal)
+    let { error } = await supabase.from('contacts').update({ full_name: newName }).eq('id', selected.id)
+    
+    if (error) {
+      // Se full_name nao existir, tentar name
+      const fallback = await supabase.from('contacts').update({ name: newName }).eq('id', selected.id)
+      if (fallback.error) {
+        alert('Erro ao salvar: ' + (fallback.error.message || fallback.error.code))
+        setSavingName(false)
+        return
+      }
     }
+    
+    // Atualizar UI
+    setContacts(prev => prev.map(c => c.id === selected.id ? { ...c, full_name: newName, name: newName } : c))
+    setSelected(c => ({ ...c, full_name: newName, name: newName }))
     setEditingName(false)
     setSavingName(false)
   }
