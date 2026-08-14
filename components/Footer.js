@@ -93,7 +93,7 @@ export default function Footer() {
             <div className="footer-col-title">Produtos</div>
             <div className="footer-col-links">
               <Link href="/#produtos">Assistente Ark</Link>
-              <Link href="/#produtos">Ark AOI</Link>
+              <Link href="/#produtos">Azura</Link>
               <Link href="/#solucoes">Automações</Link>
               <Link href="/#solucoes">Analytics</Link>
               <Link href="/#precos">Preços</Link>
