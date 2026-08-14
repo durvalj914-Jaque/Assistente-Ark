@@ -242,14 +242,16 @@ export default async function handler(req, res) {
         .eq('id', existing.id)
       if (error) {
         errors++
-        if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message}`)
+        if (errors === 1) console.error('[import-device] PRIMEIRO ERRO UPDATE:', JSON.stringify({ message: error.message, code: error.code, details: error.details, contact: contactData }))
+        if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message} (${error.code})`)
       }
       else imported++
     } else {
       const { error } = await db.from('contacts').insert(contactData)
       if (error) {
         errors++
-        if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message}`)
+        if (errors === 1) console.error('[import-device] PRIMEIRO ERRO INSERT:', JSON.stringify({ message: error.message, code: error.code, details: error.details, contact: contactData }))
+        if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message} (${error.code})`)
       }
       else imported++
     }

@@ -209,9 +209,11 @@ export default function PainelAdminPage() {
 
       setUploadResult({ imported: totalImported, skipped: totalSkipped, errors: totalErrors, total: totalProcessed })
       if (totalErrors > 0 && totalImported === 0) {
-        setContactsMsg('❌ Falha ao salvar. Verifique se a tabela foi inicializada. Erro: ' + (json.error || 'erro desconhecido'))
+        const errMsg = lastErrorMessages && lastErrorMessages.length ? lastErrorMessages.join(' | ') : 'erro desconhecido'
+        setContactsMsg('❌ ' + totalErrors + ' erros ao importar. Detalhe: ' + errMsg)
       } else if (totalErrors > 0) {
-        setContactsMsg(`✅ ${totalImported} importados! ${totalSkipped} duplicados. ⚠️ ${totalErrors} erros: ${json.errorMessages ? json.errorMessages.join('; ') : 'erro desconhecido'}`)
+        const errMsg = lastErrorMessages && lastErrorMessages.length ? lastErrorMessages.join(' | ') : 'erro desconhecido'
+        setContactsMsg(`✅ ${totalImported} importados! ${totalSkipped} duplicados. ⚠️ ${totalErrors} erros: ${errMsg}`)
       } else {
         setContactsMsg(`✅ ${totalImported} contatos importados! ${totalSkipped} duplicados ignorados.`)
       }
