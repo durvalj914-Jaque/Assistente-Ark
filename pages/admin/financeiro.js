@@ -40,6 +40,11 @@ export default function FinanceiroPage() {
   const [receiptAmount, setReceiptAmount] = useState('')
   const [availablePayments, setAvailablePayments] = useState([])
 
+  // Pagamentos pendentes (enviados via chat, aguardando B2C)
+  const [pendingPayments, setPendingPayments] = useState([])
+  const [loadingPending, setLoadingPending] = useState(false)
+  const [cancelingId, setCancelingId] = useState(null)
+
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     return { Authorization: `Bearer ${session?.access_token || ''}` }
@@ -99,6 +104,39 @@ export default function FinanceiroPage() {
       if (json.payments) setPayments(json.payments)
     } catch (e) {}
     finally { setLoadingPayments(false) }
+  }
+
+  async function loadPendingPayments() {
+    setLoadingPending(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/payments/list?status=pending', { headers: h })
+      const json = await res.json()
+      if (json.payments) setPendingPayments(json.payments)
+    } catch (e) {}
+    finally { setLoadingPending(false) }
+  }
+
+  async function cancelPayment(paymentId) {
+    if (!confirm('⚠️ Cancelar este pagamento pendente?\n\nO cliente não poderá mais pagar por este link/QR Code.')) return
+    setCancelingId(paymentId)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/payments/cancel', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId })
+      })
+      const json = await res.json()
+      if (json.ok) {
+        loadPendingPayments()
+      } else {
+        alert('Erro: ' + (json.error || 'Falha ao cancelar'))
+      }
+    } catch (e) {
+      alert('Erro: ' + e.message)
+    }
+    finally { setCancelingId(null) }
   }
 
   async function loadPayConfig() {
@@ -262,7 +300,7 @@ export default function FinanceiroPage() {
     if (!user) return
     loadPayConfig()
     if (subTab === 'payment_methods') loadPaymentMethods('payment')
-    else if (subTab === 'billing_methods') { loadPaymentMethods('billing') }
+    else if (subTab === 'billing_methods') { loadPaymentMethods('billing'); loadPendingPayments() }
     else if (subTab === 'receipts') { loadReceipts('all'); loadPayments() }
     else if (subTab === 'history') { loadPayments() }
   }, [user, subTab])
@@ -584,6 +622,108 @@ export default function FinanceiroPage() {
                   <button onClick={() => setPmModal(null)} style={{ flex: 1, padding: '10px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
                   <button onClick={savePaymentMethod} style={{ flex: 1, padding: '10px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Salvar</button>
                 </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
+      {/* ── PAGAMENTOS PENDENTES (Formas de Cobrança) ── */}
+      {subTab === 'billing_methods' && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
+              ⏳ Pagamentos Pendentes
+            </h3>
+            <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              {pendingPayments.length > 0 ? `${pendingPayments.length} aguardando pagamento` : 'Nenhum pendente'}
+            </span>
+          </div>
+          <p style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 14 }}>
+            Pagamentos enviados via chat aos seus clientes que ainda não foram pagos. Você pode cancelar a qualquer momento.
+          </p>
+
+          {loadingPending ? (
+            <div className="ark-card" style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+              Carregando pagamentos pendentes...
+            </div>
+          ) : pendingPayments.length === 0 ? (
+            <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: 28, marginBottom: 6 }}>✅</div>
+              <span style={{ fontSize: 13 }}>Nenhum pagamento pendente. Tudo em dia!</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {pendingPayments.map(p => {
+                const mpMeta = (() => { try { return JSON.parse(p.pix_qr_url || '{}') } catch { return {} } })()
+                const isMP = !!mpMeta.mp_payment_id
+                return (
+                  <div key={p.id} className="ark-card" style={{
+                    padding: '14px 16px',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    borderLeft: '3px solid #f59e0b',
+                    flexWrap: 'wrap', gap: 10
+                  }}>
+                    <div style={{ flex: 1, minWidth: 200 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 18 }}>{p.method === 'pix' ? '💠' : '💳'}</span>
+                        <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 15 }}>
+                          R$ {parseFloat(p.amount).toFixed(2)}
+                        </span>
+                        <span style={{
+                          padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 700,
+                          background: 'rgba(245,158,11,0.15)', color: '#f59e0b'
+                        }}>
+                          ⏳ Pendente
+                        </span>
+                        {isMP && (
+                          <span style={{
+                            padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                            background: 'rgba(79,142,247,0.15)', color: '#4f8ef7'
+                          }}>
+                            Mercado Pago
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 6 }}>
+                        {p.description || 'Pagamento'} • Enviado em {new Date(p.created_at).toLocaleString('pt-BR')}
+                      </div>
+                      {p.pix_code && (
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(p.pix_code); alert('Código PIX copiado!') }}
+                          style={{ marginTop: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 10, cursor: 'pointer' }}
+                        >
+                          📋 Copiar código PIX
+                        </button>
+                      )}
+                      {p.mp_checkout_url && (
+                        <a href={p.mp_checkout_url} target="_blank" rel="noopener"
+                          style={{ marginTop: 6, marginLeft: 6, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 10, textDecoration: 'none', display: 'inline-block' }}>
+                          🔗 Ver link
+                        </a>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => cancelPayment(p.id)}
+                      disabled={cancelingId === p.id}
+                      style={{
+                        padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)',
+                        background: 'rgba(239,68,68,0.08)', color: '#ef4444',
+                        fontWeight: 700, fontSize: 12, cursor: cancelingId === p.id ? 'not-allowed' : 'pointer',
+                        opacity: cancelingId === p.id ? 0.5 : 1,
+                        whiteSpace: 'nowrap'
+                      }}
+                    >
+                      {cancelingId === p.id ? '⏳ Cancelando...' : '❌ Cancelar'}
+                    </button>
+                  </div>
+                )
+              })}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>
+                  Total pendente: <strong style={{ color: '#f59e0b' }}>R$ {pendingPayments.reduce((s, p) => s + parseFloat(p.amount), 0).toFixed(2)}</strong>
+                </span>
               </div>
             </div>
           )}
