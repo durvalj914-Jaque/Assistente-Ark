@@ -146,8 +146,8 @@ export default function AssistenteArkPage() {
         <div className="footer-links">
           <Link href="/">Arkiel</Link>
           <Link href="/assistente-ark/entrar">Entrar</Link>
-          <Link href="/termos">Termos</Link>
-          <Link href="/privacidade">Privacidade</Link>
+          <a href="https://www.arkiel.com.br/termos">Termos</a>
+          <a href="https://www.arkiel.com.br/privacidade">Privacidade</a>
         </div>
         <div className="footer-copy">© {new Date().getFullYear()} Arkiel Tecnologia.</div>
       </footer>
