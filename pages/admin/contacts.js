@@ -32,6 +32,8 @@ export default function ContactsPage() {
   const [newEmail, setNewEmail] = useState('')
   const [addingContact, setAddingContact] = useState(false)
   const [addMsg, setAddMsg] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -306,6 +308,29 @@ export default function ContactsPage() {
     } finally { setAddingContact(false) }
   }
 
+  async function deleteContact() {
+    if (!selected || deleting) return
+    setDeleting(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/contacts/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contact_id: selected.id }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setContacts(prev => prev.filter(c => c.id !== selected.id))
+        setSelected(null)
+        setConfirmDelete(false)
+      } else {
+        alert('Erro ao excluir: ' + (data.error || 'Falha'))
+      }
+    } catch (e) {
+      alert('Erro: ' + e.message)
+    } finally { setDeleting(false) }
+  }
+
   const filtered = search
     ? contacts.filter(c =>
         (c.name || c.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -553,6 +578,28 @@ export default function ContactsPage() {
                 className="ark-btn-ghost" style={{ width: '100%', justifyContent: 'center', marginTop: 6 }}>
                 Ver conversas →
               </button>
+              {confirmDelete ? (
+                <div style={{ marginTop: 8, padding: 12, borderRadius: 10, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <p style={{ fontSize: 12, color: 'var(--text-secondary)', textAlign: 'center', marginBottom: 10 }}>
+                    Excluir {(selected.name || selected.phone || 'este contato')}? Esta acao nao pode ser desfeita.
+                  </p>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={deleteContact} disabled={deleting}
+                      style={{ flex: 1, padding: '8px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600, background: '#ef4444', color: '#fff', opacity: deleting ? 0.5 : 1 }}>
+                      {deleting ? 'Excluindo...' : 'Sim, excluir'}
+                    </button>
+                    <button onClick={() => setConfirmDelete(false)}
+                      style={{ flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--border-soft)', cursor: 'pointer', fontSize: 12, background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button onClick={() => setConfirmDelete(true)}
+                  style={{ width: '100%', justifyContent: 'center', marginTop: 8, padding: '10px', fontSize: 13, fontWeight: 500, background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, cursor: 'pointer' }}>
+                  🗑 Excluir contato
+                </button>
+              )}
             </div>
           </div>
         )}
