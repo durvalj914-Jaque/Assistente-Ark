@@ -145,10 +145,13 @@ Vamos finalizar o pagamento 👇`)
       } else if (hasMp) {
         // ── Mercado Pago fallback ──
         const mpToken = tenant?.mp_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN
+        const _catFee = Number((total * 2.0 / 100).toFixed(2))
         const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
           body: JSON.stringify({
             items: [{ title: `Pedido Catálogo - ${itemCount} item(s)`, quantity: 1, unit_price: total, currency_id: 'BRL' }],
+            marketplace: 'ARKIEL',
+            marketplace_fee: _catFee,
             back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
             auto_return: 'approved', external_reference: txid,
             notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
@@ -766,10 +769,13 @@ Obrigado! 🎉`)
             reply = `[PIX enviado - R$ ${payAmount.toFixed(2)}]`
           }
         } else if (payMethod === 'mercadopago' && process.env.MERCADOPAGO_ACCESS_TOKEN) {
+          const _flowFee = Number((payAmount * 2.0 / 100).toFixed(2))
           const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}` },
             body: JSON.stringify({
               items: [{ title: reply?.substring(0, 50) || 'Pagamento', quantity: 1, unit_price: payAmount, currency_id: 'BRL' }],
+              marketplace: 'ARKIEL',
+              marketplace_fee: _flowFee,
               back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
               auto_return: 'approved', external_reference: txid,
               notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',

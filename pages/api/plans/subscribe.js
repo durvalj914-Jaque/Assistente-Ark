@@ -178,10 +178,15 @@ export default async function handler(req, res) {
   } else if (method === 'mercadopago') {
     if (!mpToken) return res.status(400).json({ error: 'Mercado Pago não configurado' })
 
+    // Calcular taxa da plataforma (2%)
+    const _subFee = Number((amount * 2.0 / 100).toFixed(2))
+
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
       body: JSON.stringify({
         items: [{ title: description, quantity: 1, unit_price: amount, currency_id: 'BRL' }],
+        marketplace: 'ARKIEL',
+        marketplace_fee: _subFee,
         back_urls: {
           success: 'https://arkiel.com.br/client?tab=finance&payment=success',
           failure: 'https://arkiel.com.br/client?tab=finance&payment=error',

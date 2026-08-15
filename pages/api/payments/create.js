@@ -125,10 +125,17 @@ export default async function handler(req, res) {
     if (!mpToken) mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
     if (!mpToken) return res.status(400).json({ error: 'Mercado Pago não configurado.' })
 
+    // Calcular taxa da plataforma (2%)
+    const _payAmount = parseFloat(amount)
+    const _feePercent = 2.0
+    const _mpFee = Number((_payAmount * _feePercent / 100).toFixed(2))
+
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
       body: JSON.stringify({
-        items: [{ title: description || 'Pagamento', quantity: 1, unit_price: parseFloat(amount), currency_id: 'BRL' }],
+        items: [{ title: description || 'Pagamento', quantity: 1, unit_price: _payAmount, currency_id: 'BRL' }],
+        marketplace: 'ARKIEL',
+        marketplace_fee: _mpFee,
         back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
         auto_return: 'approved', external_reference: txid, statement_descriptor: finalName.substring(0, 12),
         notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
