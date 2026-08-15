@@ -34,6 +34,10 @@ export default function ContactsPage() {
   const [addMsg, setAddMsg] = useState('')
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [bulkMode, setBulkMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [confirmBulk, setConfirmBulk] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -331,6 +335,52 @@ export default function ContactsPage() {
     } finally { setDeleting(false) }
   }
 
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(c => c.id)))
+    }
+  }
+
+  function clearBulkSelection() {
+    setSelectedIds(new Set())
+    setConfirmBulk(false)
+  }
+
+  async function bulkDeleteContacts() {
+    if (selectedIds.size === 0 || bulkDeleting) return
+    setBulkDeleting(true)
+    try {
+      const token = await getToken()
+      const ids = Array.from(selectedIds)
+      const res = await fetch('/api/contacts/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ contact_ids: ids }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setContacts(prev => prev.filter(c => !selectedIds.has(c.id)))
+        clearBulkSelection()
+        setBulkMode(false)
+      } else {
+        alert('Erro: ' + (data.error || 'Falha ao excluir'))
+      }
+    } catch (e) {
+      alert('Erro: ' + e.message)
+    } finally { setBulkDeleting(false) }
+  }
+
   const filtered = search
     ? contacts.filter(c =>
         (c.name || c.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -357,6 +407,13 @@ export default function ContactsPage() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="🔍 Buscar…" className="ark-input" style={{ width: 200 }} />
+          <button
+            onClick={() => { setBulkMode(b => !b); setSelectedIds(new Set()); setConfirmBulk(false) }}
+            className={bulkMode ? "ark-btn" : "ark-btn-ghost"}
+            style={{ fontSize: 13, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+          >
+            ☐ Selecionar
+          </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="ark-btn"
@@ -450,9 +507,18 @@ export default function ContactsPage() {
           <table className="ark-table">
             <thead>
               <tr>
-                {['Contato', 'Telefone', 'E-mail', 'Origem', 'Cadastro'].map(h => (
-                  <th key={h}>{h}</th>
-                ))}
+                {bulkMode && (
+                  <th style={{ width: 36, textAlign: 'center' }}>
+                    <input type="checkbox" checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                      onChange={toggleSelectAll}
+                      style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#4f8ef7' }} />
+                  </th>
+                )}
+                <th>Contato</th>
+                <th>Telefone</th>
+                <th>E-mail</th>
+                <th>Origem</th>
+                <th>Cadastro</th>
               </tr>
             </thead>
             <tbody>
@@ -469,9 +535,23 @@ export default function ContactsPage() {
               )}
               {filtered.map(c => {
                 const name = c.name || c.full_name || ''
+                const isBulkSelected = selectedIds.has(c.id)
                 return (
-                  <tr key={c.id} onClick={() => setSelected(s => s?.id === c.id ? null : c)}
-                    style={{ cursor: 'pointer', background: selected?.id === c.id ? 'rgba(79,142,247,0.07)' : undefined }}>
+                  <tr key={c.id}
+                    onClick={() => bulkMode ? toggleSelect(c.id) : setSelected(s => s?.id === c.id ? null : c)}
+                    style={{
+                      cursor: 'pointer',
+                      background: bulkMode
+                        ? (isBulkSelected ? 'rgba(239,68,68,0.08)' : undefined)
+                        : (selected?.id === c.id ? 'rgba(79,142,247,0.07)' : undefined),
+                    }}>
+                    {bulkMode && (
+                      <td style={{ textAlign: 'center', width: 36 }} onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" checked={isBulkSelected}
+                          onChange={() => toggleSelect(c.id)}
+                          style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#ef4444' }} />
+                      </td>
+                    )}
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         {c.photo_url ? (
@@ -604,6 +684,48 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+      {/* Barra de acoes em massa */}
+      {bulkMode && selectedIds.size > 0 && (
+        <div style={{
+          position: 'sticky', bottom: 0, zIndex: 100,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, padding: '12px 20px', marginTop: 16,
+          background: 'var(--bg-card)', border: '1px solid rgba(239,68,68,0.3)',
+          borderRadius: 12, boxShadow: '0 -4px 24px rgba(0,0,0,0.15)',
+        }}>
+          <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+            <b style={{ color: 'var(--text-primary)' }}>{selectedIds.size}</b> contato(s) selecionado(s)
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {confirmBulk ? (
+              <>
+                <span style={{ fontSize: 12, color: '#ef4444', alignSelf: 'center', marginRight: 4 }}>
+                  Confirmar exclusao? Nao pode ser desfeita.
+                </span>
+                <button onClick={bulkDeleteContacts} disabled={bulkDeleting}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600, background: '#ef4444', color: '#fff', opacity: bulkDeleting ? 0.5 : 1 }}>
+                  {bulkDeleting ? 'Excluindo...' : 'Sim, excluir tudo'}
+                </button>
+                <button onClick={() => setConfirmBulk(false)}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border-soft)', cursor: 'pointer', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setConfirmBulk(true)}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)', cursor: 'pointer', fontSize: 13, fontWeight: 500, background: 'rgba(239,68,68,0.08)', color: '#ef4444' }}>
+                  🗑 Excluir ({selectedIds.size})
+                </button>
+                <button onClick={clearBulkSelection}
+                  className="ark-btn-ghost" style={{ fontSize: 13, padding: '8px 16px' }}>
+                  Limpar
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       {/* Modal Novo Contato */}
       {showAddModal && (
         <>
