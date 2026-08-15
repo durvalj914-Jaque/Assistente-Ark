@@ -163,7 +163,11 @@ export default function ContactsPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        setSyncMsg(`✅ ${data.imported} contatos importados! (${data.skipped} ignorados, ${data.errors} erros)`)
+        const parts = [`✅ ${data.imported} contatos importados!`]
+        if (data.newContacts) parts.push(`${data.newContacts} novos`)
+        if (data.updatedContacts) parts.push(`${data.updatedContacts} atualizados`)
+        if (data.errors > 0) parts.push(`${data.errors} erros`)
+        setSyncMsg(parts.join(' • '))
         loadContacts(true)
       } else {
         setSyncMsg('❌ ' + (data.error || 'Erro ao importar'))
@@ -188,7 +192,10 @@ export default function ContactsPage() {
       })
       const data = await res.json()
       if (data.ok) {
-        setSyncMsg(`✅ ${data.imported} contatos importados do dispositivo! (${data.skipped} ignorados)`)
+        const parts2 = [`✅ ${data.imported} contatos do dispositivo!`]
+        if (data.newContacts) parts2.push(`${data.newContacts} novos`)
+        if (data.updatedContacts) parts2.push(`${data.updatedContacts} atualizados`)
+        setSyncMsg(parts2.join(' • '))
         loadContacts(true)
       } else {
         setSyncMsg('❌ ' + (data.error || 'Erro ao importar'))
@@ -394,7 +401,7 @@ export default function ContactsPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
-      <input ref={fileInputRef} type="file" accept=".vcf,.vcard" onChange={handleVCardUpload} style={{ display: 'none' }} />
+      <input ref={fileInputRef} type="file" accept=".vcf,.vcard,.csv" onChange={handleVCardUpload} style={{ display: 'none' }} />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>

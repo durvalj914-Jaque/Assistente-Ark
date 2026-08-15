@@ -2,32 +2,51 @@
  * POST /api/contacts/import-device
  * Importa contatos enviados pelo dispositivo (vCard .vcf, .csv, ou JSON).
  * Body: FormData com file (.vcf/.csv) + tenant_id  OU  JSON { tenant_id, contacts: [...] }
- * Usa o client autenticado do usuário (não service role) — a tabela contacts tem RLS permissiva.
+ * Usa service role key (bypassa RLS) para inserir contatos.
  */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 export const config = { api: { bodyParser: false } }
 
+/**
+ * Desdobra linhas continuadas (folded lines) do vCard.
+ * Linhas que comecam com espaco ou tab sao continuacao da linha anterior.
+ */
+function unfoldLines(text) {
+  return text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '')
+}
+
 function parseVCard(text) {
+  // Remover BOM se existir
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)
+
+  // Desdobrar linhas continuadas
+  text = unfoldLines(text)
+
   const cards = text.split('BEGIN:VCARD').slice(1)
   return cards.map(cardText => {
     const block = cardText.split('END:VCARD')[0]
     let name = '', phone = '', email = '', org = ''
 
-    const fnMatch = block.match(/^FN:(.+)$/m)
+    // FN: pode ter prefixo item1. (iOS)
+    const fnMatch = block.match(/^(?:item\d+\.)?FN:(.+)$/m)
     if (fnMatch) name = fnMatch[1].trim()
 
-    const telMatch = block.match(/^TEL[^:]*:(.+)$/m)
+    // TEL: pode ter prefixo item1. (iOS)
+    const telMatch = block.match(/^(?:item\d+\.)?TEL[^:]*:(.+)$/m)
     if (telMatch) phone = telMatch[1].trim()
 
-    const emailMatch = block.match(/^EMAIL[^:]*:(.+)$/m)
+    // EMAIL: pode ter prefixo item1. (iOS)
+    const emailMatch = block.match(/^(?:item\d+\.)?EMAIL[^:]*:(.+)$/m)
     if (emailMatch) email = emailMatch[1].trim()
 
+    // ORG:
     const orgMatch = block.match(/^ORG[^:]*:(.+)$/m)
     if (orgMatch) org = orgMatch[1].trim()
 
+    // Fallback para N: se FN nao existir
     if (!name) {
-      const nMatch = block.match(/^N:(.+)$/m)
+      const nMatch = block.match(/^N[^:]*:(.+)$/m)
       if (nMatch) {
         const parts = nMatch[1].split(';').filter(Boolean).reverse()
         name = parts.join(' ').trim()
@@ -39,6 +58,7 @@ function parseVCard(text) {
 }
 
 function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1)
   const lines = text.split(/\r?\n/).filter(l => l.trim())
   if (lines.length < 2) return []
 
@@ -49,7 +69,7 @@ function parseCSV(text) {
 
   const headers = firstLine.split(delim).map(h => h.trim().toLowerCase().replace(/"/g, ''))
 
-  const nameIdx = headers.findIndex(h => h.match(/nome|name|fullname|name|nome completo/))
+  const nameIdx = headers.findIndex(h => h.match(/nome|name|fullname|nome completo/))
   const phoneIdx = headers.findIndex(h => h.match(/telefone|phone|celular|whats|mobile|numero/))
   const emailIdx = headers.findIndex(h => h.match(/email|e-mail|mail/))
   const orgIdx = headers.findIndex(h => h.match(/empresa|organization|org|company/))
@@ -185,14 +205,13 @@ export default async function handler(req, res) {
   if (!tenantId) return res.status(400).json({ error: 'tenant_id é obrigatório' })
   if (!contactsList.length) return res.status(400).json({ error: 'Nenhum contato válido encontrado' })
 
-  // Verificar autenticação com o token do usuário
+  // Verificar autenticacao
   const { data: { user }, error: authErr } = await supabase.auth.getUser(userToken)
   if (authErr || !user) return res.status(401).json({ error: 'Sessão inválida' })
 
-  // Usar service role key (bypassa RLS) para inserir contatos
   const db = supabaseAdmin()
 
-  // Verificar permissão no tenant
+  // Verificar permissao no tenant
   const { data: profile } = await db.from('profiles').select('id, is_platform_admin').eq('id', user.id).maybeSingle()
   if (!profile) return res.status(403).json({ error: 'Perfil não encontrado' })
 
@@ -202,63 +221,95 @@ export default async function handler(req, res) {
     if (!member) return res.status(403).json({ error: 'Sem permissão para este tenant' })
   }
 
-  // Importar contatos — SÓ colunas que existem na tabela
-  let imported = 0, skipped = 0, errors = 0
-  const errorMessages = []
-
-  for (const c of contactsList) {
+  // Normalizar contatos
+  const normalized = contactsList.map(c => {
     let phone = (c.phone || '').replace(/[^\d+]/g, '')
     if (phone && !phone.startsWith('+')) phone = '+' + phone
-
-    const contactData = {
+    return {
       tenant_id: tenantId,
-      name: c.name || '',
-      phone,
-      email: c.email || '',
-      organization: c.organization || '',
+      name: (c.name || '').trim(),
+      phone: phone || null,
+      email: (c.email || '').trim() || null,
+      organization: (c.organization || '').trim() || null,
       synced_at: new Date().toISOString(),
     }
+  }).filter(c => c.name || c.phone || c.email)
 
-    if (!contactData.name && !contactData.phone && !contactData.email) {
-      skipped++
-      continue
-    }
+  // Buscar contatos existentes para evitar duplicatas (busca em batch)
+  const phones = normalized.filter(c => c.phone).map(c => c.phone)
+  const emails = normalized.filter(c => c.email && !c.phone).map(c => c.email)
 
-    // Verificar se já existe (por phone ou email)
-    let existingQuery = db.from('contacts').select('id').eq('tenant_id', tenantId).limit(1)
-    if (contactData.phone) existingQuery = existingQuery.eq('phone', contactData.phone)
-    else if (contactData.email) existingQuery = existingQuery.eq('email', contactData.email)
-    else { skipped++; continue }
+  let existingMap = new Map()
 
-    const { data: existing, error: existErr } = await existingQuery.maybeSingle()
+  if (phones.length > 0) {
+    const { data: existingByPhone } = await db.from('contacts')
+      .select('id, phone, email').eq('tenant_id', tenantId).in('phone', phones)
+    ;(existingByPhone || []).forEach(c => existingMap.set(c.phone, c))
+  }
+
+  if (emails.length > 0) {
+    const { data: existingByEmail } = await db.from('contacts')
+      .select('id, phone, email').eq('tenant_id', tenantId).in('email', emails)
+    ;(existingByEmail || []).forEach(c => {
+      if (!existingMap.has(c.phone)) existingMap.set(`email:${c.email}`, c)
+    })
+  }
+
+  // Separar em inserts e updates
+  const toInsert = []
+  const toUpdate = []
+  let skipped = 0
+
+  for (const c of normalized) {
+    if (!c.phone && !c.email) { skipped++; continue }
+
+    const key = c.phone ? c.phone : `email:${c.email}`
+    const existing = existingMap.get(key)
 
     if (existing) {
-      const { error } = await db.from('contacts')
-        .update({ ...contactData, updated_at: new Date().toISOString() })
-        .eq('id', existing.id)
-      if (error) {
-        errors++
-        if (errors === 1) console.error('[import-device] PRIMEIRO ERRO UPDATE:', JSON.stringify({ message: error.message, code: error.code, details: error.details, contact: contactData }))
-        if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message} (${error.code})`)
-      }
-      else imported++
+      toUpdate.push({ ...c, id: existing.id, updated_at: new Date().toISOString() })
     } else {
-      const { error } = await db.from('contacts').insert(contactData)
-      if (error) {
-        errors++
-        if (errors === 1) console.error('[import-device] PRIMEIRO ERRO INSERT:', JSON.stringify({ message: error.message, code: error.code, details: error.details, contact: contactData }))
-        if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message} (${error.code})`)
-      }
-      else imported++
+      toInsert.push(c)
+    }
+  }
+
+  let imported = 0, errors = 0
+  const errorMessages = []
+
+  // Batch insert (ate 500 por vez)
+  const BATCH_SIZE = 500
+  for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+    const batch = toInsert.slice(i, i + BATCH_SIZE)
+    const { error } = await db.from('contacts').insert(batch)
+    if (error) {
+      errors += batch.length
+      if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message} (${error.code})`)
+    } else {
+      imported += batch.length
+    }
+  }
+
+  // Updates um a um (RLS nao permite batch update com .in() de forma eficiente)
+  for (const c of toUpdate) {
+    const { id, ...updateData } = c
+    const { error } = await db.from('contacts').update(updateData).eq('id', id)
+    if (error) {
+      errors++
+      if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message} (${error.code})`)
+    } else {
+      imported++
     }
   }
 
   return res.status(200).json({
     ok: true,
     imported,
-    skipped,
+    skipped: skipped + (contactsList.length - normalized.length),
     errors,
     total: contactsList.length,
+    parsed: normalized.length,
+    newContacts: toInsert.length,
+    updatedContacts: toUpdate.length,
     errorMessages: errors > 0 ? errorMessages : undefined,
   })
 }
