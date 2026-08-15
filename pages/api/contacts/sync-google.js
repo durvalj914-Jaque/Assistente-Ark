@@ -1,8 +1,6 @@
 /**
  * POST /api/contacts/sync-google
  * Sincroniza contatos do Google People API usando tokens salvos.
- * Body: { tenant_id: string }
- * Funciona para: platform admin (qualquer tenant) OU usuário autenticado dono do tenant.
  */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
@@ -15,78 +13,70 @@ async function refreshAccessToken(tenant_id, db) {
 
   if (!auth) return null
 
+  // Token ainda valido?
   if (auth.expires_at && new Date(auth.expires_at) > new Date(Date.now() + 60000)) {
     return auth.access_token
   }
 
+  // Refresh
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
   const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
   if (!auth.refresh_token || !clientSecret) return null
 
-  const resp = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      refresh_token: auth.refresh_token,
-      client_id: clientId,
-      client_secret: clientSecret,
-      grant_type: 'refresh_token',
+  try {
+    const resp = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        refresh_token: auth.refresh_token,
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+      })
     })
-  })
 
-  const tokens = await resp.json()
-  if (!resp.ok || !tokens.access_token) return null
+    const tokens = await resp.json()
+    if (!resp.ok || !tokens.access_token) return null
 
-  const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()
-  await db.from('google_contacts_auth')
-    .update({ access_token: tokens.access_token, expires_at: expiresAt, updated_at: new Date().toISOString() })
-    .eq('tenant_id', tenant_id)
+    const expiresAt = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString()
+    await db.from('google_contacts_auth')
+      .update({ access_token: tokens.access_token, expires_at: expiresAt, updated_at: new Date().toISOString() })
+      .eq('tenant_id', tenant_id)
 
-  return tokens.access_token
+    return tokens.access_token
+  } catch {
+    return null
+  }
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { tenant_id } = req.body
+  let body = req.body
+  if (typeof body === 'string') body = JSON.parse(body)
+  const { tenant_id } = body
   if (!tenant_id) return res.status(400).json({ error: 'tenant_id é obrigatório' })
 
-  // Verificar autenticação — usuário autenticado OU platform admin
+  // Auth
   const authHeader = req.headers.authorization
-  let userId = null
-  let isPlatformAdmin = false
-  let db = supabaseAdmin() // default to admin
+  if (!authHeader) return res.status(401).json({ error: 'Não autenticado' })
 
-  if (authHeader) {
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user } } = await supabase.auth.getUser(token)
-    if (user) {
-      userId = user.id
-      // Verificar se é platform admin
-      const { data: profile } = await supabaseAdmin()
-        .from('profiles').select('is_platform_admin').eq('id', user.id).maybeSingle()
-      isPlatformAdmin = profile?.is_platform_admin || false
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user } } = await supabase.auth.getUser(token)
+  if (!user) return res.status(401).json({ error: 'Sessão inválida' })
 
-      // Se não é platform admin, verificar se é dono do tenant
-      if (!isPlatformAdmin) {
-        const { data: member } = await supabaseAdmin()
-          .from('tenant_members').select('tenant_id, role')
-          .eq('user_id', user.id).eq('tenant_id', tenant_id).maybeSingle()
-        if (!member) return res.status(403).json({ error: 'Sem permissão para este tenant' })
-      }
-    } else {
-      return res.status(401).json({ error: 'Sessão inválida' })
-    }
-  } else {
-    return res.status(401).json({ error: 'Não autenticado' })
+  const db = supabaseAdmin()
+  const { data: profile } = await db.from('profiles').select('is_platform_admin').eq('id', user.id).maybeSingle()
+  if (!profile) return res.status(403).json({ error: 'Perfil não encontrado' })
+
+  if (!profile.is_platform_admin) {
+    const { data: member } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).eq('tenant_id', tenant_id).maybeSingle()
+    if (!member) return res.status(403).json({ error: 'Sem permissão' })
   }
 
-  const accessToken = await refreshAccessToken(tenant_id, supabaseAdmin())
+  const accessToken = await refreshAccessToken(tenant_id, db)
   if (!accessToken) {
-    return res.status(401).json({
-      error: 'Google não conectado. Clique em "Conectar Google" para autorizar.',
-      needsAuth: true
-    })
+    return res.status(401).json({ needsAuth: true, error: 'Google não conectado. Clique em "Conectar Google".' })
   }
 
   try {
@@ -104,7 +94,7 @@ export default async function handler(req, res) {
 
       const resp = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } })
       if (!resp.ok) {
-        if (resp.status === 401) return res.status(401).json({ error: 'Token expirado. Reconecte o Google.', needsAuth: true })
+        if (resp.status === 401) return res.status(401).json({ needsAuth: true, error: 'Token expirado. Reconecte o Google.' })
         const errBody = await resp.text()
         return res.status(resp.status).json({ error: 'Erro ao buscar contatos', detail: errBody })
       }
@@ -116,46 +106,50 @@ export default async function handler(req, res) {
       pageCount++
     }
 
+    // Mapear contatos
     const contactsData = allContacts.map(person => {
       const name = person.names?.[0]?.displayName || ''
       const email = person.emailAddresses?.[0]?.value || ''
-      const phone = person.phoneNumbers?.[0]?.value || ''
+      let phone = person.phoneNumbers?.[0]?.value || ''
       const phoneE164 = person.phoneNumbers?.[0]?.canonicalForm || ''
       const photoUrl = person.photos?.[0]?.url || ''
       const org = person.organizations?.[0]?.name || ''
       const jobTitle = person.organizations?.[0]?.title || ''
       const notes = person.biographies?.[0]?.value || ''
 
+      // Normalizar telefone
+      phone = phone.replace(/[^\d+]/g, '')
+      if (phone && !phone.startsWith('+')) phone = '+' + phone
+
       return {
         tenant_id,
         google_resource_name: person.resourceName,
-        name: name,
-        email,
-        phone,
-        phone_e164: phoneE164,
-        photo_url: photoUrl,
-        organization: org,
-        job_title: jobTitle,
-        notes,
-        raw_data: person,
+        name,
+        email: email || null,
+        phone: phone || null,
+        phone_e164: phoneE164 || null,
+        photo_url: photoUrl || null,
+        organization: org || null,
+        job_title: jobTitle || null,
+        notes: notes || null,
+        source: 'google',
         synced_at: new Date().toISOString(),
       }
     }).filter(c => c.name || c.email || c.phone)
 
-    // Upsert contatos
-    let synced = 0
-    let errors = 0
-    for (const contact of contactsData) {
-      const { error } = await supabaseAdmin()
-        .from('contacts')
-        .upsert(contact, { onConflict: 'tenant_id,google_resource_name' })
-      if (error) errors++
-      else synced++
+    // Batch upsert (500 por vez)
+    let synced = 0, errors = 0
+    const BATCH = 500
+    for (let i = 0; i < contactsData.length; i += BATCH) {
+      const batch = contactsData.slice(i, i + BATCH)
+      const { error } = await db.from('contacts')
+        .upsert(batch, { onConflict: 'tenant_id,google_resource_name' })
+      if (error) { errors += batch.length }
+      else { synced += batch.length }
     }
 
-    // Contar total no banco
-    const { count } = await supabaseAdmin()
-      .from('contacts').select('*', { count: 'exact', head: true })
+    const { count } = await db.from('contacts')
+      .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenant_id)
 
     return res.status(200).json({

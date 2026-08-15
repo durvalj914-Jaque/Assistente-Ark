@@ -64,7 +64,7 @@ export default function ContactsPage() {
     setDeviceSupported(typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window)
   }, [])
 
-  // Verificar se Google está conectado
+  // Verificar se Google está conectado + ler params de retorno
   useEffect(() => {
     if (!tenant) return
     async function checkGoogle() {
@@ -76,6 +76,20 @@ export default function ContactsPage() {
       setGoogleConnected(d.connected || false)
     }
     checkGoogle()
+
+    // Verificar params de retorno do OAuth
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('google_connected') === '1') {
+        setSyncMsg('✅ Google conectado com sucesso! Clique em "Sincronizar agora" para importar seus contatos.')
+        setGoogleConnected(true)
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+      if (params.get('google_error')) {
+        setSyncMsg('❌ Erro Google: ' + params.get('google_error'))
+        window.history.replaceState({}, '', window.location.pathname)
+      }
+    }
   }, [tenant])
 
   async function getToken() {
@@ -102,7 +116,11 @@ export default function ContactsPage() {
         return
       }
       if (data.ok) {
-        setSyncMsg(`✅ ${data.synced} contatos sincronizados do Google! (${data.total_in_db} total)`)
+        const parts = [`✅ ${data.synced} contatos do Google!`]
+        if (data.total_from_google) parts.push(`${data.total_from_google} encontrados`)
+        if (data.total_in_db) parts.push(`${data.total_in_db} no total`)
+        if (data.errors > 0) parts.push(`${data.errors} erros`)
+        setSyncMsg(parts.join(' • '))
         setGoogleConnected(true)
         loadContacts(true)
       } else {
