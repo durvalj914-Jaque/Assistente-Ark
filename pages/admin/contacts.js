@@ -38,6 +38,8 @@ export default function ContactsPage() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [confirmBulk, setConfirmBulk] = useState(false)
+  const [showDeviceModal, setShowDeviceModal] = useState(false)
+  const [deviceSupported, setDeviceSupported] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -57,6 +59,11 @@ export default function ContactsPage() {
   }, [tenant, page])
 
   useEffect(() => { loadContacts(true) }, [tenant])
+
+  // Detectar suporte a Contact Picker API
+  useEffect(() => {
+    setDeviceSupported(typeof navigator !== 'undefined' && 'contacts' in navigator && 'ContactsManager' in window)
+  }, [])
 
   // Verificar se Google está conectado
   useEffect(() => {
@@ -115,8 +122,9 @@ export default function ContactsPage() {
 
   async function handleDevicePicker() {
     setShowSyncMenu(false)
-    // Tentar usar a Contact Picker API (disponível em alguns navegadores mobile)
-    if ('contacts' in navigator && 'ContactsManager' in window) {
+
+    // Se Contact Picker API estiver disponivel, usar diretamente
+    if (deviceSupported) {
       try {
         const props = await navigator.contacts.getProperties()
         const selectedProps = ['name']
@@ -129,20 +137,24 @@ export default function ContactsPage() {
           return
         }
 
-        // Formatar contatos
         const contactsList = deviceContacts.map(c => ({
           name: (c.name || []).join(' '),
           phone: (c.tel || [])[0] || '',
           email: (c.email || [])[0] || '',
+          source: 'device',
         }))
 
         await importDeviceContacts(contactsList)
       } catch (e) {
-        setSyncMsg('❌ Não foi possível acessar contatos do dispositivo: ' + e.message)
+        if (e.name === 'SecurityError' || e.name === 'AbortError') {
+          setSyncMsg('⚠️ Sincronização cancelada.')
+        } else {
+          setSyncMsg('❌ Não foi possível acessar contatos: ' + e.message)
+        }
       }
     } else {
-      // Fallback: abrir seletor de arquivo pra upload .vcf
-      fileInputRef.current?.click()
+      // Sem Contact Picker API — mostrar modal com QR code
+      setShowDeviceModal(true)
     }
   }
 
@@ -155,6 +167,7 @@ export default function ContactsPage() {
       const token = await getToken()
       const formData = new FormData()
       formData.append('tenant_id', tenant.id)
+      formData.append('source', 'device')
       formData.append('file', file)
       const res = await fetch('/api/contacts/import-device', {
         method: 'POST',
@@ -188,7 +201,7 @@ export default function ContactsPage() {
       const res = await fetch('/api/contacts/import-device', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ tenant_id: tenant.id, contacts: contactsList }),
+        body: JSON.stringify({ tenant_id: tenant.id, contacts: contactsList, source: 'device' }),
       })
       const data = await res.json()
       if (data.ok) {
@@ -482,7 +495,7 @@ export default function ContactsPage() {
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>DISPOSITIVO</div>
                     <button onClick={handleDevicePicker}
                       style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
-                      📱 Importar contatos do dispositivo
+                      📱 Sincronizar do celular
                     </button>
                     <button onClick={() => { setShowSyncMenu(false); fileInputRef.current?.click() }}
                       style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'var(--bg-secondary)', color: 'var(--text-secondary)', marginTop: 4 }}>
@@ -691,6 +704,57 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+      {/* Modal Sincronizar com Dispositivo */}
+      {showDeviceModal && (
+        <div onClick={() => setShowDeviceModal(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={e => e.stopPropagation()}
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 16, padding: 28, maxWidth: 380, width: '90%', textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}>
+            <div style={{ fontSize: 40, marginBottom: 8 }}>📱</div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6, color: 'var(--text-primary)' }}>
+              Sincronizar contatos do celular
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20, lineHeight: 1.5 }}>
+              A sincronização direta só funciona abrindo esta página no celular.
+              Escaneie o QR code abaixo ou acesse o painel pelo navegador do seu telefone.
+            </p>
+
+            {/* QR Code */}
+            <div style={{ display: 'inline-block', padding: 12, background: '#fff', borderRadius: 12, marginBottom: 20 }}>
+              <img
+                src={'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(typeof window !== 'undefined' ? window.location.href : 'https://arkiel.com.br/admin/contacts')}
+                alt="QR Code"
+                style={{ width: 200, height: 200, display: 'block' }}
+              />
+            </div>
+
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Aponte a câmera do celular para abrir esta página
+            </p>
+
+            <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 16, marginBottom: 12 }}>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>
+                Ou suba um arquivo exportado do celular:
+              </p>
+              <button
+                onClick={() => { setShowDeviceModal(false); fileInputRef.current?.click() }}
+                className="ark-btn"
+                style={{ width: '100%', fontSize: 13, padding: '10px 16px' }}
+              >
+                📁 Upload de arquivo .vcf ou .csv
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowDeviceModal(false)}
+              className="ark-btn-ghost"
+              style={{ width: '100%', fontSize: 13, padding: '8px 16px' }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
       {/* Barra de acoes em massa */}
       {bulkMode && selectedIds.size > 0 && (
         <div style={{
