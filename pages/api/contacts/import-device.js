@@ -4,7 +4,7 @@
  * Body: FormData com file (.vcf/.csv) + tenant_id  OU  JSON { tenant_id, contacts: [...] }
  * Usa o client autenticado do usuário (não service role) — a tabela contacts tem RLS permissiva.
  */
-import { createClient } from '@supabase/supabase-js'
+import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 export const config = { api: { bodyParser: false } }
 
@@ -185,25 +185,21 @@ export default async function handler(req, res) {
   if (!tenantId) return res.status(400).json({ error: 'tenant_id é obrigatório' })
   if (!contactsList.length) return res.status(400).json({ error: 'Nenhum contato válido encontrado' })
 
-  // Cliente autenticado com o token do usuário (RLS da tabela contacts é permissiva)
-  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  const db = createClient(supaUrl, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { Authorization: `Bearer ${userToken}` } }
-  })
-
-  // Verificar autenticação
-  const { data: { user }, error: authErr } = await db.auth.getUser(userToken)
+  // Verificar autenticação com o token do usuário
+  const { data: { user }, error: authErr } = await supabase.auth.getUser(userToken)
   if (authErr || !user) return res.status(401).json({ error: 'Sessão inválida' })
 
-  // Verificar se a tabela contacts existe
-  const { error: tableCheck } = await db.from('contacts').select('id').limit(1)
-  if (tableCheck) {
-    return res.status(500).json({
-      error: 'Tabela de contatos não existe. Clique em "Inicializar" primeiro.',
-      detail: tableCheck.message
-    })
+  // Usar service role key (bypassa RLS) para inserir contatos
+  const db = supabaseAdmin()
+
+  // Verificar permissão no tenant
+  const { data: profile } = await db.from('profiles').select('id, is_platform_admin').eq('id', user.id).maybeSingle()
+  if (!profile) return res.status(403).json({ error: 'Perfil não encontrado' })
+
+  if (!profile.is_platform_admin) {
+    const { data: member } = await db.from('tenant_members')
+      .select('tenant_id').eq('user_id', user.id).eq('tenant_id', tenantId).maybeSingle()
+    if (!member) return res.status(403).json({ error: 'Sem permissão para este tenant' })
   }
 
   // Importar contatos — SÓ colunas que existem na tabela
