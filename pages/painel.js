@@ -38,6 +38,7 @@ export default function PainelAdminPage() {
   const [selectedTenantContacts, setSelectedTenantContacts] = useState('')
   const [syncingContacts, setSyncingContacts] = useState(false)
   const [contactsMsg, setContactsMsg] = useState('')
+  const [googleConnected, setGoogleConnected] = useState(false)
   const [uploadingContacts, setUploadingContacts] = useState(false)
   const [uploadResult, setUploadResult] = useState(null)
   const [loadingBots, setLoadingBots] = useState(true)
@@ -137,6 +138,16 @@ export default function PainelAdminPage() {
     if (tab === 'receipts') { loadReceipts('all') }
     if (tab === 'planos') { loadPlans(); loadResources() }
   }, [tab])
+
+  async function checkGoogle(tenantId) {
+    if (!tenantId) { setGoogleConnected(false); return }
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/contacts/check-google?tenant_id=' + tenantId, { headers: h })
+      const data = await res.json()
+      setGoogleConnected(data.connected || false)
+    } catch (_) { setGoogleConnected(false) }
+  }
 
   async function loadContacts(tenantId) {
     if (!tenantId) return
@@ -548,9 +559,23 @@ export default function PainelAdminPage() {
     setTimeout(() => setDeregisterMsg(''), 5000)
   }
 
-  function connectGoogle() {
+  async function connectGoogle() {
     if (!selectedTenantContacts) return
-    window.location.href = '/api/contacts/google-auth?tenant_id=' + selectedTenantContacts
+    setContactsMsg('🔄 Conectando ao Google...')
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/contacts.readonly',
+          redirectTo: window.location.origin + '/painel?google_connect=1&tenant=' + selectedTenantContacts,
+        },
+      })
+      if (error) {
+        setContactsMsg('❌ ' + error.message)
+      }
+    } catch (e) {
+      setContactsMsg('❌ ' + e.message)
+    }
   }
 
   async function initContactsTable() {
@@ -583,7 +608,10 @@ export default function PainelAdminPage() {
   }, [clients])
 
   useEffect(() => {
-    if (selectedTenantContacts) loadContacts(selectedTenantContacts)
+    if (selectedTenantContacts) {
+      loadContacts(selectedTenantContacts)
+      checkGoogle(selectedTenantContacts)
+    }
   }, [selectedTenantContacts])
 
   useEffect(() => {
@@ -923,8 +951,8 @@ export default function PainelAdminPage() {
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{contacts.length} contatos</span>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={connectGoogle} className="ark-btn-ghost" style={{ fontSize: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontSize: 14 }}>🔵</span> Conectar Google
+              <button onClick={connectGoogle} className="ark-btn-ghost" style={{ fontSize: 12, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 6, borderColor: googleConnected ? 'rgba(34,197,94,0.3)' : undefined }}>
+                <span style={{ fontSize: 14 }}>{googleConnected ? '✅' : '🔵'}</span> {googleConnected ? 'Google Conectado' : 'Conectar Google'}
               </button>
               <button onClick={syncGoogleContacts} className="ark-btn" disabled={syncingContacts} style={{ fontSize: 12, padding: '8px 16px' }}>
                 {syncingContacts ? '🔄 Sincronizando...' : '🔄 Sincronizar Contatos'}

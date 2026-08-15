@@ -11,8 +11,34 @@ export default function App({ Component, pageProps }) {
   const router = useRouter()
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
+        // ── Capturar provider_token do Google para sync de contatos ──
+        if (session.provider_token && typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search)
+          const googleConnect = params.get('google_connect')
+          const tenantId = params.get('tenant')
+          if (googleConnect === '1' && tenantId) {
+            try {
+              await fetch('/api/contacts/store-google-token', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer ' + session.access_token,
+                },
+                body: JSON.stringify({
+                  tenant_id: tenantId,
+                  provider_token: session.provider_token,
+                  provider_refresh_token: session.provider_refresh_token || null,
+                }),
+              })
+              // Limpar parâmetros da URL
+              const cleanUrl = window.location.pathname + '#tab=contacts'
+              window.history.replaceState({}, '', cleanUrl)
+            } catch (_) {}
+          }
+        }
+
         if (router.pathname === '/login' || router.pathname === '/assistente-ark' || router.pathname === '/assistente-ark/entrar') {
           router.replace('/painel')
         }
