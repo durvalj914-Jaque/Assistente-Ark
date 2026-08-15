@@ -1,9 +1,3 @@
-/**
- * POST /api/contacts/import-device
- * Importa contatos enviados pelo dispositivo (vCard .vcf, .csv, ou JSON).
- * Body: FormData com file (.vcf/.csv) + tenant_id  OU  JSON { tenant_id, contacts: [...], source }
- * Usa service role key (bypassa RLS) para inserir contatos.
- */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 export const config = { api: { bodyParser: false } }
@@ -102,8 +96,16 @@ function parseMultipart(rawBuffer, boundary) {
   return { fields, files }
 }
 
+// Ler o body bruto da requisicao (usado quando bodyParser esta desativado)
+async function readBody(req) {
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  return Buffer.concat(chunks)
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
   const contentType = req.headers['content-type'] || ''
   const authHeader = req.headers.authorization
   if (!authHeader) return res.status(401).json({ error: 'Não autenticado' })
@@ -113,16 +115,17 @@ export default async function handler(req, res) {
   let importSource = 'device'
 
   if (contentType.includes('multipart/form-data')) {
-    const chunks = []
-    for await (const chunk of req) chunks.push(chunk)
-    const rawBuffer = Buffer.concat(chunks)
+    // Upload de arquivo (.vcf / .csv)
+    const rawBuffer = await readBody(req)
     const boundaryMatch = contentType.match(/boundary=([^\s;]+)/)
     if (!boundaryMatch) return res.status(400).json({ error: 'Boundary não encontrado' })
     const boundary = boundaryMatch[1].replace(/"/g, '')
     const { fields, files } = parseMultipart(rawBuffer, boundary)
     tenantId = fields.tenant_id || ''
     importSource = fields.source || 'device'
+
     if (!tenantId) return res.status(400).json({ error: 'tenant_id é obrigatório' })
+
     for (const [fieldName, file] of Object.entries(files)) {
       const text = file.data.toString('utf-8')
       const filename = (file.filename || '').toLowerCase()
@@ -132,23 +135,30 @@ export default async function handler(req, res) {
         contactsList.push(...parseCSV(text))
       }
     }
+
     if (!contactsList.length) {
       return res.status(400).json({
         error: 'Nenhum contato válido encontrado. Verifique se é .vcf ou .csv',
-        debug: { filesReceived: Object.keys(files).length, fileNames: Object.values(files).map(f => f.filename), fileSizes: Object.values(files).map(f => f.data.length) }
+        debug: { filesReceived: Object.keys(files).length, fileNames: Object.values(files).map(f => f.filename) }
       })
     }
   } else {
-    let body = req.body
-    if (typeof body === 'string') body = JSON.parse(body)
-    tenantId = body.tenant_id
-    contactsList = body.contacts || []
-    importSource = body.source || 'device'
+    // JSON body (sincronizacao do dispositivo via Contact Picker API)
+    const rawBuffer = await readBody(req)
+    try {
+      const body = JSON.parse(rawBuffer.toString('utf-8'))
+      tenantId = body.tenant_id
+      contactsList = body.contacts || []
+      importSource = body.source || 'device'
+    } catch (e) {
+      return res.status(400).json({ error: 'Body inválido: esperado JSON ou multipart/form-data' })
+    }
   }
 
   if (!tenantId) return res.status(400).json({ error: 'tenant_id é obrigatório' })
   if (!contactsList.length) return res.status(400).json({ error: 'Nenhum contato válido encontrado' })
 
+  // Auth
   const { data: { user }, error: authErr } = await supabase.auth.getUser(userToken)
   if (authErr || !user) return res.status(401).json({ error: 'Sessão inválida' })
 
@@ -160,6 +170,7 @@ export default async function handler(req, res) {
     if (!member) return res.status(403).json({ error: 'Sem permissão para este tenant' })
   }
 
+  // Normalizar
   const normalized = contactsList.map(c => {
     let phone = (c.phone || '').replace(/[^\d+]/g, '')
     if (phone && !phone.startsWith('+')) phone = '+' + phone
@@ -174,10 +185,10 @@ export default async function handler(req, res) {
     }
   }).filter(c => c.name || c.phone || c.email)
 
+  // Buscar duplicatas em batch
   const phones = normalized.filter(c => c.phone).map(c => c.phone)
   const emails = normalized.filter(c => c.email && !c.phone).map(c => c.email)
   let existingMap = new Map()
-
   if (phones.length > 0) {
     const { data: existingByPhone } = await db.from('contacts').select('id, phone, email').eq('tenant_id', tenantId).in('phone', phones)
     ;(existingByPhone || []).forEach(c => existingMap.set(c.phone, c))
@@ -190,50 +201,34 @@ export default async function handler(req, res) {
   const toInsert = []
   const toUpdate = []
   let skipped = 0
-
   for (const c of normalized) {
     if (!c.phone && !c.email) { skipped++; continue }
     const key = c.phone ? c.phone : `email:${c.email}`
     const existing = existingMap.get(key)
-    if (existing) {
-      toUpdate.push({ ...c, id: existing.id, updated_at: new Date().toISOString() })
-    } else {
-      toInsert.push(c)
-    }
+    if (existing) toUpdate.push({ ...c, id: existing.id, updated_at: new Date().toISOString() })
+    else toInsert.push(c)
   }
 
   let imported = 0, errors = 0
   const errorMessages = []
-
   const BATCH_SIZE = 500
   for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
     const batch = toInsert.slice(i, i + BATCH_SIZE)
     const { error } = await db.from('contacts').insert(batch)
-    if (error) {
-      errors += batch.length
-      if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message} (${error.code})`)
-    } else {
-      imported += batch.length
-    }
+    if (error) { errors += batch.length; if (errorMessages.length < 5) errorMessages.push(`Insert: ${error.message} (${error.code})`) }
+    else imported += batch.length
   }
-
   for (const c of toUpdate) {
     const { id, ...updateData } = c
     const { error } = await db.from('contacts').update(updateData).eq('id', id)
-    if (error) {
-      errors++
-      if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message} (${error.code})`)
-    } else {
-      imported++
-    }
+    if (error) { errors++; if (errorMessages.length < 5) errorMessages.push(`Update: ${error.message} (${error.code})`) }
+    else imported++
   }
 
   return res.status(200).json({
-    ok: true,
-    imported,
+    ok: true, imported,
     skipped: skipped + (contactsList.length - normalized.length),
-    errors,
-    total: contactsList.length,
+    errors, total: contactsList.length,
     parsed: normalized.length,
     newContacts: toInsert.length,
     updatedContacts: toUpdate.length,
