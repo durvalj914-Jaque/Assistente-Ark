@@ -1,6 +1,7 @@
 /**
  * POST /api/payments/webhook/mercadopago
- * Recebe notificações do Mercado Pago, atualiza status, confirma pedidos do catálogo e cria comprovante automático.
+ * Recebe notificações do Mercado Pago, atualiza status, confirma pedidos do catálogo,
+ * cria comprovante automático, registra taxa da plataforma (marketplace fee / split).
  */
 import { supabaseAdmin } from '../../../../lib/supabase'
 import { activatePlan } from '../../../../lib/planActivation'
@@ -59,7 +60,53 @@ export default async function handler(req, res) {
               category: 'b2c_client',
             })
 
-            // ── Atualizar pedido do catálogo se aplicável ──
+            // ── Registrar taxa da plataforma (marketplace fee / split) ──
+            try {
+              const grossAmount = parseFloat(payment.amount) || parseFloat(payData.transaction_amount) || 0
+              const mpFee = parseFloat(payData.marketplace_fee) || 0
+              const isSplit = !!payData.marketplace || mpFee > 0
+
+              // Buscar config de taxa do tenant
+              const { data: tenant } = await db.from('tenants')
+                .select('mp_access_token')
+                .eq('id', payment.tenant_id)
+                .maybeSingle()
+
+              let feePercent = 2.0
+              let splitEnabled = false
+              let splitCollected = false
+              try {
+                const tenantConfig = JSON.parse(tenant?.mp_access_token || '{}')
+                const mc = tenantConfig.marketplace_config || {}
+                if (mc.fee_percent) feePercent = parseFloat(mc.fee_percent)
+                if (mc.split_enabled !== undefined) splitEnabled = !!mc.split_enabled
+              } catch (_) {}
+
+              const calculatedFee = +(grossAmount * feePercent / 100).toFixed(2)
+
+              // Se o MP retornou marketplace_fee, o split ja foi coletado automaticamente
+              if (isSplit && mpFee > 0) {
+                splitCollected = true
+              }
+
+              await db.from('platform_fees').insert({
+                tenant_id: payment.tenant_id,
+                payment_id: String(data.id),
+                gross_amount: grossAmount,
+                fee_percent: feePercent,
+                fee_amount: mpFee > 0 ? mpFee : calculatedFee,
+                payment_method: payData.payment_method_id || 'unknown',
+                status: 'pending',
+                split_collected: splitCollected,
+                split_payment_id: isSplit ? String(data.id) : null,
+              })
+
+              console.log(`[webhook-mp] Taxa registrada: R$ ${mpFee > 0 ? mpFee : calculatedFee} (${feePercent}% de R$ ${grossAmount}) | Split: ${splitCollected ? 'automatico' : 'manual'}`)
+            } catch (e) {
+              console.error('[webhook-mp] Erro ao registrar taxa:', e.message)
+            }
+
+            // ── Atualizar pedido do catalogo se aplicavel ──
             const orderId = JSON.parse(payment.pix_qr_url || '{}')?.order_id
             if (orderId) {
               await db.from('whatsapp_orders').update({
@@ -76,7 +123,7 @@ export default async function handler(req, res) {
               const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
               const isCatalog = !!meta.from_catalog
               const confirmText = isCatalog
-                ? `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\nSeu pedido do catálogo foi confirmado e está sendo processado. 🎉\n\nObrigado pela compra!`
+                ? `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\nSeu pedido do catalogo foi confirmado e esta sendo processado. 🎉\n\nObrigado pela compra!`
                 : `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\n${meta.description || ''}\n\nObrigado pelo pagamento! 🎉`
 
               try {
@@ -105,7 +152,7 @@ export default async function handler(req, res) {
               const { sendFcmToTenant } = await import('../../../../lib/fcm')
               const pushPayload = {
                 title: '✅ Pagamento confirmado!',
-                body: `R$ ${parseFloat(payment.amount).toFixed(2)}${isCatalog ? ' — Pedido do catálogo' : ''}`,
+                body: `R$ ${parseFloat(payment.amount).toFixed(2)}${isCatalog ? ' — Pedido do catalogo' : ''}`,
                 url: '/painel?tab=receipts',
                 tag: `ark-paid-${payment.id}`,
               }
