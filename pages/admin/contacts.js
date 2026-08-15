@@ -26,6 +26,12 @@ export default function ContactsPage() {
   const [nameDraft, setNameDraft] = useState('')
   const [savingName, setSavingName] = useState(false)
   const [startingChat, setStartingChat] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newPhone, setNewPhone] = useState('')
+  const [newEmail, setNewEmail] = useState('')
+  const [addingContact, setAddingContact] = useState(false)
+  const [addMsg, setAddMsg] = useState('')
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -258,6 +264,48 @@ export default function ContactsPage() {
     } finally { setStartingChat(false) }
   }
 
+  async function addContact() {
+    if (!tenant || addingContact) return
+    if (!newPhone.trim() && !newEmail.trim()) {
+      setAddMsg('Telefone ou e-mail e obrigatorio')
+      return
+    }
+    setAddingContact(true)
+    setAddMsg('')
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/contacts/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          name: newName.trim() || null,
+          phone: newPhone.trim() || null,
+          email: newEmail.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (data.ok) {
+        if (data.created) {
+          setContacts(prev => [data.contact, ...prev])
+          setAddMsg('+ Contato adicionado!')
+        } else {
+          setContacts(prev => prev.map(c => c.id === data.contact.id ? { ...c, ...data.contact } : c))
+          setAddMsg(data.message || 'Contato ja existia')
+        }
+        setNewName('')
+        setNewPhone('')
+        setNewEmail('')
+        setTimeout(() => { setShowAddModal(false); setAddMsg('') }, 1500)
+        loadContacts(true)
+      } else {
+        setAddMsg('Erro: ' + (data.error || 'Falha ao adicionar'))
+      }
+    } catch (e) {
+      setAddMsg('Erro: ' + e.message)
+    } finally { setAddingContact(false) }
+  }
+
   const filtered = search
     ? contacts.filter(c =>
         (c.name || c.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
@@ -283,7 +331,14 @@ export default function ContactsPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="🔍 Buscar…" className="ark-input" style={{ width: 220 }} />
+            placeholder="🔍 Buscar…" className="ark-input" style={{ width: 200 }} />
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="ark-btn"
+            style={{ fontSize: 13, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+          >
+            ＋ Novo contato
+          </button>
           {/* Botão Sincronizar — dropdown */}
           <div style={{ position: 'relative' }}>
             <button
@@ -502,6 +557,60 @@ export default function ContactsPage() {
           </div>
         )}
       </div>
+      {/* Modal Novo Contato */}
+      {showAddModal && (
+        <>
+          <div onClick={() => { setShowAddModal(false); setAddMsg('') }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 300, backdropFilter: 'blur(2px)' }} />
+          <div style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            zIndex: 400, width: '90%', maxWidth: 420,
+            background: 'var(--bg-card)', border: '1px solid var(--border-medium)',
+            borderRadius: 16, padding: 24, boxShadow: '0 16px 64px rgba(0,0,0,0.4)',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16, margin: 0 }}>＋ Novo contato</h3>
+              <button onClick={() => { setShowAddModal(false); setAddMsg('') }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>NOME</label>
+                <input value={newName} onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && newPhone.trim()) addContact() }}
+                  placeholder="Nome do contato"
+                  className="ark-input" style={{ width: '100%' }} autoFocus />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>TELEFONE *</label>
+                <input value={newPhone} onChange={e => setNewPhone(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && (newPhone.trim() || newEmail.trim())) addContact() }}
+                  placeholder="5511999999999"
+                  className="ark-input" style={{ width: '100%' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 4, display: 'block' }}>E-MAIL</label>
+                <input value={newEmail} onChange={e => setNewEmail(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter' && (newPhone.trim() || newEmail.trim())) addContact() }}
+                  placeholder="email@exemplo.com"
+                  className="ark-input" style={{ width: '100%' }} />
+              </div>
+              {addMsg && (
+                <div style={{
+                  padding: '8px 12px', borderRadius: 8, fontSize: 13,
+                  background: addMsg.startsWith('+') ? 'rgba(16,185,129,0.1)' : addMsg.startsWith('Erro') ? 'rgba(239,68,68,0.1)' : 'rgba(79,142,247,0.1)',
+                  color: addMsg.startsWith('+') ? '#10b981' : addMsg.startsWith('Erro') ? '#ef4444' : '#4f8ef7',
+                }}>{addMsg}</div>
+              )}
+              <button onClick={addContact} disabled={addingContact || (!newPhone.trim() && !newEmail.trim())}
+                className="ark-btn"
+                style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: 14, opacity: (addingContact || (!newPhone.trim() && !newEmail.trim())) ? 0.5 : 1 }}>
+                {addingContact ? 'Adicionando...' : 'Adicionar contato'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </AdminLayout>
   )
 }
