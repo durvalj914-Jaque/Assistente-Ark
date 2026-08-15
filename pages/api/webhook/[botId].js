@@ -384,6 +384,17 @@ async function handleCatalogOrder(db, botId, order, from) {
       if (mp.fee_config) feeConfig = { ...feeConfig, ...mp.fee_config }
     } catch {}
   }
+  // Ler marketplace config (Option A — split oficial)
+  let marketplaceConfig = { collector_id: '', split_enabled: false, split_mode: 'manual' }
+  if (arkielTenant?.mp_access_token) {
+    try {
+      const mpAll = JSON.parse(arkielTenant.mp_access_token)
+      if (mpAll.marketplace_config) marketplaceConfig = { ...marketplaceConfig, ...mpAll.marketplace_config }
+    } catch {}
+  }
+  // Se split_enabled e collector_id configurados, usar split oficial do MP
+  const useOfficialSplit = usingTenantToken && marketplaceConfig.split_enabled && marketplaceConfig.collector_id
+
   // Função helper: calcula a taxa do método
   function calcFee(method, total) {
     const pct = feeConfig[method] ?? feeConfig.pix ?? 2.0
@@ -412,7 +423,9 @@ async function handleCatalogOrder(db, botId, order, from) {
           payer: { email: `cliente${from.slice(-4)}@arkiel.com.br` },
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('pix', orderTotal) } : {})
+          ...(useOfficialSplit
+            ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('pix', orderTotal), collector: { id: marketplaceConfig.collector_id } }
+            : usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('pix', orderTotal) } : {})
         })
       })
       const pixData = await pixRes.json()
@@ -448,7 +461,9 @@ async function handleCatalogOrder(db, botId, order, from) {
           }],
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          ...(usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('credit_card', orderTotal) } : {}),
+          ...(useOfficialSplit
+            ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('credit_card', orderTotal), collector: { id: marketplaceConfig.collector_id } }
+            : usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('credit_card', orderTotal) } : {}),
           back_urls: {
             success: 'https://arkiel.com.br/payment/success',
             failure: 'https://arkiel.com.br/payment/failure'

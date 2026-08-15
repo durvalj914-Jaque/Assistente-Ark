@@ -57,6 +57,14 @@ export default function PainelAdminPage() {
   const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   const [savingFees, setSavingFees] = useState(false)
   const [feeMsg, setFeeMsg] = useState('')
+  // ── Platform fees (receitas) ──
+  const [feeSummary, setFeeSummary] = useState(null)
+  const [feeList, setFeeList] = useState([])
+  const [loadingFees, setLoadingFees] = useState(false)
+  const [feeActionMsg, setFeeActionMsg] = useState('')
+  const [marketplaceCfg, setMarketplaceCfg] = useState({ collector_id: '', collector_email: '', split_enabled: false, split_mode: 'manual' })
+  const [savingMarketplace, setSavingMarketplace] = useState(false)
+  const [marketplaceMsg, setMarketplaceMsg] = useState('')
   const [plans, setPlans] = useState([])
   const [planModal, setPlanModal] = useState(null) // null | 'new' | {editing plan}
   const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '', resource_ids: [] })
@@ -287,6 +295,96 @@ export default function PainelAdminPage() {
       if (json.fee_config) setFeeConfig(json.fee_config)
     } catch (e) { console.error('loadFeeConfig', e) }
   }
+
+  // ── Load platform fees summary ──
+  async function loadFeeSummary() {
+    const h = await getAuthHeaders()
+    if (!h) return
+    const res = await fetch('/api/admin/fees?summary=true', { headers: h })
+    if (res.ok) {
+      const json = await res.json()
+      setFeeSummary(json)
+    }
+  }
+
+  // ── Load fee list (detailed) ──
+  async function loadFeeList(status) {
+    const h = await getAuthHeaders()
+    if (!h) return
+    setLoadingFees(true)
+    const res = await fetch('/api/admin/fees?status=' + (status || 'pending'), { headers: h })
+    if (res.ok) {
+      const json = await res.json()
+      setFeeList(json.fees || [])
+    }
+    setLoadingFees(false)
+  }
+
+  // ── Generate monthly invoice for a tenant ──
+  async function generateInvoice(tenantId, tenantName) {
+    if (!confirm('Gerar cobrança PIX de todas as taxas pendentes de ' + tenantName + '?')) return
+    const h = await getAuthHeaders()
+    if (!h) return
+    setFeeActionMsg('Gerando cobrança...')
+    try {
+      const res = await fetch('/api/admin/fees', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'generate_invoice', tenant_id: tenantId })
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setFeeActionMsg('✅ ' + data.message + ' — PIX: R$ ' + data.amount)
+        loadFeeSummary()
+      } else {
+        setFeeActionMsg('❌ ' + (data.error || 'Erro'))
+      }
+    } catch (e) {
+      setFeeActionMsg('❌ ' + e.message)
+    }
+  }
+
+  // ── Mark fees as collected ──
+  async function markCollected(feeIds) {
+    const h = await getAuthHeaders()
+    if (!h) return
+    const res = await fetch('/api/admin/fees', {
+      method: 'POST',
+      headers: { ...h, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'mark_collected', fee_ids: feeIds })
+    })
+    if (res.ok) {
+      setFeeActionMsg('✅ ' + feeIds.length + ' taxa(s) marcada(s) como coletada(s)')
+      loadFeeSummary()
+      loadFeeList('pending')
+    }
+  }
+
+  // ── Save marketplace config ──
+  async function saveMarketplaceConfig() {
+    const h = await getAuthHeaders()
+    if (!h) return
+    setSavingMarketplace(true)
+    setMarketplaceMsg('')
+    try {
+      const res = await fetch('/api/admin/marketplace-config', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify(marketplaceCfg)
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setMarketplaceMsg('✅ Configuração salva!')
+        setMarketplaceCfg(data.marketplace_config || marketplaceCfg)
+      } else {
+        setMarketplaceMsg('❌ ' + (data.error || 'Erro'))
+      }
+    } catch (e) {
+      setMarketplaceMsg('❌ ' + e.message)
+    }
+    setSavingMarketplace(false)
+  }
+
 
   async function loadPlans() {
     try {
@@ -607,6 +705,7 @@ export default function PainelAdminPage() {
 
   useEffect(() => {
     if (tab === 'bots' && !wabaNumbers.length) loadWabaNumbers()
+    if (tab === 'revenue') { loadFeeSummary(); loadFeeList('pending') }
   }, [tab])
 
   if (loading || !user || !tenant || !profile?.is_platform_admin) return null
@@ -619,6 +718,7 @@ export default function PainelAdminPage() {
     { key: 'planos',    icon: '\uD83D\uDCC4', label: 'Planos' },
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
+    { key: 'revenue',  icon: '\uD83D\uDCB0', label: 'Receitas' },
     { key: 'activity',  icon: '\uD83D\uDCE0', label: 'Atividade' },
     { key: 'logs',      icon: '\uD83D\uDCCB', label: 'Logs do Servidor' },
   ]
@@ -1739,6 +1839,130 @@ export default function PainelAdminPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {tab === 'revenue' && (
+        <div>
+          {/* ── Resumo Geral de Receitas ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <StatTile label="Pendente" value={'R$ ' + (feeSummary?.totals?.pending_amount || 0).toFixed(2)} icon="⏳" sub="A receber dos clientes" />
+            <StatTile label="Cobrado" value={'R$ ' + (feeSummary?.totals?.invoiced_amount || 0).toFixed(2)} icon="📋" sub="PIX emitido, aguardando" />
+            <StatTile label="Recebido" value={'R$ ' + (feeSummary?.totals?.collected_amount || 0).toFixed(2)} icon="✅" sub="Taxas já coletadas" />
+            <StatTile label="Volume Total" value={'R$ ' + (feeSummary?.totals?.total_volume || 0).toFixed(2)} icon="📊" sub="Transações processadas" />
+          </div>
+
+          {/* ── Option A: Split Oficial MP (Marketplace) ── */}
+          <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>🔧 Opção A — Split Oficial no Mercado Pago</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+              Quando ativado, o Mercado Pago retém a taxa automaticamente no momento do pagamento e deposita na conta collector da Arkiel.
+              Requer que a Arkiel esteja cadastrada como marketplace no MP e que o cliente B2B tenha autorizado o split no OAuth.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Collector ID (Conta MP Arkiel)</label>
+                <input value={marketplaceCfg.collector_id || ''} onChange={e => setMarketplaceCfg(c => ({ ...c, collector_id: e.target.value }))}
+                  placeholder="ex: 1234567890"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
+              </div>
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Email da Conta Collector</label>
+                <input value={marketplaceCfg.collector_email || ''} onChange={e => setMarketplaceCfg(c => ({ ...c, collector_email: e.target.value }))}
+                  placeholder="ex: arkieltech@gmail.com"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingTop: 20 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={marketplaceCfg.split_enabled || false} onChange={e => setMarketplaceCfg(c => ({ ...c, split_enabled: e.target.checked }))}
+                    style={{ width: 18, height: 18, accentColor: '#4f8ef7' }} />
+                  <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>
+                    {marketplaceCfg.split_enabled ? '✅ Split ativo' : '⭕ Split inativo'}
+                  </span>
+                </label>
+              </div>
+            </div>
+            {marketplaceMsg && (
+              <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: marketplaceMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: marketplaceMsg.startsWith('✅') ? '#22c55e' : '#ef4444' }}>
+                {marketplaceMsg}
+              </div>
+            )}
+            <button onClick={saveMarketplaceConfig} disabled={savingMarketplace}
+              style={{ marginTop: 14, padding: '10px 24px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: savingMarketplace ? 0.5 : 1 }}>
+              {savingMarketplace ? 'Salvando...' : '💾 Salvar Configuração de Split'}
+            </button>
+          </div>
+
+          {/* ── Option B: Cobrança Mensal (PIX pós-pagamento) ── */}
+          <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(34,197,94,0.15)' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📋 Opção B — Cobrança Mensal de Taxas</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+              Cada pagamento aprovado gera um registro de taxa pendente. Gere um PIX de cobrança mensal por cliente para receber todas as taxas acumuladas.
+            </p>
+
+            {feeSummary?.tenants?.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {feeSummary.tenants.filter(t => t.pending_amount > 0 || t.invoiced_amount > 0 || t.collected_amount > 0).map(t => (
+                  <div key={t.tenant_id} style={{ padding: 14, borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{t.tenant_name || 'Cliente'}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 4 }}>
+                        Volume: R$ {t.total_volume.toFixed(2)} • Pendente: <span style={{ color: '#f59e0b', fontWeight: 700 }}>R$ {t.pending_amount.toFixed(2)}</span> ({t.pending_count} tx) • Cobrado: <span style={{ color: '#4f8ef7' }}>R$ {t.invoiced_amount.toFixed(2)}</span> • Recebido: <span style={{ color: '#22c55e' }}>R$ {t.collected_amount.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => generateInvoice(t.tenant_id, t.tenant_name)}
+                      disabled={t.pending_count === 0}
+                      style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: t.pending_count > 0 ? '#22c55e' : 'var(--border-soft)', color: 'var(--text-primary)', fontWeight: 700, fontSize: 12, cursor: t.pending_count > 0 ? 'pointer' : 'not-allowed', opacity: t.pending_count > 0 ? 1 : 0.5 }}>
+                      💰 Gerar Cobrança PIX
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>💰</div>
+                Nenhuma taxa registrada ainda. Quando os clientes processarem pagamentos, as taxas aparecem aqui.
+              </div>
+            )}
+
+            {feeActionMsg && (
+              <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: feeActionMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: feeActionMsg.startsWith('✅') ? '#22c55e' : '#ef4444' }}>
+                {feeActionMsg}
+              </div>
+            )}
+          </div>
+
+          {/* ── Lista detalhada de taxas pendentes ── */}
+          <div className="ark-card" style={{ padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>📋 Taxas Pendentes</h3>
+              <button onClick={() => loadFeeList('pending')} style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 12, cursor: 'pointer' }}>🔄 Atualizar</button>
+            </div>
+            {loadingFees ? (
+              <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
+            ) : feeList.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>Nenhuma taxa pendente.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {feeList.slice(0, 50).map(f => (
+                  <div key={f.id} style={{ padding: 10, borderRadius: 8, background: 'var(--bg-secondary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                    <div>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{f.tenant_name}</span>
+                      <span style={{ color: 'var(--text-muted)', marginLeft: 8 }}>
+                        R$ {parseFloat(f.gross_amount).toFixed(2)} → {f.fee_percent}% = <span style={{ color: '#f59e0b', fontWeight: 700 }}>R$ {parseFloat(f.fee_amount).toFixed(2)}</span>
+                      </span>
+                      <span style={{ color: 'var(--text-dim)', marginLeft: 8, fontSize: 10 }}>{f.payment_method} • {new Date(f.created_at).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    <button onClick={() => markCollected([f.id])} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)', color: '#22c55e', fontSize: 11, cursor: 'pointer' }}>✅ Recebido</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

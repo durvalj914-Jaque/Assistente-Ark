@@ -9,13 +9,9 @@ export default async function handler(req, res) {
   try {
     const body = req.body || {}
     
-    // Handle BOTH notification formats:
-    // New: { type: "payment", data: { id: "123" } }
-    // Old IPN: { resource: "123", topic: "payment" }
     let type = body.type || body.action || body.topic
     let paymentId = body.data?.id || body.resource
     
-    // Also handle "payment.updated" action format
     if (body.action && body.action.includes('payment')) {
       type = 'payment'
       paymentId = body.data?.id
@@ -25,12 +21,10 @@ export default async function handler(req, res) {
 
     if (!paymentId) return res.status(200).json({ ok: true })
 
-    // Only process payment notifications
     if (!type?.includes('payment') && type !== 'payment') {
       return res.status(200).json({ ok: true })
     }
 
-    // Try platform token first
     let payment = null
     const platformToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
     
@@ -42,7 +36,6 @@ export default async function handler(req, res) {
       payment = await mpRes.json()
     }
 
-    // If platform token fails, search orders and try tenant tokens
     if (!payment) {
       console.log('[mp-webhook] Platform token failed, searching orders for payment_id:', paymentId)
       const { data: orders } = await db.from('whatsapp_orders')
@@ -81,7 +74,6 @@ export default async function handler(req, res) {
 
     console.log('[mp-webhook] Payment:', payment.id, 'status:', payment.status)
 
-    // Find order by metadata.order_id
     const orderId = payment.metadata?.order_id
     let order = null
 
@@ -93,7 +85,6 @@ export default async function handler(req, res) {
       order = data
     }
 
-    // Also try external_reference
     if (!order && payment.external_reference) {
       const { data } = await db.from('whatsapp_orders')
         .select('id, tenant_id, bot_id, contact_id, conversation_id, total, status, note')
@@ -102,7 +93,6 @@ export default async function handler(req, res) {
       order = data
     }
 
-    // Try searching by payment_id in notes
     if (!order) {
       const { data: orders } = await db.from('whatsapp_orders')
         .select('id, tenant_id, bot_id, contact_id, conversation_id, total, status, note')
@@ -129,6 +119,56 @@ export default async function handler(req, res) {
         status: 'paid',
         note: JSON.stringify(updatedNote)
       }).eq('id', order.id)
+
+      // ── OPTION B: Record platform fee in platform_fees table ──
+      try {
+        const grossAmount = parseFloat(order.total) || 0
+        const paymentMethod = payment.payment_method_id || 'pix'
+        
+        let feeMethod = 'pix'
+        if (paymentMethod.includes('credit')) feeMethod = 'credit_card'
+        else if (paymentMethod.includes('debit')) feeMethod = 'debit_card'
+        else if (paymentMethod === 'ticket' || paymentMethod.includes('boleto')) feeMethod = 'boleto'
+
+        const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
+        const { data: arkielTenant } = await db.from('tenants')
+          .select('mp_access_token')
+          .eq('id', ARKIEL_TENANT_ID)
+          .maybeSingle()
+        
+        let feePercent = 2.0
+        if (arkielTenant?.mp_access_token) {
+          try {
+            const mp = JSON.parse(arkielTenant.mp_access_token)
+            if (mp.fee_config && mp.fee_config[feeMethod]) {
+              feePercent = mp.fee_config[feeMethod]
+            }
+          } catch {}
+        }
+        
+        const feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
+
+        const { data: existingFee } = await db.from('platform_fees')
+          .select('id')
+          .eq('payment_id', String(payment.id))
+          .maybeSingle()
+
+        if (!existingFee && feeAmount > 0) {
+          await db.from('platform_fees').insert({
+            tenant_id: order.tenant_id,
+            order_id: order.id,
+            payment_id: String(payment.id),
+            gross_amount: grossAmount,
+            fee_percent: feePercent,
+            fee_amount: feeAmount,
+            payment_method: paymentMethod,
+            status: 'pending'
+          })
+          console.log('[mp-webhook] 💰 Platform fee recorded:', feeAmount, 'for tenant:', order.tenant_id)
+        }
+      } catch (feeErr) {
+        console.error('[mp-webhook] Error recording platform fee:', feeErr.message)
+      }
 
       // Send confirmation to customer
       const { data: bot } = await db.from('bots')
