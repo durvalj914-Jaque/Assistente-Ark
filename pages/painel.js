@@ -563,16 +563,7 @@ export default function PainelAdminPage() {
     if (!selectedTenantContacts) return
     setContactsMsg('🔄 Conectando ao Google...')
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          scopes: 'https://www.googleapis.com/auth/contacts.readonly',
-          redirectTo: window.location.origin + '/painel?google_connect=1&tenant=' + selectedTenantContacts,
-        },
-      })
-      if (error) {
-        setContactsMsg('❌ ' + error.message)
-      }
+      window.location.href = '/api/contacts/google-auth?tenant_id=' + selectedTenantContacts
     } catch (e) {
       setContactsMsg('❌ ' + e.message)
     }
