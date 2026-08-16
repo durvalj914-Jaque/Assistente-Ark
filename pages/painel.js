@@ -65,6 +65,10 @@ export default function PainelAdminPage() {
   const [marketplaceCfg, setMarketplaceCfg] = useState({ collector_id: '', collector_email: '', split_enabled: false, split_mode: 'manual' })
   const [savingMarketplace, setSavingMarketplace] = useState(false)
   const [marketplaceMsg, setMarketplaceMsg] = useState('')
+  // ── Bank account (conta de recebimento) ──
+  const [bankAccount, setBankAccount] = useState(null)
+  const [savingBank, setSavingBank] = useState(false)
+  const [bankMsg, setBankMsg] = useState('')
   const [plans, setPlans] = useState([])
   const [planModal, setPlanModal] = useState(null) // null | 'new' | {editing plan}
   const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '', resource_ids: [] })
@@ -706,6 +710,7 @@ export default function PainelAdminPage() {
   useEffect(() => {
     if (tab === 'bots' && !wabaNumbers.length) loadWabaNumbers()
     if (tab === 'revenue') { loadFeeSummary(); loadFeeList('pending') }
+  if (tab === 'bank') { loadBankAccount() }
   }, [tab])
 
   if (loading || !user || !tenant || !profile?.is_platform_admin) return null
@@ -719,6 +724,7 @@ export default function PainelAdminPage() {
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
     { key: 'revenue',  icon: '\uD83D\uDCB0', label: 'Receitas' },
+    { key: 'bank',     icon: '\uD83C\uDFE6', label: 'Conta Bancária' },
     { key: 'activity',  icon: '\uD83D\uDCE0', label: 'Atividade' },
     { key: 'logs',      icon: '\uD83D\uDCCB', label: 'Logs do Servidor' },
   ]
@@ -1962,6 +1968,216 @@ export default function PainelAdminPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {tab === 'bank' && (
+        <div>
+          <div style={{ marginBottom: 20 }}>
+            <h2 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 18, marginBottom: 4 }}>🏦 Conta Bancária de Recebimento</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              Cadastre a conta onde a Arkiel recebe as taxas de plataforma (split Mercado Pago) e cobranças manuais via PIX.
+            </p>
+          </div>
+
+          {/* ── Resumo visual ── */}
+          {bankAccount && (
+            <div className="ark-card" style={{ padding: 24, marginBottom: 20, border: '1px solid rgba(79,142,247,0.2)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', top: 0, right: 0, width: 120, height: 120, background: 'linear-gradient(135deg, rgba(79,142,247,0.08), rgba(6,182,212,0.04))', borderRadius: '0 0 0 100%' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, position: 'relative' }}>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>Conta Cadastrada</div>
+                  <div style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20, marginTop: 4 }}>{bankAccount.bank_name || 'Banco ' + bankAccount.bank_code}</div>
+                </div>
+                <div style={{ fontSize: 28 }}>🏦</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, position: 'relative' }}>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Titular</div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, marginTop: 2 }}>{bankAccount.holder_name}</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Documento</div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, marginTop: 2 }}>{bankAccount.holder_document}</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Agência</div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, marginTop: 2 }}>{bankAccount.branch}{bankAccount.branch_digit ? '-' + bankAccount.branch_digit : ''}</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Conta</div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, marginTop: 2 }}>{bankAccount.account_number}{bankAccount.account_digit ? '-' + bankAccount.account_digit : ''}</div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Tipo</div>
+                  <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600, marginTop: 2 }}>{bankAccount.account_type === 'savings' ? 'Poupança' : 'Corrente'}</div>
+                </div>
+                {bankAccount.pix_key && (
+                  <div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>Chave PIX</div>
+                    <div style={{ color: '#22c55e', fontSize: 14, fontWeight: 600, marginTop: 2 }}>{bankAccount.pix_key}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Formulário ── */}
+          <div className="ark-card" style={{ padding: 24 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+              {bankAccount ? 'Editar Conta' : 'Cadastrar Nova Conta'}
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 20 }}>
+              {bankAccount ? 'Atualize os dados da conta de recebimento.' : 'Preencha os dados da conta onde a Arkiel receberá as taxas.'}
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 16 }}>
+              {/* Titular */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome do Titular *</label>
+                <input
+                  value={bankAccount?.holder_name || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), holder_name: e.target.value }))}
+                  placeholder="Ex: Arkiel Tecnologia LTDA"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* CPF/CNPJ */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>CPF / CNPJ *</label>
+                <input
+                  value={bankAccount?.holder_document || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), holder_document: e.target.value }))}
+                  placeholder="Ex: 12.345.678/0001-90"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Tipo de conta */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Tipo de Conta</label>
+                <select
+                  value={bankAccount?.account_type || 'checking'}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), account_type: e.target.value }))}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                >
+                  <option value="checking">Conta Corrente</option>
+                  <option value="savings">Conta Poupança</option>
+                </select>
+              </div>
+
+              {/* Código do banco */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Código do Banco *</label>
+                <input
+                  value={bankAccount?.bank_code || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), bank_code: e.target.value }))}
+                  placeholder="Ex: 260 (Nubank)"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Nome do banco */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome do Banco</label>
+                <input
+                  value={bankAccount?.bank_name || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), bank_name: e.target.value }))}
+                  placeholder="Ex: Nubank"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Agência */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Agência *</label>
+                <input
+                  value={bankAccount?.branch || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), branch: e.target.value }))}
+                  placeholder="Ex: 0001"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Dígito agência */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Dígito Agência (opcional)</label>
+                <input
+                  value={bankAccount?.branch_digit || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), branch_digit: e.target.value }))}
+                  placeholder="Ex: 0"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Número da conta */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Número da Conta *</label>
+                <input
+                  value={bankAccount?.account_number || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), account_number: e.target.value }))}
+                  placeholder="Ex: 12345678"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Dígito conta */}
+              <div>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Dígito da Conta</label>
+                <input
+                  value={bankAccount?.account_digit || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), account_digit: e.target.value }))}
+                  placeholder="Ex: 9"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+              </div>
+
+              {/* Chave PIX */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Chave PIX para Recebimento Manual</label>
+                <input
+                  value={bankAccount?.pix_key || ''}
+                  onChange={e => setBankAccount(b => ({ ...(b || {}), pix_key: e.target.value }))}
+                  placeholder="Ex: arkieltech@gmail.com (email, CPF, telefone ou aleatória)"
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                />
+                <p style={{ color: 'var(--text-dim)', fontSize: 11, marginTop: 4 }}>
+                  Esta chave é usada na cobrança manual via PIX (Opção B — taxas pendentes sem split automático).
+                </p>
+              </div>
+            </div>
+
+            {bankMsg && (
+              <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: bankMsg.startsWith('✅') ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                color: bankMsg.startsWith('✅') ? '#22c55e' : '#ef4444' }}>
+                {bankMsg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
+              <button onClick={saveBankAccount} disabled={savingBank}
+                style={{ padding: '12px 28px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', opacity: savingBank ? 0.5 : 1 }}>
+                {savingBank ? 'Salvando...' : '💾 Salvar Conta Bancária'}
+              </button>
+            </div>
+          </div>
+
+          {/* ── Info: Como funciona o recebimento ── */}
+          <div className="ark-card" style={{ padding: 20, marginTop: 20, border: '1px solid rgba(79,142,247,0.1)' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, marginBottom: 10 }}>ℹ️ Como funciona o recebimento das taxas</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ color: '#4f8ef7', fontWeight: 700, fontSize: 13 }}>Opção A:</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Split automático no Mercado Pago — a taxa é retida na origem do pagamento e depositada diretamente na conta collector (MP Arkiel). Transfira o saldo para esta conta bancária quando quiser.</span>
+              </div>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span style={{ color: '#22c55e', fontWeight: 700, fontSize: 13 }}>Opção B:</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Cobrança manual via PIX — ao gerar cobrança das taxas pendentes na aba Receitas, o cliente paga via PIX usando a chave cadastrada acima.</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
