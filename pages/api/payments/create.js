@@ -125,9 +125,15 @@ export default async function handler(req, res) {
     if (!mpToken) mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
     if (!mpToken) return res.status(400).json({ error: 'Mercado Pago não configurado.' })
 
-    // Calcular taxa da plataforma (2%)
+    // Calcular taxa da plataforma — ler config dinâmica do tenant Arkiel
     const _payAmount = parseFloat(amount)
-    const _feePercent = 2.0
+    const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
+    let _feePercent = 2.0
+    try {
+      const { data: _arkielT } = await db.from('tenants').select('mp_access_token').eq('id', ARKIEL_TENANT_ID).maybeSingle()
+      const _parsed = JSON.parse(_arkielT?.mp_access_token || '{}')
+      _feePercent = _parsed.fee_config?.pix ?? 2.0
+    } catch {}
     const _mpFee = Number((_payAmount * _feePercent / 100).toFixed(2))
 
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {

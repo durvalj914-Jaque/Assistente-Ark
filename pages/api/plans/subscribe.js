@@ -178,8 +178,15 @@ export default async function handler(req, res) {
   } else if (method === 'mercadopago') {
     if (!mpToken) return res.status(400).json({ error: 'Mercado Pago não configurado' })
 
-    // Calcular taxa da plataforma (2%)
-    const _subFee = Number((amount * 2.0 / 100).toFixed(2))
+    // Calcular taxa da plataforma — ler config dinâmica
+    const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
+    let _subFeePct = 2.0
+    try {
+      const { data: _at } = await db.from('tenants').select('mp_access_token').eq('id', ARKIEL_TENANT_ID).maybeSingle()
+      const _parsed = JSON.parse(_at?.mp_access_token || '{}')
+      _subFeePct = _parsed.fee_config?.pix ?? 2.0
+    } catch {}
+    const _subFee = Number((amount * _subFeePct / 100).toFixed(2))
 
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
       method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },

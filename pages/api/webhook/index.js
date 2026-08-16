@@ -145,7 +145,14 @@ Vamos finalizar o pagamento 👇`)
       } else if (hasMp) {
         // ── Mercado Pago fallback ──
         const mpToken = tenant?.mp_access_token || process.env.MERCADOPAGO_ACCESS_TOKEN
-        const _catFee = Number((total * 2.0 / 100).toFixed(2))
+        // Ler fee_config dinamico
+        const _ARKIEL_TID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
+        let _catFeePct = 2.0
+        try {
+          const { data: _at3 } = await db.from('tenants').select('mp_access_token').eq('id', _ARKIEL_TID).maybeSingle()
+          _catFeePct = JSON.parse(_at3?.mp_access_token || '{}').fee_config?.pix ?? 2.0
+        } catch {}
+        const _catFee = Number((total * _catFeePct / 100).toFixed(2))
         const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
           body: JSON.stringify({
@@ -769,7 +776,13 @@ Obrigado! 🎉`)
             reply = `[PIX enviado - R$ ${payAmount.toFixed(2)}]`
           }
         } else if (payMethod === 'mercadopago' && process.env.MERCADOPAGO_ACCESS_TOKEN) {
-          const _flowFee = Number((payAmount * 2.0 / 100).toFixed(2))
+          // Ler fee_config dinamico
+          let _flowFeePct = 2.0
+          try {
+            const { data: _at4 } = await db.from('tenants').select('mp_access_token').eq('id', _ARKIEL_TID || 'cc629c88-c072-4593-84dc-e9cd8d2b06d2').maybeSingle()
+            _flowFeePct = JSON.parse(_at4?.mp_access_token || '{}').fee_config?.pix ?? 2.0
+          } catch {}
+          const _flowFee = Number((payAmount * _flowFeePct / 100).toFixed(2))
           const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}` },
             body: JSON.stringify({
