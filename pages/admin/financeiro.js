@@ -18,6 +18,7 @@ export default function FinanceiroPage() {
   // Pagamentos / histórico
   const [payConfig, setPayConfig] = useState({ pix_key: '', merchant_name: '', merchant_city: '', mp_access_token: '' })
   const [savingPayConfig, setSavingPayConfig] = useState(false)
+  const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   const [mpConnected, setMpConnected] = useState(false)
   const [mpDisconnecting, setMpDisconnecting] = useState(false)
   const [mpDisconnectResult, setMpDisconnectResult] = useState(null)
@@ -152,6 +153,7 @@ export default function FinanceiroPage() {
       
       if (json.config) {
         setPayConfig({ pix_key: json.config.pix_key || '', merchant_name: json.config.merchant_name || '', merchant_city: json.config.merchant_city || '', mp_access_token: json.config.mp_access_token || '' })
+        if (json.config.fee_config) setFeeConfig(json.config.fee_config)
         // Usar o status endpoint para determinar conexao (mais confiavel)
         setMpConnected(status.mp_connected === true)
         if (status.mp_connected && status.token_info) {
@@ -197,7 +199,7 @@ export default function FinanceiroPage() {
   }
 
   async function disconnectMP() {
-    if (!confirm('⚠️ Desconectar o Mercado Pago?\n\nSua conta MP será desvinculada da plataforma Arkiel.\n\n• Os pagamentos deixarão de ter confirmação automática\n• A taxa de 2% não será mais aplicada\n• Você voltará a receber apenas via PIX direto (chave própria)\n\nDeseja continuar?')) return
+    if (!confirm('⚠️ Desconectar o Mercado Pago?\n\nSua conta MP será desvinculada da plataforma Arkiel.\n\n• Os pagamentos deixarão de ter confirmação automática\n• A taxa da Arkiel não será mais aplicada\n• Você voltará a receber apenas via PIX direto (chave própria)\n\nDeseja continuar?')) return
     try {
       const h = await authHeader()
       await fetch('/api/payments/config', { method: 'POST', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payConfig, mp_access_token: '' }) })
@@ -376,7 +378,9 @@ export default function FinanceiroPage() {
               {mpConnected ? `Mercado Pago conectado${mpUser ? ` — ${mpUser}` : ''}` : 'Mercado Pago — usando conta da plataforma'}
             </div>
             <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
-              {mpConnected ? 'Sua conta própria • Taxa Arkiel: 2% • Confirmação automática via webhook' : 'Conecte sua própria conta para receber direto • Taxa Arkiel: 2% por transação'}
+              {mpConnected
+                ? `Sua conta própria • Taxa Arkiel: ${feeConfig.pix}% (PIX) / ${feeConfig.credit_card}% (Crédito) • Confirmação automática via webhook`
+                : `Conecte sua própria conta para receber direto • Taxa Arkiel: ${feeConfig.pix}%-${feeConfig.credit_card}% por transação`}
             </div>
           </div>
         </div>
@@ -406,6 +410,95 @@ export default function FinanceiroPage() {
           </div>
         )}
       </div>
+      {/* ── Resumo de taxas (Arkiel + Provedor) ── */}
+      <div className="ark-card" style={{ padding: 16, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 16 }}>📊</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Resumo de Taxas por Método</span>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+          {/* PIX */}
+          <div style={{ padding: '12px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 16 }}>💠</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>PIX</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa Arkiel:</span>
+              <span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeConfig.pix}%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa MP:</span>
+              <span style={{ color: '#22c55e', fontWeight: 700 }}>Grátis</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingTop: 4, borderTop: '1px solid var(--border-soft)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Você recebe (R$100):</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>R$ {(100 - feeConfig.pix).toFixed(2)}</span>
+            </div>
+          </div>
+          {/* Crédito */}
+          <div style={{ padding: '12px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 16 }}>💳</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>Crédito</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa Arkiel:</span>
+              <span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeConfig.credit_card}%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa MP:</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>~4,99%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingTop: 4, borderTop: '1px solid var(--border-soft)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Você recebe (R$100):</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>R$ {(100 - feeConfig.credit_card - 4.99).toFixed(2)}</span>
+            </div>
+          </div>
+          {/* Débito */}
+          <div style={{ padding: '12px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 16 }}>💳</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>Débito</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa Arkiel:</span>
+              <span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeConfig.debit_card}%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa MP:</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>~2,39%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingTop: 4, borderTop: '1px solid var(--border-soft)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Você recebe (R$100):</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>R$ {(100 - feeConfig.debit_card - 2.39).toFixed(2)}</span>
+            </div>
+          </div>
+          {/* Boleto */}
+          <div style={{ padding: '12px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <span style={{ fontSize: 16 }}>🧾</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>Boleto</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa Arkiel:</span>
+              <span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeConfig.boleto}%</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 3 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Taxa MP:</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>R$ 3,99</span>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, paddingTop: 4, borderTop: '1px solid var(--border-soft)' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Você recebe (R$100):</span>
+              <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>R$ {(100 - feeConfig.boleto - 3.99).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+        <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          * Taxas do MP (à vista) podem variar conforme plano da conta (Standard/Pro/Premium) e promoções. Taxa da Arkiel é configurável no painel admin em Pagamentos → Taxas da Plataforma.
+        </div>
+      </div>
+
       {/* Feedback da desconexão MP */}
       {mpDisconnectResult && (
         <div style={{ marginBottom: 16, padding: '12px 16px', borderRadius: 10,
@@ -785,11 +878,58 @@ export default function FinanceiroPage() {
                     <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Como funciona com a taxa da Arkiel</span>
                   </div>
                   <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-                    As transações do Point Tap entram no mesmo ecossistema do Mercado Pago. A taxa de 2% da Arkiel é retida automaticamente, igual às transações online. Você não precisa configurar nada extra — basta ter a conta PJ ativa no Mercado Pago.
+                    As transações do Point Tap entram no mesmo ecossistema do Mercado Pago. A taxa da Arkiel de <strong style={{ color: 'var(--text-secondary)' }}>{feeConfig.pix}%</strong> (PIX) / <strong style={{ color: 'var(--text-secondary)' }}>{feeConfig.credit_card}%</strong> (Crédito) é retida automaticamente, igual às transações online. Você não precisa configurar nada extra — basta ter a conta PJ ativa no Mercado Pago.
                   </p>
                 </div>
 
-                <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {/* Taxas do provedor (Mercado Pago) */}
+              <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: 'rgba(255,196,0,0.05)', border: '1px solid rgba(255,196,0,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 16 }}>🟡</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Taxas do Mercado Pago (Provedor)</span>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '0 0 10px 0' }}>
+                  Além da taxa da Arkiel, o Mercado Pago cobra sua própria taxa por processamento. Os valores abaixo são os praticados oficialmente pelo MP para contas PJ no Brasil:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>💠</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>PIX</span>
+                    </div>
+                    <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>Grátis</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>💳</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>Crédito</span>
+                    </div>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>~4,99% a.vista</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>💳</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>Débito</span>
+                    </div>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>~2,39%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>🧾</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>Boleto</span>
+                    </div>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>R$ 3,99 fixo</span>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,196,0,0.06)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Exemplo:</strong> Uma venda de R$ 100 no crédito: o MP cobra ~R$ 4,99 (taxa dele) + a Arkiel cobra <strong style={{ color: 'var(--text-secondary)' }}>R$ {feeConfig.credit_card}</strong> (taxa da plataforma). O cliente B2B recebe líquido ~R$ {100 - 4.99 - feeConfig.credit_card}.
+                </div>
+                <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  * Taxas do MP podem variar conforme plano da conta (Standard/Pro/Premium) e promoções. Confirme sempre no app do Mercado Pago.
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <a href="https://www.mercadopago.com.br/blog/como-usar-point-tap" target="_blank" rel="noopener"
                     style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)', color: '#22c55e', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
                     📖 Guia completo do Point Tap

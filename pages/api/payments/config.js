@@ -32,7 +32,24 @@ export default async function handler(req, res) {
       .select('id, pix_key, merchant_name, merchant_city, mp_access_token')
       .eq('id', tenantId)
       .maybeSingle()
-    return res.status(200).json({ config: tenant || {} })
+
+    // Buscar fee_config da plataforma (Arkiel tenant)
+    const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
+    const DEFAULT_FEES = { pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 }
+    let fee_config = DEFAULT_FEES
+    try {
+      const { data: arkielTenant } = await db.from('tenants')
+        .select('mp_access_token')
+        .eq('id', ARKIEL_TENANT_ID)
+        .maybeSingle()
+      if (arkielTenant?.mp_access_token) {
+        const parsed = JSON.parse(arkielTenant.mp_access_token)
+        if (parsed.fee_config) fee_config = { ...DEFAULT_FEES, ...parsed.fee_config }
+      }
+    } catch (e) { console.error('[payments/config] fee_config error:', e.message) }
+
+    return res.status(200).json({ config: { ...tenant, fee_config } })
+  }
 
   } else if (req.method === 'POST') {
     const { pix_key, merchant_name, merchant_city, mp_access_token } = req.body
