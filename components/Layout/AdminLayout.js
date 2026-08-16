@@ -12,7 +12,7 @@ import { PLANS } from '../../lib/plans'
 export default function AdminLayout({ children, tenant, user, role, profile, hideTopBar }) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [finOpen, setFinOpen] = useState(false)
+  const [finOpen, setFinOpen] = useState(router.pathname === '/admin/financeiro')
   const menuRef = useRef(null)
 
   async function handleLogout() {

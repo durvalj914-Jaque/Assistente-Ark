@@ -349,15 +349,15 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 24, borderBottom: '1px solid var(--border-soft)', paddingBottom: 0, overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, padding: 4, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', overflowX: 'auto' }}>
         {SUB_TABS.map(st => (
           <button key={st.key} onClick={() => setSubTab(st.key)}
             style={{
-              padding: '10px 16px', borderRadius: '10px 10px 0 0', cursor: 'pointer', whiteSpace: 'nowrap',
+              padding: '10px 16px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
               fontSize: 13, fontWeight: subTab === st.key ? 700 : 500,
-              border: 'none', borderBottom: subTab === st.key ? '2px solid #4f8ef7' : '2px solid transparent',
-              background: subTab === st.key ? 'rgba(79,142,247,0.1)' : 'transparent',
-              color: subTab === st.key ? '#4f8ef7' : 'var(--text-muted)',
+              border: 'none',
+              background: subTab === st.key ? '#4f8ef7' : 'transparent',
+              color: subTab === st.key ? '#fff' : 'var(--text-muted)',
               display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
             }}>
             <span style={{ fontSize: 16 }}>{st.icon}</span>
