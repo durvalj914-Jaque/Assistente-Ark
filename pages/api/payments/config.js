@@ -49,7 +49,6 @@ export default async function handler(req, res) {
     } catch (e) { console.error('[payments/config] fee_config error:', e.message) }
 
     return res.status(200).json({ config: { ...tenant, fee_config } })
-  }
 
   } else if (req.method === 'POST') {
     const { pix_key, merchant_name, merchant_city, mp_access_token } = req.body
