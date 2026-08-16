@@ -300,6 +300,40 @@ export default function PainelAdminPage() {
     } catch (e) { console.error('loadFeeConfig', e) }
   }
 
+  // ── Load bank account ──
+  async function loadBankAccount() {
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/bank-account', { headers: h })
+      const json = await res.json()
+      setBankAccount(json.bank_account || null)
+    } catch (e) { console.error('loadBankAccount', e) }
+  }
+
+  // ── Save bank account ──
+  async function saveBankAccount() {
+    setSavingBank(true)
+    setBankMsg('')
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/bank-account', {
+        method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bank_account: bankAccount })
+      })
+      const data = await res.json()
+      if (data.ok) {
+        setBankAccount(data.bank_account)
+        setBankMsg('✅ Conta bancária salva com sucesso!')
+        setTimeout(() => setBankMsg(''), 4000)
+      } else {
+        setBankMsg('❌ ' + (data.error || 'Erro ao salvar'))
+      }
+    } catch (e) {
+      setBankMsg('❌ ' + e.message)
+    }
+    setSavingBank(false)
+  }
+
   // ── Load platform fees summary ──
   async function loadFeeSummary() {
     const h = await getAuthHeaders()
