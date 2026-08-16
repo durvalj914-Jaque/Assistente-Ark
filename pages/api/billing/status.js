@@ -2,24 +2,29 @@
  * GET /api/billing/status?tenantId=xxx
  * Retorna o plano e status de billing do tenant
  */
-import { supabaseAdmin } from '../../../lib/supabase'
+import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).end()
 
   const { tenantId } = req.query
-  const authHeader   = req.headers.authorization || ''
-  const userToken    = authHeader.replace('Bearer ', '')
-  const db           = supabaseAdmin()
+  if (!tenantId) return res.status(400).json({ error: 'tenantId é obrigatório' })
 
-  const { data: { user } } = await db.auth.getUser(userToken)
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.replace('Bearer ', '')
+
+  // Usar client normal para validar sessão (não service role)
+  const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return res.status(401).json({ error: 'Não autorizado' })
+
+  // Usar admin para buscar dados do tenant
+  const db = supabaseAdmin()
 
   const { data: tenant } = await db
     .from('tenants')
     .select('id,name,plan,status,plan_expires_at,billing_provider,max_bots,max_messages_month')
     .eq('id', tenantId)
-    .single()
+    .maybeSingle()
 
   if (!tenant) return res.status(404).json({ error: 'Tenant não encontrado' })
 
