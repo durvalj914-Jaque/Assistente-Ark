@@ -349,21 +349,23 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, padding: 4, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24, padding: 6, borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', overflowX: 'auto' }}>
         {SUB_TABS.map(st => (
           <button key={st.key} onClick={() => setSubTab(st.key)}
             style={{
-              padding: '10px 16px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
-              fontSize: 13, fontWeight: subTab === st.key ? 700 : 500,
+              flex: 1, padding: '16px 20px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap',
+              fontSize: 15, fontWeight: subTab === st.key ? 700 : 500,
               border: 'none',
               background: subTab === st.key ? '#4f8ef7' : 'transparent',
               color: subTab === st.key ? '#fff' : 'var(--text-muted)',
-              display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.15s',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.15s',
+              boxShadow: subTab === st.key ? '0 2px 8px rgba(79,142,247,0.3)' : 'none',
+              minHeight: 56,
             }}>
-            <span style={{ fontSize: 16 }}>{st.icon}</span>
+            <span style={{ fontSize: 22 }}>{st.icon}</span>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <span>{st.label}</span>
-              <span style={{ fontSize: 10, fontWeight: 400, opacity: 0.7 }}>{st.desc}</span>
+              <span style={{ fontSize: 15 }}>{st.label}</span>
+              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>{st.desc}</span>
             </div>
           </button>
         ))}
