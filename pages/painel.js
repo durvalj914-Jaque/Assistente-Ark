@@ -1698,6 +1698,79 @@ export default function PainelAdminPage() {
               ))}
             </div>
           )}
+
+          {/* ── Point Tap: Smartphone como maquininha ── */}
+          <div className="ark-card" style={{ padding: 24, marginBottom: 20, border: '1px solid rgba(34,197,94,0.2)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: 140, height: 140, background: 'linear-gradient(135deg, rgba(34,197,94,0.06), rgba(79,142,247,0.04))', borderRadius: '0 0 0 100%' }} />
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 28 }}>📱</span>
+                <div>
+                  <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Point Tap — Celular como Maquininha</h3>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Receba pagamentos por aproximação (NFC) sem hardware extra</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                {/* Android */}
+                <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 18 }}>🤖</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Android (Point Tap)</span>
+                  </div>
+                  <ol style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
+                    <li>Abra o app <strong style={{ color: 'var(--text-secondary)' }}>Mercado Pago</strong></li>
+                    <li>Na tela inicial, toque em <strong style={{ color: '#22c55e' }}>Cobrar com Point Tap</strong></li>
+                    <li>Digite o valor da venda</li>
+                    <li>Peça para o cliente aproximar o cartão ou celular no NFC do aparelho</li>
+                    <li>Pronto! O dinheiro cai na conta MP na hora</li>
+                  </ol>
+                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(34,197,94,0.08)', fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
+                    ✓ Requisitos: Android com NFC + app Mercado Pago + internet
+                  </div>
+                </div>
+
+                {/* iPhone */}
+                <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 18 }}>🍎</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>iPhone (Tap to Pay)</span>
+                  </div>
+                  <ol style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
+                    <li>Abra o app <strong style={{ color: 'var(--text-secondary)' }}>Mercado Pago</strong></li>
+                    <li>Toque em <strong style={{ color: '#4f8ef7' }}>Cobrar</strong> e selecione <strong style={{ color: '#4f8ef7' }}>Tap to Pay no iPhone</strong></li>
+                    <li>Digite o valor e confirme</li>
+                    <li>Aproxime o cartão ou iPhone/Apple Watch do cliente na parte superior do aparelho</li>
+                    <li>Pagamento aprovado na hora</li>
+                  </ol>
+                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(79,142,247,0.08)', fontSize: 11, color: '#4f8ef7', fontWeight: 600 }}>
+                    ✓ Requisitos: iPhone XS ou superior + iOS 15.4+ + app Mercado Pago
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 16 }}>💡</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Como funciona com o split da Arkiel</span>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                  As transações do Point Tap entram no mesmo ecossistema do Mercado Pago. O split de {feeConfig?.pix ?? 2}% da Arkiel é retido automaticamente, igual às transações online. O cliente não precisa configurar nada extra — basta ter a conta PJ ativa no Mercado Pago.
+                </p>
+              </div>
+
+              <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <a href="https://www.mercadopago.com.br/blog/como-usar-point-tap" target="_blank" rel="noopener"
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)', color: '#22c55e', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                  📖 Guia completo do Point Tap
+                </a>
+                <a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noopener"
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                  🔧 Documentação para desenvolvedores
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
