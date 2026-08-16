@@ -349,24 +349,27 @@ export default function FinanceiroPage() {
       </div>
 
       {/* Sub-tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, padding: 6, borderRadius: 14, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         {SUB_TABS.map(st => (
-          <button key={st.key} onClick={() => setSubTab(st.key)}
+          <button
+            key={st.key}
+            onClick={() => setSubTab(st.key)}
             style={{
-              flex: 1, padding: '16px 20px', borderRadius: 10, cursor: 'pointer', whiteSpace: 'nowrap',
-              fontSize: 15, fontWeight: subTab === st.key ? 700 : 500,
-              border: 'none',
-              background: subTab === st.key ? '#4f8ef7' : 'transparent',
-              color: subTab === st.key ? '#fff' : 'var(--text-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, transition: 'all 0.15s',
-              boxShadow: subTab === st.key ? '0 2px 8px rgba(79,142,247,0.3)' : 'none',
-              minHeight: 56,
-            }}>
-            <span style={{ fontSize: 22 }}>{st.icon}</span>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-              <span style={{ fontSize: 15 }}>{st.label}</span>
-              <span style={{ fontSize: 11, fontWeight: 400, opacity: 0.7 }}>{st.desc}</span>
-            </div>
+              flex: 1,
+              padding: '14px 12px',
+              borderRadius: 12,
+              cursor: 'pointer',
+              fontSize: 14,
+              fontWeight: subTab === st.key ? 700 : 500,
+              border: subTab === st.key ? '1px solid #4f8ef7' : '1px solid var(--border-soft)',
+              background: subTab === st.key ? '#4f8ef7' : 'var(--bg-card, #fff)',
+              color: subTab === st.key ? '#fff' : '#64748b',
+              transition: 'all 0.15s',
+            }}
+          >
+            <div style={{ fontSize: 24, marginBottom: 6 }}>{st.icon}</div>
+            <div>{st.label}</div>
+            <div style={{ fontSize: 11, fontWeight: 400, opacity: 0.7, marginTop: 2 }}>{st.desc}</div>
           </button>
         ))}
       </div>
