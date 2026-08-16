@@ -930,13 +930,13 @@ export default function FinanceiroPage() {
               </div>
 
               <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <a href="https://www.mercadopago.com.br/blog/como-usar-point-tap" target="_blank" rel="noopener"
+                  <a href="https://www.mercadopago.com.br/ferramentas-para-vender/point-tap/ios" target="_blank" rel="noopener"
                     style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)', color: '#22c55e', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
-                    📖 Guia completo do Point Tap
+                    📖 Saber mais no Mercado Pago
                   </a>
-                  <a href="https://www.mercadopago.com.br/developers" target="_blank" rel="noopener"
+                  <a href="https://wa.me/5511913751590?text=Preciso%20de%20ajuda%20com%20o%20Point%20Tap" target="_blank" rel="noopener"
                     style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
-                    🔧 Documentação para desenvolvedores
+                    🎧 Falar com suporte Arkiel
                   </a>
                 </div>
               </div>
