@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import { PLANS, getEffectiveLimits, isPlanActive, getActivePlanLabel } from '../../lib/plans'
 
 export default function FinanceiroPage() {
   const { user, tenant, role, profile, loading } = useTenant()
@@ -46,10 +47,41 @@ export default function FinanceiroPage() {
   const [loadingPending, setLoadingPending] = useState(false)
   const [cancelingId, setCancelingId] = useState(null)
 
+  // Billing Arkiel (planos, bots, mensagens)
+  const [billingStatus, setBillingStatus] = useState(null)
+  const [loadingBilling, setLoadingBilling] = useState(false)
+  const [arkielPayments, setArkielPayments] = useState([])
+  const [loadingArkielPayments, setLoadingArkielPayments] = useState(false)
+
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     return { Authorization: `Bearer ${session?.access_token || ''}` }
   }, [])
+
+  // ── BILLING ARKIEL (planos) ──
+  async function loadBillingStatus() {
+    if (!tenant?.id) return
+    setLoadingBilling(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch(`/api/billing/status?tenantId=${tenant.id}`, { headers: h })
+      const json = await res.json()
+      if (!json.error) setBillingStatus(json)
+    } catch (e) { console.error('billing status:', e) }
+    finally { setLoadingBilling(false) }
+  }
+
+  async function loadArkielPayments() {
+    setLoadingArkielPayments(true)
+    try {
+      const h = await authHeader()
+      // Busca pagamentos feitos para a Arkiel (subscription payments)
+      const res = await fetch('/api/payments/history', { headers: h })
+      const json = await res.json()
+      if (json.payments) setArkielPayments(json.payments)
+    } catch (e) { console.error('arkiel payments:', e) }
+    finally { setLoadingArkielPayments(false) }
+  }
 
   // ── PAYMENT METHODS ──
   async function loadPaymentMethods(type) {
@@ -301,7 +333,8 @@ export default function FinanceiroPage() {
   useEffect(() => {
     if (!user) return
     loadPayConfig()
-    if (subTab === 'payment_methods') loadPaymentMethods('payment')
+    loadBillingStatus()
+    if (subTab === 'payment_methods') { loadPaymentMethods('payment'); loadArkielPayments() }
     else if (subTab === 'billing_methods') { loadPaymentMethods('billing'); loadPendingPayments() }
     else if (subTab === 'receipts') { loadReceipts('all'); loadPayments() }
     else if (subTab === 'history') { loadPayments() }
@@ -337,8 +370,8 @@ export default function FinanceiroPage() {
     ],
   }
 
-  const currentType = subTab === 'payment_methods' ? 'payment' : 'billing'
-  const currentPresets = PM_PRESETS[currentType] || []
+  const currentType = 'billing'
+  const currentPresets = PM_PRESETS['billing'] || []
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
@@ -515,12 +548,203 @@ export default function FinanceiroPage() {
         </div>
       )}
 
-      {/* ── FORMAS DE PAGAMENTO / COBRANÇA ── */}
-      {(subTab === 'payment_methods' || subTab === 'billing_methods') && (
+      {/* ── FORMAS DE PAGAMENTO: Pagar Arkiel ── */}
+      {subTab === 'payment_methods' && (
+        <div>
+          {/* Plano atual */}
+          <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 6 }}>Seu plano atual</div>
+                {(() => {
+                  const limits = getEffectiveLimits(tenant)
+                  const planLabel = getActivePlanLabel(tenant)
+                  const active = isPlanActive(tenant)
+                  const planData = PLANS[tenant?.plan] || PLANS.free
+                  const price = planData.price
+                  return (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                        <span style={{ fontSize: 24 }}>{active ? '✅' : '⚠️'}</span>
+                        <div>
+                          <span style={{ color: active ? '#22c55e' : '#f59e0b', fontSize: 16, fontWeight: 800 }}>{planLabel}</span>
+                          {price !== null && price > 0 && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 8 }}>
+                              R$ {(price / 100).toFixed(2)}/mês
+                            </span>
+                          )}
+                          {price === 0 && (
+                            <span style={{ color: 'var(--text-muted)', fontSize: 13, marginLeft: 8 }}>Grátis</span>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 16 }}>🤖</span>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Bots</div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+                              {limits.max_bots >= 999 ? 'Ilimitado' : `${billingStatus?.tenant?.max_bots || limits.max_bots}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 16 }}>💬</span>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Msgs/mês</div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+                              {limits.max_messages_month >= 999999 ? 'Ilimitado' : `${(billingStatus?.tenant?.max_messages_month || limits.max_messages_month).toLocaleString('pt-BR')}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 16 }}>📊</span>
+                          <div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Usadas este mês</div>
+                            <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+                              {(billingStatus?.usage?.messages || 0).toLocaleString('pt-BR')}
+                            </div>
+                          </div>
+                        </div>
+                        {limits.expires_at && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 16 }}>📅</span>
+                            <div>
+                              <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Renovação</div>
+                              <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>
+                                {new Date(limits.expires_at).toLocaleDateString('pt-BR')}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {Object.entries(PLANS).filter(([,p]) => p.price > 0).map(([key, plan]) => (
+                  <button
+                    key={key}
+                    onClick={() => router.push('/painel?tab=planos')}
+                    style={{
+                      padding: '8px 16px', borderRadius: 8, cursor: 'pointer', whiteSpace: 'nowrap',
+                      border: tenant?.plan === key ? '1px solid #22c55e' : '1px solid var(--border-soft)',
+                      background: tenant?.plan === key ? 'rgba(34,197,94,0.08)' : 'var(--bg-secondary)',
+                      color: tenant?.plan === key ? '#22c55e' : 'var(--text-secondary)',
+                      fontSize: 12, fontWeight: 600,
+                    }}
+                  >
+                    {plan.label} — R$ {(plan.price / 100).toFixed(2)}/mês
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Formas de pagar a Arkiel */}
+          <div className="ark-card" style={{ padding: 20, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
+            <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+              💳 Como pagar a Arkiel
+            </div>
+            <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 16 }}>
+              Formas de pagamento disponíveis para planos, bots e mensagens
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+              {/* PIX */}
+              <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid rgba(34,197,94,0.2)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 24 }}>💠</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>PIX</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Pague via PIX copia e cola ou QR Code</div>
+                <button
+                  onClick={() => { navigator.clipboard.writeText('arkieltech@gmail.com'); alert('Chave PIX copiada: arkieltech@gmail.com') }}
+                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)', color: '#22c55e', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginTop: 4 }}
+                >
+                  📋 Copiar chave PIX
+                </button>
+              </div>
+              {/* Cartão via MP */}
+              <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid rgba(0,158,227,0.2)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 24 }}>💳</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>Cartão / Boleto</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Crédito, débito ou boleto via Mercado Pago</div>
+                <a href="https://mpago.li/arkiel" target="_blank" rel="noopener"
+                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid rgba(0,158,227,0.3)', background: 'rgba(0,158,227,0.08)', color: '#009ee3', fontSize: 12, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', textAlign: 'center', marginTop: 4 }}
+                >
+                  🔗 Pagar via Mercado Pago
+                </a>
+              </div>
+              {/* Google Play */}
+              <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 24 }}>🟢</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>Google Play</span>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 11 }}>Assinatura via app Android (Ark AOI)</div>
+                <a href="https://play.google.com/store/apps/details?id=com.arkiel.assistenteark" target="_blank" rel="noopener"
+                  style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', textDecoration: 'none', textAlign: 'center', marginTop: 4 }}
+                >
+                  📲 Ver na Play Store
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Histórico de pagamentos à Arkiel */}
+          <div className="ark-card" style={{ padding: 20, border: '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
+                📜 Histórico de Pagamentos
+              </h3>
+              <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                {arkielPayments.length > 0 ? `${arkielPayments.length} transações` : 'Nenhum pagamento'}
+              </span>
+            </div>
+            {loadingArkielPayments ? (
+              <div style={{ color: 'var(--text-muted)', fontSize: 13, padding: 12, textAlign: 'center' }}>Carregando...</div>
+            ) : arkielPayments.length === 0 ? (
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div style={{ fontSize: 28, marginBottom: 6 }}>📋</div>
+                <span style={{ fontSize: 13 }}>Nenhum pagamento registrado ainda</span>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {arkielPayments.map(p => (
+                  <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 18 }}>{p.status === 'paid' ? '✅' : '⏳'}</span>
+                      <div>
+                        <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 13 }}>{p.description || 'Pagamento'}</div>
+                        <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{new Date(p.created_at).toLocaleString('pt-BR')}</div>
+                      </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>R$ {parseFloat(p.amount).toFixed(2)}</div>
+                      <div style={{
+                        fontSize: 10, fontWeight: 700,
+                        color: p.status === 'paid' ? '#22c55e' : '#f59e0b',
+                      }}>
+                        {p.status === 'paid' ? 'Pago' : 'Pendente'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── FORMAS DE COBRANÇA: B2B cobra B2C ── */}
+      {subTab === 'billing_methods' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
-              {subTab === 'payment_methods' ? '💳 Formas de Pagamento' : '📥 Formas de Cobrança'}
+              📥 Formas de Cobrança
             </h3>
             <button onClick={() => { setPmForm({ method_name: '', method_key: '', is_active: true }); setPmModal({ type: currentType, editing: null }) }}
               style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#4f8ef7', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
@@ -660,7 +884,7 @@ export default function FinanceiroPage() {
             <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
           ) : paymentMethods.length === 0 ? (
             <div className="ark-card" style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>{subTab === 'payment_methods' ? '💳' : '📥'}</div>
+              <div style={{ fontSize: 32, marginBottom: 8 }}>📥</div>
               Nenhuma forma cadastrada. Clique em "Adicionar" ou escolha um preset acima.
             </div>
           ) : (
