@@ -119,6 +119,12 @@ export default async function handler(req, res) {
     }
 
     if (!qrBuffer && !pixCode) {
+      // PIX via MP: NÃO faz fallback para PIX manual — se MP falhou, retorna erro
+      if (method === 'pix_mp') {
+        console.error('[pix-mp] MP falhou e method=pix_mp — sem fallback para manual')
+        return res.status(500).json({ error: 'Falha ao gerar PIX via Mercado Pago. Tente novamente ou use PIX Direto.' })
+      }
+      // PIX Simples / both: fallback para chave manual se disponível
       if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Cadastre uma chave PIX em Configurações ou conecte o Mercado Pago.' })
       pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
       qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
