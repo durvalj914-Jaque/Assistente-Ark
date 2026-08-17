@@ -114,6 +114,9 @@ export default function ConversationsPage() {
   const [payAmount, setPayAmount] = useState('')
   const [payDesc, setPayDesc] = useState('')
   const [payMethod, setPayMethod] = useState('pix')
+  const [chargeTab, setChargeTab] = useState('cobrar')
+  const [convCharges, setConvCharges] = useState({ pending: [], paid: [], receipts: [] })
+  const [loadingCharges, setLoadingCharges] = useState(false)
   const [sendingPayment, setSendingPayment] = useState(false)
   const [mpChargeMethods, setMpChargeMethods] = useState([])
   const [mpChargeAccount, setMpChargeAccount] = useState(null)
@@ -302,6 +305,18 @@ export default function ConversationsPage() {
       if (cfg.config?.fee_config) setFeeConfig(cfg.config.fee_config)
     } catch (e) { console.error('fetchChargeMethods:', e.message) }
     finally { setLoadingChargeMethods(false) }
+  }
+
+  async function fetchConvCharges() {
+    if (!selected?.id) return
+    setLoadingCharges(true)
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`/api/payments/conv-charges?conversation_id=${selected.id}`, { headers: h })
+      const json = await res.json()
+      if (json.pending) setConvCharges({ pending: json.pending, paid: json.paid, receipts: json.receipts })
+    } catch (e) { console.error('fetchConvCharges:', e.message) }
+    finally { setLoadingCharges(false) }
   }
 
   async function sendPayment() {
@@ -672,7 +687,7 @@ export default function ConversationsPage() {
                     </button>
                   )}
                   {/* Botão de pagamento */}
-                  <button onClick={() => { setShowPayModal(o => !o); if (!showPayModal) fetchChargeMethods() }} title="Enviar cobrança"
+                  <button onClick={() => { setShowPayModal(o => !o); if (!showPayModal) { fetchChargeMethods(); setChargeTab('cobrar'); fetchConvCharges() } }} title="Enviar cobrança"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
@@ -886,6 +901,36 @@ export default function ConversationsPage() {
               <button onClick={() => !sendingPayment && setShowPayModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', padding: 4 }}>✕</button>
             </div>
 
+            {/* Tab bar */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 16, padding: '4px', borderRadius: 10, background: 'var(--bg-secondary)' }}>
+              {[
+                { key: 'cobrar', label: 'Cobrar', icon: '💵' },
+                { key: 'pending', label: 'Pendentes', icon: '⏳', badge: convCharges.pending.length },
+                { key: 'paid', label: 'Pagos', icon: '✅', badge: convCharges.paid.length },
+                { key: 'receipts', label: 'Comprovantes', icon: '📄', badge: convCharges.receipts.length },
+              ].map(t => (
+                <button key={t.key} onClick={() => { setChargeTab(t.key); if (t.key !== 'cobrar') fetchConvCharges() }}
+                  style={{
+                    flex: 1, padding: '8px 4px', borderRadius: 8, cursor: 'pointer',
+                    border: 'none', fontSize: 11, fontWeight: 700,
+                    background: chargeTab === t.key ? 'var(--bg-card)' : 'transparent',
+                    color: chargeTab === t.key ? '#4f8ef7' : 'var(--text-muted)',
+                    boxShadow: chargeTab === t.key ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3,
+                    transition: 'all .15s',
+                  }}>
+                  <span style={{ fontSize: 13 }}>{t.icon}</span>
+                  <span>{t.label}</span>
+                  {t.badge > 0 && (
+                    <span style={{ fontSize: 9, fontWeight: 700, background: chargeTab === t.key ? '#4f8ef7' : 'var(--border-medium)', color: chargeTab === t.key ? '#fff' : 'var(--text-muted)', padding: '1px 5px', borderRadius: 8, minWidth: 16, textAlign: 'center' }}>{t.badge}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ── ABA: COBRAR ── */}
+            {chargeTab === 'cobrar' && (
+            <>
             <div style={{ marginBottom: 16 }}>
               <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Cliente</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
@@ -1081,7 +1126,103 @@ export default function ConversationsPage() {
               )}
             </div>
 
+          </>
+            )}
+            {/* ── ABA: PENDENTES ── */}
+            {chargeTab === 'pending' && (
+              <div>
+                {loadingCharges ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>Carregando…</div>
+                ) : convCharges.pending.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>✅</div>
+                    Nenhuma cobrança pendente
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {convCharges.pending.map(p => {
+                      const meta = (() => { try { return JSON.parse(p.pix_qr_url || '{}') } catch { return {} } })()
+                      return (
+                        <div key={p.id} style={{ padding: 12, borderRadius: 10, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>R$ {parseFloat(p.amount).toFixed(2)}</div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', padding: '2px 8px', borderRadius: 6 }}>⏳ Pendente</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{p.description || 'Pagamento'}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            {p.method?.toUpperCase() || 'PIX'} · {new Date(p.created_at).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* ── ABA: PAGOS ── */}
+            {chargeTab === 'paid' && (
+              <div>
+                {loadingCharges ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>Carregando…</div>
+                ) : convCharges.paid.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                    Nenhum pagamento recebido
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {convCharges.paid.map(p => {
+                      const meta = (() => { try { return JSON.parse(p.pix_qr_url || '{}') } catch { return {} } })()
+                      return (
+                        <div key={p.id} style={{ padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>R$ {parseFloat(p.amount).toFixed(2)}</div>
+                            <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '2px 8px', borderRadius: 6 }}>✅ Pago</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{p.description || 'Pagamento'}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                            {p.method?.toUpperCase() || 'PIX'} · {p.paid_at ? new Date(p.paid_at).toLocaleString('pt-BR') : new Date(p.created_at).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* ── ABA: COMPROVANTES ── */}
+            {chargeTab === 'receipts' && (
+              <div>
+                {loadingCharges ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>Carregando…</div>
+                ) : convCharges.receipts.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
+                    Nenhum comprovante recebido
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {convCharges.receipts.map(r => (
+                      <div key={r.id} style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{r.file_name || 'Comprovante'}</div>
+                          <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.file_type === 'image' ? '🖼️' : r.file_type === 'pdf' ? '📋' : '📄'}</span>
+                        </div>
+                        {r.notes && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{r.notes}</div>}
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                          {r.uploaded_by || '—'} · {new Date(r.created_at).toLocaleString('pt-BR')}
+                        </div>
+                        {r.file_url && !r.file_url.startsWith('__media__') && (
+                          <a href={r.file_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: '#4f8ef7', textDecoration: 'none', marginTop: 4, display: 'inline-block' }}>Ver arquivo →</a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+          {chargeTab === 'cobrar' && (
           <div style={{ display: 'flex', gap: 8, paddingTop: 16, flexShrink: 0, borderTop: '1px solid var(--border-soft)' }}>
               <button onClick={() => setShowPayModal(false)} disabled={sendingPayment}
                 className="ark-btn-ghost" style={{ flex: 1, fontSize: 13, padding: '12px 18px' }}>
@@ -1098,6 +1239,7 @@ export default function ConversationsPage() {
                 {sendingPayment ? 'Enviando…' : '💵 Enviar cobrança'}
               </button>
             </div>
+          )}
           </div>
         </div>
       )
