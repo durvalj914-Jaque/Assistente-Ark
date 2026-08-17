@@ -85,7 +85,7 @@ export default async function handler(req, res) {
     })
   }
 
-  if (method === 'pix' || method === 'pix_direct' || method === 'both') {
+  if (method === 'pix' || method === 'pix_mp' || method === 'pix_direct' || method === 'both') {
     const useDirectPix = method === 'pix_direct'
     let mpTokenForPix = null
     if (tenant?.mp_access_token) {

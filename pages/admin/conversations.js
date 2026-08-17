@@ -1001,16 +1001,16 @@ export default function ConversationsPage() {
                         </div>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: mpChargeMethods.length > 0 ? 8 : 0 }}>
-                        <button onClick={() => setPayMethod('pix')}
+                        <button onClick={() => setPayMethod('pix_mp')}
                           style={{
                             padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
-                            border: payMethod === 'pix' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                            background: payMethod === 'pix' ? 'rgba(79,142,247,0.12)' : 'var(--bg-secondary)',
+                            border: payMethod === 'pix_mp' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                            background: payMethod === 'pix_mp' ? 'rgba(79,142,247,0.12)' : 'var(--bg-secondary)',
                             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                             transition: 'all .15s',
                           }}>
                           <span style={{ fontSize: 18 }}>💸</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix' ? '#4f8ef7' : 'var(--text-primary)' }}>PIX via MP</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix_mp' ? '#4f8ef7' : 'var(--text-primary)' }}>PIX via MP</span>
                           <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Auto-confirma · Arkiel {feeConfig.pix}% + MP {MP_FEE_LABELS.pix}</span>
                         </button>
                         <button onClick={() => setPayMethod('mercadopago')}
@@ -1033,7 +1033,7 @@ export default function ConversationsPage() {
                           </div>
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             {mpChargeMethods.map(cat => {
-                              const methodKey = cat.key === 'pix' ? 'pix' : 'mercadopago'
+                              const methodKey = cat.key === 'pix' ? 'pix_mp' : 'mercadopago'
                               const isActive = payMethod === methodKey
                               return (
                                 <button key={cat.key} onClick={() => setPayMethod(methodKey)}
