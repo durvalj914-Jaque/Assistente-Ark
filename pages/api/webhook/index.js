@@ -240,6 +240,60 @@ async function processWebhook(body) {
     return
   }
 
+  // === HANDLER: Cliente clicou "Ver detalhes" no template de cobrança ===
+  if (userText === 'Ver detalhes' && (msg.type === 'button' || msg.type === 'interactive')) {
+    console.log('[webhook] Botao "Ver detalhes" clicado por:', from)
+    // Buscar o PIX pendente mais recente desta conversa
+    const { data: botArr0 } = await db.from('bots').select('id,phone_number_id,tenant_id,access_token,status').eq('phone_number_id', phoneNumberId).eq('status', 'active').limit(1)
+    if (botArr0?.length) {
+      const bot0 = botArr0[0]
+      const { data: contact0 } = await db.from('contacts').select('id,phone').eq('phone', from).limit(1).maybeSingle()
+      if (contact0) {
+        const { data: conv0 } = await db.from('conversations').select('id').eq('bot_id', bot0.id).eq('contact_id', contact0.id).limit(1).maybeSingle()
+        if (conv0) {
+          // Buscar mensagem __pending_charge__ mais recente
+          const { data: pending } = await db.from('messages')
+            .select('content,created_at')
+            .eq('conversation_id', conv0.id)
+            .like('content', '__pending_charge__:%')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+
+          if (pending?.content) {
+            // Extrair dados do pending
+            const amountMatch = pending.content.match(/amount=([\d.]+)/)
+            const descMatch = pending.content.match(/desc=([^:]+):/)
+            const pixMatch = pending.content.match(/pix=([^:]+):/)
+            const methodMatch = pending.content.match(/method=(.+)$/)
+            const pAmount = amountMatch ? amountMatch[1] : ''
+            const pDesc = descMatch ? decodeURIComponent(descMatch[1]) : ''
+            const pPix = pixMatch ? decodeURIComponent(pixMatch[1]) : ''
+            const pMethod = methodMatch ? methodMatch[1] : 'PIX'
+
+            const waToken0 = bot0.access_token || process.env.META_SYSTEM_USER_TOKEN || process.env.FACEBOOK_BUSINESS_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
+
+            const pixMsg = `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
+
+            try {
+              await sendText(phoneNumberId, waToken0, from, pixMsg)
+              await safeInsert(db, 'messages', {
+                tenant_id: bot0.tenant_id, conversation_id: conv0.id, bot_id: bot0.id,
+                contact_id: contact0.id, direction: 'outbound', content: pixMsg, sent_by: 'bot'
+              })
+              console.log('[webhook] PIX enviado apos "Ver detalhes"')
+            } catch (sendErr) {
+              console.error('[webhook] Erro ao enviar PIX:', sendErr.message)
+            }
+            return
+          } else {
+            console.log('[webhook] Nenhum PIX pendente encontrado')
+          }
+        }
+      }
+    }
+  }
+
   // Bot
   const { data: botArr, error: botErr } = await db
     .from('bots')

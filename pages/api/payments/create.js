@@ -127,24 +127,43 @@ export default async function handler(req, res) {
     const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : (useDirectPix ? 'PIX Direto' : 'PIX')
     const textMsg = `💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*PIX Copia e Cola:*\n${pixCode}\n\nEscaneie o QR Code abaixo ou copie o código acima.`
 
-    // 1. ENVIAR TEXTO PRIMEIRO (mais confiável)
+    // 1. SALVAR PIX COMO PENDENTE (será enviado quando o cliente clicar "Ver detalhes")
+    const pendingContent = `__pending_charge__:amount=${parseFloat(amount)}:desc=${encodeURIComponent(description || '')}:pix=${encodeURIComponent(pixCode)}:method=${viaLabel}`
+    await saveMessage(pendingContent, 'payment_pending')
+    console.log('[payments/create] PIX salvo como pendente')
+
+    // 2. TENTAR ENVIAR TEXTO DIRETO (se janela 24h aberta)
     let textSent = false
     try {
       await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'text', text: { body: textMsg } })
       textSent = true
       await saveMessage(textMsg, 'text')
-      console.log('[payments/create] Texto PIX enviado OK')
+      console.log('[payments/create] Texto PIX enviado OK (janela aberta)')
     } catch (textErr) {
-      console.error('[payments/create] Erro texto PIX:', textErr.message)
-      if (textErr.message.includes('message window') || textErr.message.includes('131047')) {
-        await saveMessage(`${textMsg}\n⚠️ *Não entregue:* Janela de 24h expirada. Peça ao cliente para enviar qualquer mensagem primeiro.`, 'text')
-        return res.status(400).json({ error: 'Janela de 24h do WhatsApp expirada. O cliente precisa enviar uma mensagem primeiro para receber a cobrança.' })
+      console.error('[payments/create] Texto falhou:', textErr.message)
+      // 3. SE FALHOU (janela 24h), ENVIAR TEMPLATE COM BOTÃO "Ver detalhes"
+      try {
+        await sendWaMessage({
+          messaging_product: 'whatsapp',
+          to: cleanPhone,
+          type: 'template',
+          template: {
+            name: 'nova_cobranca_arkiel',
+            language: { code: 'pt_BR' }
+          }
+        })
+        await saveMessage(`📨 *Notificação de cobrança enviada* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n\n_Cliente deve clicar em "Ver detalhes" para receber o PIX._`, 'text')
+        console.log('[payments/create] Template enviado (fora janela 24h)')
+        return res.status(200).json({ ok: true, payment_id: paymentId, method: useDirectPix ? 'pix_direct' : 'pix', pix_code: pixCode, mp_pix_id: mpPixId, delivery: 'template' })
+      } catch (tmplErr) {
+        console.error('[payments/create] Template falhou:', tmplErr.message)
+        await saveMessage(`${textMsg}\n⚠️ *Não entregue:* ${tmplErr.message}`, 'text')
+        return res.status(500).json({ error: `Não foi possível enviar: ${tmplErr.message}` })
       }
-      await saveMessage(`${textMsg}\n⚠️ *Não entregue:* ${textErr.message}`, 'text')
     }
 
-    // 2. TENTAR ENVIAR IMAGEM QR CODE (bonus)
-    if (qrBuffer) {
+    // 4. SE TEXTO DEU CERTO, TENTAR ENVIAR QR CODE TAMBÉM
+    if (qrBuffer && textSent) {
       try {
         const blob = new Blob([qrBuffer], { type: 'image/png' })
         const formData = new FormData()
@@ -164,16 +183,10 @@ export default async function handler(req, res) {
           } catch (imgErr) {
             console.error('[payments/create] Erro imagem (texto já foi):', imgErr.message)
           }
-        } else {
-          console.error('[payments/create] Upload imagem falhou:', JSON.stringify(upJson).substring(0, 200))
         }
       } catch (uploadErr) {
         console.error('[payments/create] Erro upload:', uploadErr.message)
       }
-    }
-
-    if (!textSent) {
-      return res.status(500).json({ error: 'Não foi possível enviar a cobrança via WhatsApp. Verifique se o bot está ativo e o telefone está correto.' })
     }
 
     if (method !== 'both') {
