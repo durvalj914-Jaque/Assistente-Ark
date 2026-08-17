@@ -27,8 +27,11 @@ export default async function handler(req, res) {
   const { data: conv } = await db.from('conversations').select('id, tenant_id, bot_id, contact_id').eq('id', conversation_id).maybeSingle()
   if (!conv) return res.status(404).json({ error: 'Conversa não encontrada' })
 
-  const { data: bot } = await db.from('bots').select('id, name, phone_number_id, access_token').eq('id', conv.bot_id).maybeSingle()
+  // Buscar bot com status
+  const { data: bot } = await db.from('bots').select('id, name, phone_number_id, access_token, status').eq('id', conv.bot_id).maybeSingle()
   if (!bot) return res.status(404).json({ error: 'Bot não encontrado' })
+  if (bot.status !== 'active') return res.status(400).json({ error: 'Bot inativo. Acesse Configurações para reativar o WhatsApp antes de enviar cobranças.' })
+  if (!bot.phone_number_id) return res.status(400).json({ error: 'Bot sem número de WhatsApp configurado.' })
 
   const { data: tenant } = await db.from('tenants').select('id, name, pix_key, merchant_name, merchant_city, mp_access_token').eq('id', conv.tenant_id).maybeSingle()
 
@@ -37,18 +40,32 @@ export default async function handler(req, res) {
   const finalCity = (merchant_city || tenant?.merchant_city || 'SAO PAULO').substring(0, 15)
 
   const txid = `ARK${Date.now().toString(36).toUpperCase()}`
-  // Payment record stored in messages table instead of payments (table schema incomplete)
   const paymentId = txid
 
   const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
   const phoneId = bot.phone_number_id
 
+  if (!waToken) return res.status(500).json({ error: 'Token do WhatsApp não configurado.' })
+
   const { data: contact } = await db.from('contacts').select('phone').eq('id', conv.contact_id).maybeSingle()
   if (!contact?.phone) return res.status(400).json({ error: 'Contato sem telefone' })
 
+  // Helper: enviar mensagem WhatsApp com verificação de erro
+  async function sendWaMessage(payload) {
+    const r = await fetch(`${WA_API}/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
+      body: JSON.stringify(payload),
+    })
+    const j = await r.json()
+    if (!r.ok || j.error) {
+      const errMsg = j.error?.message || j.message || JSON.stringify(j).substring(0, 200)
+      throw new Error(`WhatsApp: ${errMsg}`)
+    }
+    return j
+  }
+
   if (method === 'pix' || method === 'pix_direct' || method === 'both') {
-    // pix_direct = sempre PIX estático (chave própria do tenant)
-    // pix = PIX via MP se conectado, fallback para estático
     const useDirectPix = method === 'pix_direct'
     let mpTokenForPix = null
     if (tenant?.mp_access_token) {
@@ -59,7 +76,6 @@ export default async function handler(req, res) {
     let qrBuffer, pixCode, mpPixId = null
 
     if (mpTokenForPix && !useDirectPix) {
-      // === PIX via Mercado Pago (dinâmico) ===
       const mpPixRes = await fetch('https://api.mercadopago.com/v1/payments', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpTokenForPix}` },
         body: JSON.stringify({
@@ -74,23 +90,21 @@ export default async function handler(req, res) {
       const mpPixData = await mpPixRes.json()
 
       if (mpPixData?.point_of_interaction?.transaction_data?.qr_code_base64) {
-        // MP retornou o QR Code em base64
         qrBuffer = Buffer.from(mpPixData.point_of_interaction.transaction_data.qr_code_base64, 'base64')
         pixCode = mpPixData.point_of_interaction.transaction_data.qr_code
         mpPixId = mpPixData.id
       } else {
         console.error('[pix-mp] Falha ao criar PIX via MP:', JSON.stringify(mpPixData).substring(0, 300))
-        // Fallback para PIX estático se MP falhar
       }
     }
 
     if (!qrBuffer && !pixCode) {
-      // === PIX estático (fallback sem MP) ===
       if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Cadastre uma chave PIX em Configurações ou conecte o Mercado Pago.' })
       pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
       qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
     }
 
+    // Upload QR Code image
     const blob = new Blob([qrBuffer], { type: 'image/png' })
     const formData = new FormData()
     formData.append('messaging_product', 'whatsapp')
@@ -99,25 +113,29 @@ export default async function handler(req, res) {
 
     const upRes = await fetch(`${WA_API}/${phoneId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${waToken}` }, body: formData })
     const upJson = await upRes.json()
-    if (!upJson.id) return res.status(500).json({ error: 'Falha ao subir QR Code', detail: upJson })
+    if (!upJson.id) return res.status(500).json({ error: 'Falha ao subir QR Code no WhatsApp', detail: upJson })
 
     const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : (useDirectPix ? 'PIX Direto' : 'PIX')
-    await fetch(`${WA_API}/${phoneId}/messages`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'image',
-        image: { id: upJson.id, caption: `💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Escaneie o QR Code ou copie o código abaixo:*\n\n${pixCode}` } }),
-    })
+    const caption = `💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Escaneie o QR Code ou copie o código abaixo:*\n\n${pixCode}`
+
+    // Enviar mensagem com verificação de erro
+    try {
+      await sendWaMessage({ messaging_product: 'whatsapp', to: contact.phone, type: 'image',
+        image: { id: upJson.id, caption } })
+    } catch (sendErr) {
+      // Mensagem falhou — registrar no chat mas informar o usuário
+      await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n⚠️ *Não entregue:* ${sendErr.message}`, sent_by: 'human' })
+      return res.status(500).json({ error: `Cobrança criada mas não enviada: ${sendErr.message}` })
+    }
 
     await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}`, sent_by: 'human' })
 
-    // Se method === 'both', nao retorna ainda — continua para criar tambem o link de Checkout
     if (method !== 'both') {
       return res.status(200).json({ ok: true, payment_id: paymentId, method: useDirectPix ? 'pix_direct' : 'pix', pix_code: pixCode, mp_pix_id: mpPixId })
     }
-
   }
+
   if (method === 'mercadopago' || method === 'both') {
-    // Usa token do tenant (OAuth) com fallback para token da plataforma
     let mpToken = null
     if (tenant?.mp_access_token) {
       try { mpToken = JSON.parse(tenant.mp_access_token).access_token } catch { mpToken = tenant.mp_access_token }
@@ -125,7 +143,6 @@ export default async function handler(req, res) {
     if (!mpToken) mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
     if (!mpToken) return res.status(400).json({ error: 'Mercado Pago não configurado.' })
 
-    // Calcular taxa da plataforma — ler config dinâmica do tenant Arkiel
     const _payAmount = parseFloat(amount)
     const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
     let _feePercent = 2.0
@@ -151,8 +168,14 @@ export default async function handler(req, res) {
     if (!mpData.init_point) return res.status(500).json({ error: 'Falha ao criar pagamento MP', detail: mpData })
 
     const linkText = `💳 *Pagamento* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`
-    await fetch(`${WA_API}/${phoneId}/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: linkText } }) })
+
+    // Enviar com verificação de erro
+    try {
+      await sendWaMessage({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: linkText } })
+    } catch (sendErr) {
+      await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: `${linkText}\n⚠️ *Não entregue:* ${sendErr.message}`, sent_by: 'human' })
+      return res.status(500).json({ error: `Link criado mas não enviado: ${sendErr.message}` })
+    }
 
     await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: linkText, sent_by: 'human' })
 
