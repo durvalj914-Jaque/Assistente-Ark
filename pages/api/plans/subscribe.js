@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     if (mpToken) {
       try {
         const mpPixRes = await fetch('https://api.mercadopago.com/v1/payments', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}`, 'X-Idempotency-Key': txid },
           body: JSON.stringify({
             transaction_amount: amount,
             description,
@@ -189,7 +189,7 @@ export default async function handler(req, res) {
     const _subFee = Number((amount * _subFeePct / 100).toFixed(2))
 
     const mpRes = await fetch('https://api.mercadopago.com/checkout/preferences', {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}` },
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}`, 'X-Idempotency-Key': txid },
       body: JSON.stringify({
         items: [{ title: description, quantity: 1, unit_price: amount, currency_id: 'BRL' }],
         marketplace: 'ARKIEL',

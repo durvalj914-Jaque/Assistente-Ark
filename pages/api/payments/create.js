@@ -97,7 +97,7 @@ export default async function handler(req, res) {
 
     if (mpTokenForPix && !useDirectPix) {
       const mpPixRes = await fetch('https://api.mercadopago.com/v1/payments', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpTokenForPix}` },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${mpTokenForPix}`, 'X-Idempotency-Key': txid },
         body: JSON.stringify({
           transaction_amount: parseFloat(amount),
           description: description || 'Pagamento Arkiel',
