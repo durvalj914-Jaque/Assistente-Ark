@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     }
     if (!mpTokenForPix) mpTokenForPix = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
 
-    let qrBuffer, pixCode, mpPixId = null
+    let qrBuffer, pixCode, mpPixId = null, mpPixError = null
 
     if (mpTokenForPix && !useDirectPix) {
       const mpPixRes = await fetch('https://api.mercadopago.com/v1/payments', {
@@ -115,6 +115,7 @@ export default async function handler(req, res) {
         mpPixId = mpPixData.id
       } else {
         console.error('[pix-mp] Falha MP PIX:', JSON.stringify(mpPixData).substring(0, 300))
+        mpPixError = JSON.stringify(mpPixData).substring(0, 500)
       }
     }
 
@@ -122,7 +123,7 @@ export default async function handler(req, res) {
       // PIX via MP: NÃO faz fallback para PIX manual — se MP falhou, retorna erro
       if (method === 'pix_mp') {
         console.error('[pix-mp] MP falhou e method=pix_mp — sem fallback para manual')
-        return res.status(500).json({ error: 'Falha ao gerar PIX via Mercado Pago. Tente novamente ou use PIX Direto.' })
+        return res.status(500).json({ error: 'Falha ao gerar PIX via Mercado Pago. Tente novamente ou use PIX Direto.', debug: mpPixError, hasToken: !!mpTokenForPix })
       }
       // PIX Simples / both: fallback para chave manual se disponível
       if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Cadastre uma chave PIX em Configurações ou conecte o Mercado Pago.' })
