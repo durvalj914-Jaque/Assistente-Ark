@@ -142,24 +142,42 @@ export default async function handler(req, res) {
     } catch (textErr) {
       console.error('[payments/create] Texto falhou:', textErr.message)
       // 3. SE FALHOU (janela 24h), ENVIAR TEMPLATE COM BOTÃO "Ver detalhes"
+      // 3a. TENTAR TEMPLATE CUSTOMIZADO (se aprovado)
+      let templateSent = false
       try {
         await sendWaMessage({
           messaging_product: 'whatsapp',
           to: cleanPhone,
           type: 'template',
-          template: {
-            name: 'nova_cobranca_arkiel',
-            language: { code: 'pt_BR' }
-          }
+          template: { name: 'nova_cobranca_arkiel', language: { code: 'pt_BR' } }
         })
+        templateSent = true
         await saveMessage(`📨 *Notificação de cobrança enviada* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n\n_Cliente deve clicar em "Ver detalhes" para receber o PIX._`, 'text')
-        console.log('[payments/create] Template enviado (fora janela 24h)')
-        return res.status(200).json({ ok: true, payment_id: paymentId, method: useDirectPix ? 'pix_direct' : 'pix', pix_code: pixCode, mp_pix_id: mpPixId, delivery: 'template' })
+        console.log('[payments/create] Template custom enviado (fora janela 24h)')
       } catch (tmplErr) {
-        console.error('[payments/create] Template falhou:', tmplErr.message)
-        await saveMessage(`${textMsg}\n⚠️ *Não entregue:* ${tmplErr.message}`, 'text')
-        return res.status(500).json({ error: `Não foi possível enviar: ${tmplErr.message}` })
+        console.error('[payments/create] Template custom falhou:', tmplErr.message)
       }
+      // 3b. FALLBACK: TEMPLATE HELLO_WORLD (sempre aprovado)
+      if (!templateSent) {
+        try {
+          await sendWaMessage({
+            messaging_product: 'whatsapp',
+            to: cleanPhone,
+            type: 'template',
+            template: { name: 'hello_world', language: { code: 'en_US' } }
+          })
+          templateSent = true
+          await saveMessage(`📨 *Notificação enviada* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n\n_Cliente recebeu notificação. Quando responder, receberá o PIX automaticamente._`, 'text')
+          console.log('[payments/create] Template hello_world enviado (fallback)')
+        } catch (hwErr) {
+          console.error('[payments/create] Hello world falhou:', hwErr.message)
+        }
+      }
+      if (templateSent) {
+        return res.status(200).json({ ok: true, payment_id: paymentId, method: useDirectPix ? 'pix_direct' : 'pix', pix_code: pixCode, mp_pix_id: mpPixId, delivery: 'template' })
+      }
+      await saveMessage(`${textMsg}\n⚠️ *Não entregue:* Janela 24h expirada e templates falharam.`, 'text')
+      return res.status(500).json({ error: 'Não foi possível enviar a cobrança. O cliente não interagiu nas últimas 24h e os templates falharam.' })
     }
 
     // 4. SE TEXTO DEU CERTO, TENTAR ENVIAR QR CODE TAMBÉM

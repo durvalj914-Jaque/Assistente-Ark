@@ -472,6 +472,42 @@ async function processWebhook(body) {
     content: displayContent, meta_message_id: wamId
   })
 
+  // ── CHECK PIX PENDENTE: se há cobrança pendente, enviar PIX agora (janela 24h aberta) ──
+  const { data: pendingCharge } = await db.from('messages')
+    .select('content,created_at')
+    .eq('conversation_id', conv.id)
+    .like('content', '__pending_charge__:%')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (pendingCharge?.content) {
+    const amountMatch = pendingCharge.content.match(/amount=([\d.]+)/)
+    const descMatch = pendingCharge.content.match(/desc=([^:]+):pix=/)
+    const pixMatch = pendingCharge.content.match(/pix=([^:]+):method=/)
+    const methodMatch = pendingCharge.content.match(/method=(.+)$/)
+    const pAmount = amountMatch ? amountMatch[1] : ''
+    const pDesc = descMatch ? decodeURIComponent(descMatch[1]) : ''
+    const pPix = pixMatch ? decodeURIComponent(pixMatch[1]) : ''
+    const pMethod = methodMatch ? methodMatch[1] : 'PIX'
+
+    if (pPix) {
+      const pixMsg = `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
+      try {
+        await sendText(phoneNumberId, tkn, from, pixMsg)
+        await safeInsert(db, 'messages', {
+          tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
+          contact_id: contact.id, direction: 'outbound', content: pixMsg, sent_by: 'bot'
+        })
+        console.log('[webhook] PIX pendente enviado apos msg do cliente')
+      } catch (pixSendErr) {
+        console.error('[webhook] Erro ao enviar PIX pendente:', pixSendErr.message)
+      }
+      // Marcar como enviado (remover prefixo __pending_charge__)
+      await db.from('messages').update({ content: pendingCharge.content.replace('__pending_charge__:', '__charge_sent__:') }).eq('id', pendingCharge.id)
+    }
+  }
+
   // ── DETECÇÃO AUTOMÁTICA DE COMPROVANTE ──
   // Toda imagem ou PDF recebido = potencial comprovante de pagamento
   if (mediaId && (msg.type === 'image' || msg.type === 'document')) {
