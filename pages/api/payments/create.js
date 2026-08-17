@@ -1,6 +1,7 @@
 /**
  * POST /api/payments/create
  * Cria um pagamento (PIX ou Mercado Pago) e envia via WhatsApp.
+ * Estratégia: envia TEXTO primeiro (mais confiável), depois tenta imagem QR Code.
  */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 import { generatePixCode } from '../../../lib/pix'
@@ -27,7 +28,6 @@ export default async function handler(req, res) {
   const { data: conv } = await db.from('conversations').select('id, tenant_id, bot_id, contact_id').eq('id', conversation_id).maybeSingle()
   if (!conv) return res.status(404).json({ error: 'Conversa não encontrada' })
 
-  // Buscar bot com status
   const { data: bot } = await db.from('bots').select('id, name, phone_number_id, access_token, status').eq('id', conv.bot_id).maybeSingle()
   if (!bot) return res.status(404).json({ error: 'Bot não encontrado' })
   if (bot.status !== 'active') return res.status(400).json({ error: 'Bot inativo. Acesse Configurações para reativar o WhatsApp antes de enviar cobranças.' })
@@ -50,25 +50,18 @@ export default async function handler(req, res) {
   const { data: contact } = await db.from('contacts').select('phone').eq('id', conv.contact_id).maybeSingle()
   if (!contact?.phone) return res.status(400).json({ error: 'Contato sem telefone' })
 
-  // Sanitizar telefone: remover tudo que não for dígito
+  // Sanitizar telefone
   let cleanPhone = contact.phone.replace(/\D/g, '')
-  // Se tem 12 dígitos e começa com 55, adicionar 9 (celular BR)
   if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
-    cleanPhone = cleanPhone.slice(0,4) + '9' + cleanPhone.slice(4)
+    cleanPhone = cleanPhone.slice(0, 4) + '9' + cleanPhone.slice(4)
   }
-  // Se não tem código de país (11 dígitos), assumir Brasil +55
-  if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
-    cleanPhone = '55' + cleanPhone
-  }
-  // Se tem 10 dígitos (fixo sem 9), adicionar 55
-  if (cleanPhone.length === 10 && !cleanPhone.startsWith('55')) {
-    cleanPhone = '55' + cleanPhone
-  }
-  console.log('[payments/create] Phone original:', contact.phone, '→ Sanitizado:', cleanPhone)
+  if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) cleanPhone = '55' + cleanPhone
+  if (cleanPhone.length === 10 && !cleanPhone.startsWith('55')) cleanPhone = '55' + cleanPhone
+  console.log('[payments/create] Phone:', contact.phone, '→', cleanPhone)
 
-  // Helper: enviar mensagem WhatsApp com verificação de erro
+  // Helper: enviar mensagem WhatsApp
   async function sendWaMessage(payload) {
-    console.log('[payments/create] Sending WA message to:', payload.to, 'type:', payload.type || 'text')
+    console.log('[payments/create] WA to:', payload.to, 'type:', payload.type || 'text')
     const r = await fetch(`${WA_API}/${phoneId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
@@ -77,11 +70,19 @@ export default async function handler(req, res) {
     const j = await r.json()
     if (!r.ok || j.error) {
       const errMsg = j.error?.message || j.message || JSON.stringify(j).substring(0, 200)
-      console.error('[payments/create] WA API error:', r.status, errMsg)
+      console.error('[payments/create] WA error:', r.status, errMsg)
       throw new Error(`WhatsApp: ${errMsg}`)
     }
-    console.log('[payments/create] WA message sent OK, id:', j.messages?.[0]?.id || 'unknown')
+    console.log('[payments/create] WA OK, id:', j.messages?.[0]?.id || 'unknown')
     return j
+  }
+
+  // Helper: salvar mensagem no chat
+  async function saveMessage(content, type = 'text') {
+    await db.from('messages').insert({
+      tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id,
+      contact_id: conv.contact_id, direction: 'outbound', type, content, sent_by: 'human'
+    })
   }
 
   if (method === 'pix' || method === 'pix_direct' || method === 'both') {
@@ -113,7 +114,7 @@ export default async function handler(req, res) {
         pixCode = mpPixData.point_of_interaction.transaction_data.qr_code
         mpPixId = mpPixData.id
       } else {
-        console.error('[pix-mp] Falha ao criar PIX via MP:', JSON.stringify(mpPixData).substring(0, 300))
+        console.error('[pix-mp] Falha MP PIX:', JSON.stringify(mpPixData).substring(0, 300))
       }
     }
 
@@ -123,31 +124,57 @@ export default async function handler(req, res) {
       qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
     }
 
-    // Upload QR Code image
-    const blob = new Blob([qrBuffer], { type: 'image/png' })
-    const formData = new FormData()
-    formData.append('messaging_product', 'whatsapp')
-    formData.append('type', 'image/png')
-    formData.append('file', blob, 'pix_qr.png')
-
-    const upRes = await fetch(`${WA_API}/${phoneId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${waToken}` }, body: formData })
-    const upJson = await upRes.json()
-    if (!upJson.id) return res.status(500).json({ error: 'Falha ao subir QR Code no WhatsApp', detail: upJson })
-
     const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : (useDirectPix ? 'PIX Direto' : 'PIX')
-    const caption = `💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Escaneie o QR Code ou copie o código abaixo:*\n\n${pixCode}`
+    const textMsg = `💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*PIX Copia e Cola:*\n${pixCode}\n\nEscaneie o QR Code abaixo ou copie o código acima.`
 
-    // Enviar mensagem com verificação de erro
+    // 1. ENVIAR TEXTO PRIMEIRO (mais confiável)
+    let textSent = false
     try {
-      await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'image',
-        image: { id: upJson.id, caption } })
-    } catch (sendErr) {
-      // Mensagem falhou — registrar no chat mas informar o usuário
-      await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n⚠️ *Não entregue:* ${sendErr.message}`, sent_by: 'human' })
-      return res.status(500).json({ error: `Cobrança criada mas não enviada: ${sendErr.message}` })
+      await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'text', text: { body: textMsg } })
+      textSent = true
+      await saveMessage(textMsg, 'text')
+      console.log('[payments/create] Texto PIX enviado OK')
+    } catch (textErr) {
+      console.error('[payments/create] Erro texto PIX:', textErr.message)
+      if (textErr.message.includes('message window') || textErr.message.includes('131047')) {
+        await saveMessage(`${textMsg}\n⚠️ *Não entregue:* Janela de 24h expirada. Peça ao cliente para enviar qualquer mensagem primeiro.`, 'text')
+        return res.status(400).json({ error: 'Janela de 24h do WhatsApp expirada. O cliente precisa enviar uma mensagem primeiro para receber a cobrança.' })
+      }
+      await saveMessage(`${textMsg}\n⚠️ *Não entregue:* ${textErr.message}`, 'text')
     }
 
-    await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'image', content: `__media__:image:${upJson.id}__ 💰 *Pagamento ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}`, sent_by: 'human' })
+    // 2. TENTAR ENVIAR IMAGEM QR CODE (bonus)
+    if (qrBuffer) {
+      try {
+        const blob = new Blob([qrBuffer], { type: 'image/png' })
+        const formData = new FormData()
+        formData.append('messaging_product', 'whatsapp')
+        formData.append('type', 'image/png')
+        formData.append('file', blob, 'pix_qr.png')
+
+        const upRes = await fetch(`${WA_API}/${phoneId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${waToken}` }, body: formData })
+        const upJson = await upRes.json()
+
+        if (upJson.id) {
+          const caption = `📲 *QR Code ${viaLabel}* - R$ ${parseFloat(amount).toFixed(2)}`
+          try {
+            await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'image', image: { id: upJson.id, caption } })
+            await saveMessage(`__media__:image:${upJson.id}__ ${caption}`, 'image')
+            console.log('[payments/create] QR Code enviado OK')
+          } catch (imgErr) {
+            console.error('[payments/create] Erro imagem (texto já foi):', imgErr.message)
+          }
+        } else {
+          console.error('[payments/create] Upload imagem falhou:', JSON.stringify(upJson).substring(0, 200))
+        }
+      } catch (uploadErr) {
+        console.error('[payments/create] Erro upload:', uploadErr.message)
+      }
+    }
+
+    if (!textSent) {
+      return res.status(500).json({ error: 'Não foi possível enviar a cobrança via WhatsApp. Verifique se o bot está ativo e o telefone está correto.' })
+    }
 
     if (method !== 'both') {
       return res.status(200).json({ ok: true, payment_id: paymentId, method: useDirectPix ? 'pix_direct' : 'pix', pix_code: pixCode, mp_pix_id: mpPixId })
@@ -188,15 +215,14 @@ export default async function handler(req, res) {
 
     const linkText = `💳 *Pagamento* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`
 
-    // Enviar com verificação de erro
     try {
       await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'text', text: { body: linkText } })
     } catch (sendErr) {
-      await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: `${linkText}\n⚠️ *Não entregue:* ${sendErr.message}`, sent_by: 'human' })
+      await saveMessage(`${linkText}\n⚠️ *Não entregue:* ${sendErr.message}`, 'text')
       return res.status(500).json({ error: `Link criado mas não enviado: ${sendErr.message}` })
     }
 
-    await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: linkText, sent_by: 'human' })
+    await saveMessage(linkText, 'text')
 
     return res.status(200).json({ ok: true, payment_id: paymentId, method: method === 'both' ? 'both' : 'mercadopago', checkout_url: mpData.init_point })
   }

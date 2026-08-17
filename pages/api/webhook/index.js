@@ -206,7 +206,13 @@ async function processWebhook(body) {
   const change = body?.entry?.[0]?.changes?.[0]?.value
   await savelog(db, 'received', null, { object: body?.object })
 
-  if (change?.statuses?.length) { await savelog(db, 'status_update', 'ignored'); return }
+  if (change?.statuses?.length) {
+    for (const s of change.statuses) {
+      console.log('[webhook] Status:', s.id, '→', s.status, s.errors?.[0]?.message || '')
+      await savelog(db, 'status_update', null, { id: s.id, status: s.status, error: s.errors?.[0]?.message || null })
+    }
+    return
+  }
   const msgs = change?.messages
   if (!msgs?.length) { await savelog(db, 'no_messages', 'empty'); return }
 
