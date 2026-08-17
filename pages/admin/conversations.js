@@ -664,10 +664,11 @@ export default function ConversationsPage() {
                   {/* Botão de pagamento */}
                   <button onClick={() => { setShowPayModal(o => !o); if (!showPayModal) fetchChargeMethods() }} title="Enviar cobrança"
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 4,
-                      padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
-                      border: '1px solid transparent', background: 'transparent',
-                      fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
+                      border: showPayModal ? '1px solid #4f8ef7' : '1px solid var(--border-soft)',
+                      background: showPayModal ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
+                      fontSize: 13, fontWeight: 700, color: showPayModal ? '#4f8ef7' : 'var(--text-secondary)',
                       transition: 'all .15s',
                     }}>
                     💰 Cobrar
@@ -865,6 +866,7 @@ export default function ConversationsPage() {
             background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 16,
             padding: 24, maxWidth: 420, width: '100%',
             boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+            maxHeight: '90vh', overflowY: 'auto',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
