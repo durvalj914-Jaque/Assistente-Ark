@@ -118,6 +118,10 @@ export default function ConversationsPage() {
   const [mpChargeMethods, setMpChargeMethods] = useState([])
   const [mpChargeAccount, setMpChargeAccount] = useState(null)
   const [loadingChargeMethods, setLoadingChargeMethods] = useState(false)
+  const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
+  // Taxas reais do provedor (Mercado Pago) — atualizado conforme plano da conta
+  const MP_PROVIDER_FEES = { pix: 0, credit_card: 4.99, debit_card: 2.39, boleto: 3.99 }
+  const MP_FEE_LABELS = { pix: "Grátis", credit_card: "~4,99%", debit_card: "~2,39%", boleto: "R$ 3,99" }
   const endRef = useRef(null)
   const listEndRef = useRef(null)
 
@@ -286,10 +290,16 @@ export default function ConversationsPage() {
     if (!selected?.tenant_id) return
     setLoadingChargeMethods(true)
     try {
-      const res = await fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}&platform_fallback=true`)
-      const json = await res.json()
+      const h = await authHeaders()
+      const [mpRes, cfgRes] = await Promise.all([
+        fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}&platform_fallback=true`),
+        fetch('/api/payments/config', { headers: h })
+      ])
+      const json = await mpRes.json()
+      const cfg = await cfgRes.json()
       if (json.connected && json.methods) setMpChargeMethods(json.methods)
       if (json.account) setMpChargeAccount(json.account)
+      if (cfg.config?.fee_config) setFeeConfig(cfg.config.fee_config)
     } catch (e) { console.error('fetchChargeMethods:', e.message) }
     finally { setLoadingChargeMethods(false) }
   }
@@ -944,7 +954,7 @@ export default function ConversationsPage() {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                       <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏦 PIX Direto</span>
-                      <span style={{ fontSize: 9, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Sem taxa</span>
+                      <span style={{ fontSize: 9, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Sem taxa Arkiel</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                       <button onClick={() => setPayMethod('pix_direct')}
@@ -983,7 +993,7 @@ export default function ConversationsPage() {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 11, fontWeight: 700, color: '#4f8ef7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💳 Mercado Pago</span>
-                          <span style={{ fontSize: 9, color: '#4f8ef7', background: 'rgba(79,142,247,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Taxa 2%</span>
+                          <span style={{ fontSize: 9, color: '#4f8ef7', background: 'rgba(79,142,247,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Arkiel {feeConfig.pix}% · MP {MP_FEE_LABELS.pix}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
@@ -1001,7 +1011,7 @@ export default function ConversationsPage() {
                           }}>
                           <span style={{ fontSize: 18 }}>💸</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix' ? '#4f8ef7' : 'var(--text-primary)' }}>PIX via MP</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Auto-confirma · Taxa 2%</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Auto-confirma · Arkiel {feeConfig.pix}% + MP {MP_FEE_LABELS.pix}</span>
                         </button>
                         <button onClick={() => setPayMethod('mercadopago')}
                           style={{
@@ -1013,7 +1023,7 @@ export default function ConversationsPage() {
                           }}>
                           <span style={{ fontSize: 18 }}>💳</span>
                           <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'mercadopago' ? '#4f8ef7' : 'var(--text-primary)' }}>Checkout MP</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Cartão, Boleto, PIX</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Cartão {feeConfig.credit_card}%+{MP_FEE_LABELS.credit_card} · PIX {feeConfig.pix}%+{MP_FEE_LABELS.pix}</span>
                         </button>
                       </div>
                       {mpChargeMethods.length > 0 && (

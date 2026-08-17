@@ -87,6 +87,7 @@ export default function ClientPortal() {
   const [savingPay, setSavingPay] = useState(false)
   const [payHistory, setPayHistory] = useState([])
   const [payLoading, setPayLoading] = useState(false)
+  const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
 
   async function loadPlans() {
     try {
@@ -120,6 +121,7 @@ export default function ClientPortal() {
           mp_access_token: d.config.mp_access_token || ''
         })
         setMpConnected(!!d.config.mp_access_token)
+        if (d.config.fee_config) setFeeConfig(d.config.fee_config)
       }
       // Check URL for MP OAuth callback
       if (router.query.mp_success) {
@@ -595,7 +597,7 @@ export default function ClientPortal() {
                   • Clique no botão e autorize na página do Mercado Pago<br />
                   • Seus clientes pagam via PIX ou cartão no WhatsApp<br />
                   • O dinheiro cai direto na sua conta MP<br />
-                  • A Arkiel cobra apenas uma taxa de 2% por transação<br />
+                  • A Arkiel cobra uma taxa de {feeConfig.pix}% por transação PIX, {feeConfig.credit_card}% no crédito<br />
                   • Você acompanha tudo na aba de histórico abaixo
                 </div>
               </div>
