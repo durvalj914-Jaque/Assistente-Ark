@@ -42,7 +42,7 @@ export default async function handler(req, res) {
   const txid = `ARK${Date.now().toString(36).toUpperCase()}`
   const paymentId = txid
 
-  const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
+  const waToken = bot.access_token || process.env.META_SYSTEM_USER_TOKEN || process.env.FACEBOOK_BUSINESS_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
   const phoneId = bot.phone_number_id
 
   if (!waToken) return res.status(500).json({ error: 'Token do WhatsApp não configurado.' })
@@ -50,8 +50,25 @@ export default async function handler(req, res) {
   const { data: contact } = await db.from('contacts').select('phone').eq('id', conv.contact_id).maybeSingle()
   if (!contact?.phone) return res.status(400).json({ error: 'Contato sem telefone' })
 
+  // Sanitizar telefone: remover tudo que não for dígito
+  let cleanPhone = contact.phone.replace(/\D/g, '')
+  // Se tem 12 dígitos e começa com 55, adicionar 9 (celular BR)
+  if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
+    cleanPhone = cleanPhone.slice(0,4) + '9' + cleanPhone.slice(4)
+  }
+  // Se não tem código de país (11 dígitos), assumir Brasil +55
+  if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
+    cleanPhone = '55' + cleanPhone
+  }
+  // Se tem 10 dígitos (fixo sem 9), adicionar 55
+  if (cleanPhone.length === 10 && !cleanPhone.startsWith('55')) {
+    cleanPhone = '55' + cleanPhone
+  }
+  console.log('[payments/create] Phone original:', contact.phone, '→ Sanitizado:', cleanPhone)
+
   // Helper: enviar mensagem WhatsApp com verificação de erro
   async function sendWaMessage(payload) {
+    console.log('[payments/create] Sending WA message to:', payload.to, 'type:', payload.type || 'text')
     const r = await fetch(`${WA_API}/${phoneId}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
@@ -60,8 +77,10 @@ export default async function handler(req, res) {
     const j = await r.json()
     if (!r.ok || j.error) {
       const errMsg = j.error?.message || j.message || JSON.stringify(j).substring(0, 200)
+      console.error('[payments/create] WA API error:', r.status, errMsg)
       throw new Error(`WhatsApp: ${errMsg}`)
     }
+    console.log('[payments/create] WA message sent OK, id:', j.messages?.[0]?.id || 'unknown')
     return j
   }
 
@@ -84,7 +103,7 @@ export default async function handler(req, res) {
           payment_method_id: 'pix',
           external_reference: txid,
           notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
-          payer: { email: contact?.phone ? contact.phone.replace(/\D/g, '') + '@arkiel.client' : 'cliente@arkiel.com.br' }
+          payer: { email: cleanPhone ? cleanPhone + '@arkiel.client' : 'cliente@arkiel.com.br' }
         })
       })
       const mpPixData = await mpPixRes.json()
@@ -120,7 +139,7 @@ export default async function handler(req, res) {
 
     // Enviar mensagem com verificação de erro
     try {
-      await sendWaMessage({ messaging_product: 'whatsapp', to: contact.phone, type: 'image',
+      await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'image',
         image: { id: upJson.id, caption } })
     } catch (sendErr) {
       // Mensagem falhou — registrar no chat mas informar o usuário
@@ -171,7 +190,7 @@ export default async function handler(req, res) {
 
     // Enviar com verificação de erro
     try {
-      await sendWaMessage({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: linkText } })
+      await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'text', text: { body: linkText } })
     } catch (sendErr) {
       await db.from('messages').insert({ tenant_id: conv.tenant_id, conversation_id, bot_id: conv.bot_id, contact_id: conv.contact_id, direction: 'outbound', type: 'text', content: `${linkText}\n⚠️ *Não entregue:* ${sendErr.message}`, sent_by: 'human' })
       return res.status(500).json({ error: `Link criado mas não enviado: ${sendErr.message}` })
