@@ -932,106 +932,139 @@ export default function ConversationsPage() {
             </div>
 
             <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Forma de cobrança</div>
-                {mpChargeAccount && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
-                    <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{mpChargeAccount.first_name || mpChargeAccount.nickname || 'MP'}</span>
-                  </div>
-                )}
-              </div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Forma de cobrança</div>
               {loadingChargeMethods ? (
                 <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '16px 0', textAlign: 'center' }}>Buscando formas conectadas…</div>
               ) : (
                 <>
-                  {/* Quick options — muda conforme MP conectado */}
-                  {mpChargeAccount ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                      {[
-                        { key: 'pix', label: 'PIX via MP', icon: '💸', desc: 'Auto-confirma · Taxa 2%', highlight: 'Conectado' },
-                        { key: 'pix_direct', label: 'PIX Direto', icon: '🏦', desc: 'Chave própria · Sem taxa', highlight: 'Conta própria' },
-                        { key: 'mercadopago', label: 'Checkout MP', icon: '💳', desc: 'Cartão, Boleto, PIX' },
-                        { key: 'both', label: 'Ambos', icon: '🚀', desc: 'PIX MP + Checkout' },
-                      ].map(opt => (
-                        <button key={opt.key} onClick={() => setPayMethod(opt.key)}
-                          style={{
-                            padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
-                            border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                            background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                            transition: 'all .15s', position: 'relative',
-                          }}>
-                          {opt.highlight && (
-                            <span style={{ position: 'absolute', top: 4, right: 6, fontSize: 8, fontWeight: 700, color: opt.key === 'pix' ? '#22c55e' : 'var(--text-muted)', background: opt.key === 'pix' ? 'rgba(34,197,94,0.15)' : 'var(--bg-tertiary)', padding: '1px 5px', borderRadius: 6 }}>{opt.highlight}</span>
-                          )}
-                          <span style={{ fontSize: 20 }}>{opt.icon}</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
-                        </button>
-                      ))}
+                  {/* ── SEÇÃO 1: PIX DIRETO (sem taxa) ── */}
+                  <div style={{
+                    borderRadius: 12, padding: 12, marginBottom: 10,
+                    background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏦 PIX Direto</span>
+                      <span style={{ fontSize: 9, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Sem taxa</span>
                     </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                      {[
-                        { key: 'pix', label: 'PIX', icon: '💸', desc: 'QR + Copia e cola' },
-                        { key: 'pix_direct', label: 'PIX Direto', icon: '🏦', desc: 'Chave própria' },
-                      ].map(opt => (
-                        <button key={opt.key} onClick={() => setPayMethod(opt.key)}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                      <button onClick={() => setPayMethod('pix_direct')}
+                        style={{
+                          padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
+                          border: payMethod === 'pix_direct' ? '2px solid #22c55e' : '1px solid var(--border-soft)',
+                          background: payMethod === 'pix_direct' ? 'rgba(34,197,94,0.12)' : 'var(--bg-secondary)',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                          transition: 'all .15s',
+                        }}>
+                        <span style={{ fontSize: 18 }}>🏦</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix_direct' ? '#22c55e' : 'var(--text-primary)' }}>PIX Direto</span>
+                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Chave própria · QR + Copia e cola</span>
+                      </button>
+                      <button onClick={() => setPayMethod('pix')}
+                        style={{
+                          padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
+                          border: payMethod === 'pix' ? '2px solid #22c55e' : '1px solid var(--border-soft)',
+                          background: payMethod === 'pix' ? 'rgba(34,197,94,0.12)' : 'var(--bg-secondary)',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                          transition: 'all .15s',
+                        }}>
+                        <span style={{ fontSize: 18 }}>💸</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix' ? '#22c55e' : 'var(--text-primary)' }}>PIX Simples</span>
+                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>QR + Copia e cola</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* ── SEÇÃO 2: MERCADO PAGO (com taxa) ── */}
+                  {mpChargeAccount ? (
+                    <div style={{
+                      borderRadius: 12, padding: 12,
+                      background: 'rgba(79,142,247,0.04)', border: '1px solid rgba(79,142,247,0.15)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#4f8ef7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>💳 Mercado Pago</span>
+                          <span style={{ fontSize: 9, color: '#4f8ef7', background: 'rgba(79,142,247,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Taxa 2%</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} />
+                          <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>{mpChargeAccount.first_name || mpChargeAccount.nickname || 'Conectado'}</span>
+                        </div>
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: mpChargeMethods.length > 0 ? 8 : 0 }}>
+                        <button onClick={() => setPayMethod('pix')}
                           style={{
-                            padding: '12px 8px', borderRadius: 10, cursor: 'pointer',
-                            border: payMethod === opt.key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                            background: payMethod === opt.key ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                            padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
+                            border: payMethod === 'pix' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                            background: payMethod === 'pix' ? 'rgba(79,142,247,0.12)' : 'var(--bg-secondary)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
                             transition: 'all .15s',
                           }}>
-                          <span style={{ fontSize: 20 }}>{opt.icon}</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === opt.key ? '#4f8ef7' : 'var(--text-primary)' }}>{opt.label}</span>
-                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>{opt.desc}</span>
+                          <span style={{ fontSize: 18 }}>💸</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix' ? '#4f8ef7' : 'var(--text-primary)' }}>PIX via MP</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Auto-confirma · Taxa 2%</span>
                         </button>
-                      ))}
-                    </div>
-                  )}
-                  {/* Connected methods from MP account - selecionaveis */}
-                  {mpChargeMethods.length > 0 && (
-                    <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 10, marginTop: 4 }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                        Formas ativas na conta — toque para selecionar
+                        <button onClick={() => setPayMethod('mercadopago')}
+                          style={{
+                            padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
+                            border: payMethod === 'mercadopago' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                            background: payMethod === 'mercadopago' ? 'rgba(79,142,247,0.12)' : 'var(--bg-secondary)',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                            transition: 'all .15s',
+                          }}>
+                          <span style={{ fontSize: 18 }}>💳</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'mercadopago' ? '#4f8ef7' : 'var(--text-primary)' }}>Checkout MP</span>
+                          <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Cartão, Boleto, PIX</span>
+                        </button>
                       </div>
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                        {mpChargeMethods.map(cat => {
-                          const methodKey = cat.key === 'pix' ? 'pix' : 'mercadopago'
-                          const isActive = payMethod === methodKey
-                          return (
-                            <button key={cat.key} onClick={() => setPayMethod(methodKey)}
+                      {mpChargeMethods.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--border-soft)', paddingTop: 8, marginTop: 4 }}>
+                          <div style={{ color: 'var(--text-muted)', fontSize: 9, fontWeight: 600, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Formas ativas — toque para selecionar
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                            {mpChargeMethods.map(cat => {
+                              const methodKey = cat.key === 'pix' ? 'pix' : 'mercadopago'
+                              const isActive = payMethod === methodKey
+                              return (
+                                <button key={cat.key} onClick={() => setPayMethod(methodKey)}
+                                  style={{
+                                    display: 'flex', alignItems: 'center', gap: 5,
+                                    padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
+                                    border: isActive ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                                    background: isActive ? 'rgba(79,142,247,0.15)' : 'var(--bg-secondary)',
+                                    transition: 'all .15s',
+                                  }}>
+                                  <span style={{ fontSize: 13 }}>{cat.icon}</span>
+                                  <span style={{ fontSize: 10, fontWeight: 600, color: isActive ? '#4f8ef7' : 'var(--text-secondary)' }}>{cat.label}</span>
+                                  {cat.methods.length > 1 && (
+                                    <span style={{ fontSize: 9, color: isActive ? '#4f8ef7' : 'var(--text-muted)' }}>+{cat.methods.length - 1}</span>
+                                  )}
+                                </button>
+                              )
+                            })}
+                            <button onClick={() => setPayMethod('both')}
                               style={{
                                 display: 'flex', alignItems: 'center', gap: 5,
-                                padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
-                                border: isActive ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                                background: isActive ? 'rgba(79,142,247,0.15)' : 'var(--bg-secondary)',
+                                padding: '5px 10px', borderRadius: 20, cursor: 'pointer',
+                                border: payMethod === 'both' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                                background: payMethod === 'both' ? 'rgba(79,142,247,0.15)' : 'var(--bg-secondary)',
                                 transition: 'all .15s',
                               }}>
-                              <span style={{ fontSize: 14 }}>{cat.icon}</span>
-                              <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#4f8ef7' : 'var(--text-secondary)' }}>{cat.label}</span>
-                              {cat.methods.length > 1 && (
-                                <span style={{ fontSize: 9, color: isActive ? '#4f8ef7' : 'var(--text-muted)' }}>+{cat.methods.length - 1}</span>
-                              )}
+                              <span style={{ fontSize: 13 }}>🚀</span>
+                              <span style={{ fontSize: 10, fontWeight: 600, color: payMethod === 'both' ? '#4f8ef7' : 'var(--text-secondary)' }}>Ambos</span>
                             </button>
-                          )
-                        })}
-                        {/* Botao Ambos */}
-                        <button onClick={() => setPayMethod('both')}
-                          style={{
-                            display: 'flex', alignItems: 'center', gap: 5,
-                            padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
-                            border: payMethod === 'both' ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
-                            background: payMethod === 'both' ? 'rgba(79,142,247,0.15)' : 'var(--bg-secondary)',
-                            transition: 'all .15s',
-                          }}>
-                          <span style={{ fontSize: 14 }}>🚀</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: payMethod === 'both' ? '#4f8ef7' : 'var(--text-secondary)' }}>Ambos</span>
-                        </button>
-                      </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{
+                      borderRadius: 12, padding: 10,
+                      background: 'var(--bg-secondary)', border: '1px dashed var(--border-medium)',
+                      textAlign: 'center',
+                    }}>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>💳 Mercado Pago não conectado</span>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', marginTop: 2 }}>Conecte para aceitar cartão, boleto e PIX automático</div>
                     </div>
                   )}
                 </>
