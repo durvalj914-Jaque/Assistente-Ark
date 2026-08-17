@@ -103,7 +103,7 @@ export default async function handler(req, res) {
           description: description || 'Pagamento Arkiel',
           payment_method_id: 'pix',
           external_reference: txid,
-          notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+          notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
           payer: { email: cleanPhone ? cleanPhone + '@arkiel.com.br' : 'cliente@arkiel.com.br' }
         })
       })
@@ -129,6 +129,32 @@ export default async function handler(req, res) {
       if (!finalPixKey) return res.status(400).json({ error: 'Chave PIX não configurada. Cadastre uma chave PIX em Configurações ou conecte o Mercado Pago.' })
       pixCode = generatePixCode({ pixKey: finalPixKey, merchantName: finalName, merchantCity: finalCity, amount: parseFloat(amount), txid, description: description?.substring(0, 50) })
       qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+    }
+
+    // SALVAR REGISTRO NA TABELA payments (para o webhook confirmar e criar comprovante)
+    if (mpPixId) {
+      try {
+        await db.from('payments').insert({
+          tenant_id: conv.tenant_id,
+          bot_id: conv.bot_id || null,
+          amount: parseFloat(amount),
+          description: description || 'Pagamento Arkiel',
+          method: 'pix',
+          status: 'pending',
+          pix_code: txid,
+          pix_qr_url: JSON.stringify({
+            mp_payment_id: mpPixId,
+            contact_id: conv.contact_id,
+            conversation_id: conversation_id,
+            description: description || '',
+            from_panel: true,
+          }),
+          category: 'b2c_charge',
+        })
+        console.log('[payments/create] Registro salvo na tabela payments, txid:', txid)
+      } catch (payErr) {
+        console.error('[payments/create] Erro ao salvar payments:', payErr.message)
+      }
     }
 
     const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : (useDirectPix ? 'PIX Direto' : 'PIX')
@@ -245,7 +271,7 @@ export default async function handler(req, res) {
         marketplace_fee: _mpFee,
         back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
         auto_return: 'approved', external_reference: txid, statement_descriptor: finalName.substring(0, 12),
-        notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+        notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
       }),
     })
     const mpData = await mpRes.json()
