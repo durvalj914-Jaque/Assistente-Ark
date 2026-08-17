@@ -866,8 +866,9 @@ export default function ConversationsPage() {
             background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 16,
             padding: 24, maxWidth: 420, width: '100%',
             boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
-            maxHeight: '90vh', overflowY: 'auto',
+            maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
           }}>
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 💰 Cobrar cliente
@@ -1037,7 +1038,8 @@ export default function ConversationsPage() {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: 8 }}>
+          </div>
+          <div style={{ display: 'flex', gap: 8, paddingTop: 16, flexShrink: 0, borderTop: '1px solid var(--border-soft)' }}>
               <button onClick={() => setShowPayModal(false)} disabled={sendingPayment}
                 className="ark-btn-ghost" style={{ flex: 1, fontSize: 13, padding: '12px 18px' }}>
                 Cancelar
