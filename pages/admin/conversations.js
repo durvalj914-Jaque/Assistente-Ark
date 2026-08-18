@@ -12,6 +12,114 @@ import { supabase } from '../../lib/supabase'
 // Cache global de blob URLs
 const mediaCache = new Map()
 
+// Componente para grid de thumbnails (imagens/vídeos)
+function MediaThumb({ item, getToken, botId }) {
+  const [url, setUrl] = useState(mediaCache.get(item.media_id))
+  const [loading, setLoading] = useState(!url)
+
+  useEffect(() => {
+    if (url) return
+    let cancelled = false
+    async function fetchIt() {
+      if (mediaCache.has(item.media_id)) { setUrl(mediaCache.get(item.media_id)); setLoading(false); return }
+      try {
+        const token = await getToken()
+        const res = await fetch(`/api/media/${item.media_id}?bot_id=${botId || ''}`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const blob = await res.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        mediaCache.set(item.media_id, blobUrl)
+        if (!cancelled) { setUrl(blobUrl); setLoading(false) }
+      } catch (e) { if (!cancelled) setLoading(false) }
+    }
+    fetchIt()
+    return () => { cancelled = true }
+  }, [item.media_id])
+
+  const isVideo = item.type === 'video'
+  const isInbound = item.direction === 'inbound'
+
+  return (
+    <div style={{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', background: 'var(--bg-secondary)' }}
+      onClick={() => url && window.open(url, '_blank')}>
+      {loading ? (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+          {isVideo ? '🎬' : '🖼️'}
+        </div>
+      ) : url ? (
+        isVideo ? (
+          <video src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <img src={url} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>❌</div>
+      )}
+      {isVideo && url && (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+          <span style={{ fontSize: 24, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.7))' }}>▶️</span>
+        </div>
+      )}
+      <div style={{ position: 'absolute', bottom: 2, right: 2, fontSize: 9, fontWeight: 700, color: '#fff', background: isInbound ? 'rgba(0,0,0,0.5)' : 'rgba(79,142,247,0.7)', padding: '1px 5px', borderRadius: 4 }}>
+        {isInbound ? '↙' : '↗'}
+      </div>
+    </div>
+  )
+}
+
+// Componente para lista de áudios e documentos
+function MediaRow({ item, getToken, botId }) {
+  const [url, setUrl] = useState(mediaCache.get(item.media_id))
+  const [loading, setLoading] = useState(!url)
+
+  useEffect(() => {
+    if (url) return
+    let cancelled = false
+    async function fetchIt() {
+      if (mediaCache.has(item.media_id)) { setUrl(mediaCache.get(item.media_id)); setLoading(false); return }
+      try {
+        const token = await getToken()
+        const res = await fetch(`/api/media/${item.media_id}?bot_id=${botId || ''}`, { headers: { Authorization: `Bearer ${token}` } })
+        if (!res.ok) throw new Error('HTTP ' + res.status)
+        const blob = await res.blob()
+        const blobUrl = URL.createObjectURL(blob)
+        mediaCache.set(item.media_id, blobUrl)
+        if (!cancelled) { setUrl(blobUrl); setLoading(false) }
+      } catch (e) { if (!cancelled) setLoading(false) }
+    }
+    fetchIt()
+    return () => { cancelled = true }
+  }, [item.media_id])
+
+  const isInbound = item.direction === 'inbound'
+  const icon = item.type === 'audio' ? '🎵' : item.type === 'document' ? '📎' : item.type === 'sticker' ? '🎟️' : '📄'
+  const label = item.caption || (item.type === 'audio' ? 'Áudio' : item.type === 'document' ? 'Documento' : item.type)
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+      <span style={{ fontSize: 22, flexShrink: 0 }}>{icon}</span>
+      <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+          {isInbound ? '↙ Recebido' : '↗ Enviado'} · {new Date(item.created_at).toLocaleString('pt-BR')}
+        </div>
+      </div>
+      {item.type === 'audio' && url ? (
+        <audio src={url} controls style={{ maxWidth: 120, height: 28 }} />
+      ) : (
+        <button disabled={loading || !url} onClick={() => url && window.open(url, '_blank')}
+          style={{
+            padding: '6px 10px', borderRadius: 6, cursor: loading || !url ? 'default' : 'pointer', fontSize: 11, fontWeight: 600,
+            border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: '#4f8ef7',
+            opacity: loading ? 0.5 : 1,
+          }}>
+          {loading ? '⏳' : 'Abrir'}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function parseMediaContent(content) {
   if (!content) return null
   const m = content.match(/^__media__:(\w+):([\w-]+)__(?:\s(.*))?$/s)
@@ -116,6 +224,10 @@ export default function ConversationsPage() {
   const [payMethod, setPayMethod] = useState('pix')
   const [chargeTab, setChargeTab] = useState('cobrar')
   const [convCharges, setConvCharges] = useState({ pending: [], paid: [], receipts: [] })
+  const [showMediaModal, setShowMediaModal] = useState(false)
+  const [mediaTab, setMediaTab] = useState('all')
+  const [mediaItems, setMediaItems] = useState([])
+  const [loadingMedia, setLoadingMedia] = useState(false)
   const [loadingCharges, setLoadingCharges] = useState(false)
   const [sendingPayment, setSendingPayment] = useState(false)
   const [mpChargeMethods, setMpChargeMethods] = useState([])
@@ -317,6 +429,18 @@ export default function ConversationsPage() {
       if (json.pending) setConvCharges({ pending: json.pending, paid: json.paid, receipts: json.receipts })
     } catch (e) { console.error('fetchConvCharges:', e.message) }
     finally { setLoadingCharges(false) }
+  }
+
+  async function fetchMedia() {
+    if (!selected?.id) return
+    setLoadingMedia(true)
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`/api/conversations/media?conversation_id=${selected.id}`, { headers: h })
+      const json = await res.json()
+      if (json.media) setMediaItems(json.media)
+    } catch (e) { console.error('fetchMedia:', e.message) }
+    finally { setLoadingMedia(false) }
   }
 
   async function cancelPayment(payment) {
@@ -715,6 +839,18 @@ export default function ConversationsPage() {
                       transition: 'all .15s',
                     }}>
                     💰 Cobrar
+                  </button>
+                  {/* Botão de mídia */}
+                  <button onClick={() => { setShowMediaModal(o => !o); if (!showMediaModal) fetchMedia() }} title="Mídias e documentos"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
+                      border: showMediaModal ? '1px solid #4f8ef7' : '1px solid var(--border-soft)',
+                      background: showMediaModal ? 'rgba(79,142,247,0.1)' : 'var(--bg-secondary)',
+                      fontSize: 13, fontWeight: 700, color: showMediaModal ? '#4f8ef7' : 'var(--text-secondary)',
+                      transition: 'all .15s',
+                    }}>
+                    📎 Mídia
                   </button>
 
                   {/* Checkbox "Sem bot" */}
@@ -1239,6 +1375,93 @@ export default function ConversationsPage() {
               </button>
             </div>
           )}
+          </div>
+        </div>
+      )
+
+      }
+
+      {/* Modal Mídia */}
+      {showMediaModal && selected && (
+        <div style={{
+          position: 'absolute', top: 60, right: 0, bottom: 0, width: '100%', maxWidth: 420,
+          background: 'var(--bg-card)', borderLeft: '1px solid var(--border-soft)',
+          display: 'flex', flexDirection: 'column', zIndex: 100,
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.08)',
+        }}>
+          {/* Header */}
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>📎</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>Mídia e Documentos</span>
+            </div>
+            <button onClick={() => setShowMediaModal(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-muted)', padding: '4px 8px', borderRadius: 6 }}>
+              ✕
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: 4, padding: '10px 12px', borderBottom: '1px solid var(--border-soft)', flexShrink: 0, overflowX: 'auto' }}>
+            {[
+              { key: 'all', label: 'Tudo', icon: '📁' },
+              { key: 'image', label: 'Fotos', icon: '🖼️' },
+              { key: 'video', label: 'Vídeos', icon: '🎬' },
+              { key: 'audio', label: 'Áudios', icon: '🎵' },
+              { key: 'document', label: 'Docs', icon: '📎' },
+            ].map(t => {
+              const count = t.key === 'all' ? mediaItems.length : mediaItems.filter(m => m.type === t.key).length
+              return (
+                <button key={t.key} onClick={() => setMediaTab(t.key)}
+                  style={{
+                    padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    border: mediaTab === t.key ? '1px solid #4f8ef7' : '1px solid var(--border-soft)',
+                    background: mediaTab === t.key ? 'rgba(79,142,247,0.1)' : 'transparent',
+                    color: mediaTab === t.key ? '#4f8ef7' : 'var(--text-muted)',
+                    whiteSpace: 'nowrap', transition: 'all .15s',
+                  }}>
+                  {t.icon} {t.label} {count > 0 && <span style={{ fontSize: 10, opacity: 0.6 }}>({count})</span>}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Content */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: 12 }}>
+            {loadingMedia ? (
+              <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>Carregando mídias…</div>
+            ) : (() => {
+              const filtered = mediaTab === 'all' ? mediaItems : mediaItems.filter(m => m.type === mediaTab)
+              if (filtered.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+                    <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+                    Nenhuma mídia {mediaTab !== 'all' ? 'deste tipo' : ''} encontrada
+                  </div>
+                )
+              }
+
+              // Grid for images, list for others
+              const isGrid = mediaTab === 'image' || mediaTab === 'video' || (mediaTab === 'all' && filtered.every(m => m.type === 'image' || m.type === 'video'))
+
+              if (isGrid && (mediaTab === 'image' || mediaTab === 'video')) {
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+                    {filtered.map(m => (
+                      <MediaThumb key={m.id} item={m} getToken={getToken} botId={selected.bots?.id} />
+                    ))}
+                  </div>
+                )
+              }
+
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {filtered.map(m => (
+                    <MediaRow key={m.id} item={m} getToken={getToken} botId={selected.bots?.id} />
+                  ))}
+                </div>
+              )
+            })()}
           </div>
         </div>
       )
