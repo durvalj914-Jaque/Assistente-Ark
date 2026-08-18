@@ -3,10 +3,14 @@
  * POST /api/admin/fee-config  — Salva a config de taxas
  *
  * fee_config: {
- *   pix:         { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   credit_card: { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   debit_card:  { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   boleto:      { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 }
+ *   pix:           { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   credit_card:   { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   debit_card:    { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   boleto:        { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   bank_transfer: { fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   account_balance:{ fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   paypal:        { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   prepaid_card:  { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
  * }
  *
  * fee_percent: % da transação (0-100)
@@ -26,10 +30,14 @@ export default async function handler(req, res) {
 
   const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
   const DEFAULT_FEES = {
-    pix:         { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    credit_card: { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    debit_card:  { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    boleto:      { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    pix:            { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    credit_card:    { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    debit_card:     { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    boleto:         { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    bank_transfer:  { fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    account_balance:{ fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    paypal:         { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    prepaid_card:   { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
   }
 
   async function readJson() {
@@ -54,7 +62,6 @@ export default async function handler(req, res) {
     for (const key of Object.keys(DEFAULT_FEES)) {
       const val = raw?.[key]
       if (typeof val === 'number') {
-        // Formato antigo: só percentual
         result[key] = { ...DEFAULT_FEES[key], fee_percent: val }
       } else if (val && typeof val === 'object') {
         result[key] = {
@@ -81,7 +88,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'fee_config é obrigatório' })
     }
 
-    const validKeys = ['pix', 'credit_card', 'debit_card', 'boleto']
+    const validKeys = ['pix', 'credit_card', 'debit_card', 'boleto', 'bank_transfer', 'account_balance', 'paypal', 'prepaid_card']
     const sanitized = {}
 
     for (const key of validKeys) {

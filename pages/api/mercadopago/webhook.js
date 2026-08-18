@@ -129,6 +129,10 @@ export default async function handler(req, res) {
         if (paymentMethod.includes('credit')) feeMethod = 'credit_card'
         else if (paymentMethod.includes('debit')) feeMethod = 'debit_card'
         else if (paymentMethod === 'ticket' || paymentMethod.includes('boleto')) feeMethod = 'boleto'
+        else if (paymentMethod.includes('bank_transfer') || paymentMethod.includes('transfer')) feeMethod = 'bank_transfer'
+        else if (paymentMethod.includes('account_balance') || paymentMethod === 'money' || paymentMethod.includes('saldo')) feeMethod = 'account_balance'
+        else if (paymentMethod.includes('paypal')) feeMethod = 'paypal'
+        else if (paymentMethod.includes('prepaid')) feeMethod = 'prepaid_card'
 
         const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
         const { data: arkielTenant } = await db.from('tenants')
