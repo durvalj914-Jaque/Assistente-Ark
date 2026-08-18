@@ -924,7 +924,6 @@ export default function ConversationsPage() {
               {[
                 { key: 'cobrar', label: 'Cobrar', icon: '💵' },
                 { key: 'pending', label: 'Pendentes', icon: '⏳', badge: convCharges.pending.length },
-                { key: 'paid', label: 'Pagos', icon: '✅', badge: convCharges.paid.length },
                 { key: 'receipts', label: 'Comprovantes', icon: '📄', badge: convCharges.receipts.length },
               ].map(t => (
                 <button key={t.key} onClick={() => { setChargeTab(t.key); if (t.key !== 'cobrar') fetchConvCharges() }}
@@ -1183,37 +1182,6 @@ export default function ConversationsPage() {
                           >
                             ✕ Cancelar cobrança
                           </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            {/* ── ABA: PAGOS ── */}
-            {chargeTab === 'paid' && (
-              <div>
-                {loadingCharges ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>Carregando…</div>
-                ) : convCharges.paid.length === 0 ? (
-                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
-                    <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-                    Nenhum pagamento recebido
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {convCharges.paid.map(p => {
-                      const meta = (() => { try { return JSON.parse(p.pix_qr_url || '{}') } catch { return {} } })()
-                      return (
-                        <div key={p.id} style={{ padding: 12, borderRadius: 10, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>R$ {parseFloat(p.amount).toFixed(2)}</div>
-                            <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '2px 8px', borderRadius: 6 }}>✅ Pago</span>
-                          </div>
-                          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{p.description || 'Pagamento'}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-                            {p.method?.toUpperCase() || 'PIX'} · {p.paid_at ? new Date(p.paid_at).toLocaleString('pt-BR') : new Date(p.created_at).toLocaleString('pt-BR')}
-                          </div>
                         </div>
                       )
                     })}
