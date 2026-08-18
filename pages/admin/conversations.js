@@ -229,13 +229,6 @@ export default function ConversationsPage() {
   const [mediaItems, setMediaItems] = useState([])
   const [loadingMedia, setLoadingMedia] = useState(false)
   const [loadingCharges, setLoadingCharges] = useState(false)
-  const [leftTab, setLeftTab] = useState('chats') // 'chats' | 'status'
-  const [statusList, setStatusList] = useState([])
-  const [loadingStatus, setLoadingStatus] = useState(false)
-  const [showStatusComposer, setShowStatusComposer] = useState(false)
-  const [statusText, setStatusText] = useState('')
-  const [statusBg, setStatusBg] = useState('#1a1a2e')
-  const [postingStatus, setPostingStatus] = useState(false)
   const [sendingPayment, setSendingPayment] = useState(false)
   const [mpChargeMethods, setMpChargeMethods] = useState([])
   const [mpChargeAccount, setMpChargeAccount] = useState(null)
@@ -448,44 +441,6 @@ export default function ConversationsPage() {
       if (json.media) setMediaItems(json.media)
     } catch (e) { console.error('fetchMedia:', e.message) }
     finally { setLoadingMedia(false) }
-  }
-
-  async function fetchStatus() {
-    setLoadingStatus(true)
-    try {
-      const h = await authHeaders()
-      const res = await fetch('/api/conversations/status', { headers: h })
-      const json = await res.json()
-      if (json.statuses) setStatusList(json.statuses)
-    } catch (e) { console.error('fetchStatus:', e.message) }
-    finally { setLoadingStatus(false) }
-  }
-
-  async function postStatus() {
-    if (!statusText.trim()) return
-    setPostingStatus(true)
-    try {
-      const h = await authHeaders()
-      const res = await fetch('/api/conversations/status', {
-        method: 'POST', headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: statusText.trim(), type: 'text', bg_color: statusBg })
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || 'Falha ao postar')
-      setStatusText('')
-      setShowStatusComposer(false)
-      fetchStatus()
-    } catch (e) { alert(e.message) }
-    finally { setPostingStatus(false) }
-  }
-
-  async function deleteStatus(id) {
-    if (!confirm('Excluir este status?')) return
-    try {
-      const h = await authHeaders()
-      await fetch(`/api/conversations/status?id=${id}`, { method: 'DELETE', headers: h })
-      fetchStatus()
-    } catch (e) { alert(e.message) }
   }
 
   async function cancelPayment(payment) {
@@ -718,28 +673,8 @@ export default function ConversationsPage() {
             </div>
           </div>
 
-          {/* Tabs: Conversas | Status */}
-          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--border-soft)', flexShrink: 0 }}>
-            <button onClick={() => setLeftTab('chats')}
-              style={{
-                flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                border: 'none', borderBottom: leftTab === 'chats' ? '2.5px solid #4f8ef7' : '2.5px solid transparent',
-                background: 'transparent',
-                color: leftTab === 'chats' ? '#4f8ef7' : 'var(--text-muted)',
-                transition: 'all .15s',
-              }}>💬 Conversas</button>
-            <button onClick={() => { setLeftTab('status'); fetchStatus() }}
-              style={{
-                flex: 1, padding: '10px 0', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                border: 'none', borderBottom: leftTab === 'status' ? '2.5px solid #4f8ef7' : '2.5px solid transparent',
-                background: 'transparent',
-                color: leftTab === 'status' ? '#4f8ef7' : 'var(--text-muted)',
-                transition: 'all .15s',
-              }}>⭕ Status</button>
-          </div>
-
           {/* Barra de busca + filtros */}
-          <div style={{ padding: 10, borderBottom: '1px solid var(--border-soft)', display: leftTab === 'chats' ? 'block' : 'none' }}>
+          <div style={{ padding: 10, borderBottom: '1px solid var(--border-soft)' }}>
             <div style={{
               display: 'flex', alignItems: 'center', gap: 8,
               background: 'var(--bg-input)', borderRadius: 10, padding: '8px 12px',
@@ -766,120 +701,8 @@ export default function ConversationsPage() {
             </div>
           </div>
 
-          {/* ── VIEW: STATUS ── */}
-          {leftTab === 'status' && (
-            <div style={{ flex: 1, overflowY: 'auto' }}>
-              {/* Meu Status — composer */}
-              <div onClick={() => !showStatusComposer && setShowStatusComposer(true)}
-                style={{ padding: '14px 16px', cursor: 'pointer', borderBottom: '1px solid var(--border-white)',
-                  display: 'flex', gap: 12, alignItems: 'center' }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: '50%',
-                  background: showStatusComposer ? '#1a1a2e' : 'linear-gradient(135deg, rgba(79,142,247,0.15), rgba(6,182,212,0.1))',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '2px dashed var(--border-strong)',
-                  fontSize: 20, color: showStatusComposer ? '#fff' : 'var(--text-muted)',
-                }}>+</div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Meu status</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{showStatusComposer ? 'Escreva seu status...' : 'Toque para postar um status'}</div>
-                </div>
-              </div>
-
-              {/* Composer expandido */}
-              {showStatusComposer && (
-                <div style={{ padding: 16, borderBottom: '1px solid var(--border-soft)' }}>
-                  <div style={{
-                    borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-soft)',
-                    background: statusBg, minHeight: 180, display: 'flex', flexDirection: 'column',
-                  }}>
-                    <textarea
-                      value={statusText}
-                      onChange={e => setStatusText(e.target.value)}
-                      placeholder="Digite seu status..."
-                      autoFocus
-                      style={{
-                        flex: 1, minHeight: 120, padding: 16, background: 'transparent',
-                        border: 'none', outline: 'none', resize: 'none',
-                        color: '#fff', fontSize: 16, fontWeight: 500, fontFamily: 'inherit',
-                        textAlign: 'center', display: 'flex', alignItems: 'center',
-                      }} />
-                  </div>
-                  {/* Cores de fundo */}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                    {['#1a1a2e', '#16213e', '#0f3460', '#533483', '#2c5364', '#1f4037', '#8b2c4f', '#4a1942', '#0d1b2a'].map(c => (
-                      <button key={c} onClick={() => setStatusBg(c)}
-                        style={{
-                          width: 28, height: 28, borderRadius: '50%', cursor: 'pointer',
-                          background: c, border: statusBg === c ? '2.5px solid #4f8ef7' : '2px solid transparent',
-                          transition: 'all .15s',
-                        }} />
-                    ))}
-                  </div>
-                  {/* Botoes */}
-                  <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                    <button onClick={() => { setShowStatusComposer(false); setStatusText('') }}
-                      style={{ flex: 1, padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                        border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
-                      Cancelar
-                    </button>
-                    <button onClick={postStatus} disabled={!statusText.trim() || postingStatus}
-                      style={{ flex: 1.5, padding: '10px', borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 700,
-                        border: 'none', color: '#fff', opacity: !statusText.trim() || postingStatus ? 0.5 : 1,
-                        background: 'linear-gradient(135deg, #4f8ef7, #3b82f6)' }}>
-                      {postingStatus ? 'Postando...' : '📤 Postar status'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Lista de status postados */}
-              {loadingStatus ? (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Carregando status...</div>
-              ) : statusList.length === 0 && !showStatusComposer ? (
-                <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                  <div style={{ fontSize: 32, marginBottom: 8 }}>⭕</div>
-                  Nenhum status ainda.<br />Toque em "Meu status" para postar.
-                </div>
-              ) : (
-                statusList.map(s => {
-                  const ago = Math.floor((Date.now() - new Date(s.created_at).getTime()) / 60000)
-                  const timeLabel = ago < 60 ? `${ago} min` : `${Math.floor(ago / 60)}h ${ago % 60}min`
-                  const expiresIn = Math.max(0, 24 * 60 - ago)
-                  return (
-                    <div key={s.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-white)', display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <div style={{
-                        width: 48, height: 48, borderRadius: 12, flexShrink: 0,
-                        background: s.bg_color || '#1a1a2e',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#fff', fontSize: 11, fontWeight: 700, textAlign: 'center',
-                        overflow: 'hidden', padding: 4, lineHeight: 1.2,
-                        border: '2px solid rgba(79,142,247,0.3)',
-                      }}>
-                        {s.content?.substring(0, 30) || '📝'}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{s.author_name || 'Você'}</div>
-                        <div style={{
-                          fontSize: 13, color: 'var(--text-muted)',
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>{s.content || '(sem texto)'}</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-faint)' }}>
-                          {timeLabel} atrás · expira em {Math.floor(expiresIn / 60)}h {expiresIn % 60}min
-                        </div>
-                      </div>
-                      <button onClick={() => deleteStatus(s.id)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--text-faint)', padding: 4, borderRadius: 6, flexShrink: 0 }}
-                        title="Excluir status">🗑️</button>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          )}
-
           {/* Lista de conversas */}
-          <div style={{ flex: 1, overflowY: 'auto', display: leftTab === 'chats' ? 'block' : 'none' }}>
+          <div style={{ flex: 1, overflowY: 'auto' }}>
             {filtered.length === 0 && (
               <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-faint)', fontSize: 13 }}>
                 <div style={{ fontSize: 32, marginBottom: 10 }}>💬</div>
