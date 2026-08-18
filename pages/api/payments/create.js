@@ -131,30 +131,29 @@ export default async function handler(req, res) {
       qrBuffer = await QRCode.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
     }
 
-    // SALVAR REGISTRO NA TABELA payments (para o webhook confirmar e criar comprovante)
-    if (mpPixId) {
-      try {
-        await db.from('payments').insert({
-          tenant_id: conv.tenant_id,
-          bot_id: conv.bot_id || null,
-          amount: parseFloat(amount),
-          description: description || 'Pagamento Arkiel',
-          method: 'pix',
-          status: 'pending',
-          pix_code: txid,
-          pix_qr_url: JSON.stringify({
-            mp_payment_id: mpPixId,
-            contact_id: conv.contact_id,
-            conversation_id: conversation_id,
-            description: description || '',
-            from_panel: true,
-          }),
-          category: 'b2c_charge',
-        })
-        console.log('[payments/create] Registro salvo na tabela payments, txid:', txid)
-      } catch (payErr) {
-        console.error('[payments/create] Erro ao salvar payments:', payErr.message)
-      }
+    // SALVAR REGISTRO NA TABELA payments (sempre — para o webhook confirmar e criar comprovante)
+    try {
+      await db.from('payments').insert({
+        tenant_id: conv.tenant_id,
+        bot_id: conv.bot_id || null,
+        amount: parseFloat(amount),
+        description: description || 'Pagamento Arkiel',
+        method: useDirectPix ? 'pix_direct' : (mpPixId ? 'pix_mp' : 'pix'),
+        status: 'pending',
+        pix_code: txid,
+        pix_qr_url: JSON.stringify({
+          mp_payment_id: mpPixId,
+          contact_id: conv.contact_id,
+          conversation_id: conversation_id,
+          description: description || '',
+          from_panel: true,
+          pix_code: pixCode,
+        }),
+        category: 'b2c_charge',
+      })
+      console.log('[payments/create] Registro salvo na tabela payments, txid:', txid, 'method:', useDirectPix ? 'pix_direct' : (mpPixId ? 'pix_mp' : 'pix'))
+    } catch (payErr) {
+      console.error('[payments/create] Erro ao salvar payments:', payErr.message)
     }
 
     const viaLabel = mpPixId ? 'PIX (Mercado Pago)' : (useDirectPix ? 'PIX Direto' : 'PIX')

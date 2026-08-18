@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     .eq('id', conversationId).maybeSingle()
   if (!conv) return res.status(404).json({ error: 'Conversa não encontrada' })
 
-  // Buscar todos os pagamentos do tenant
+  // 1. Buscar pagamentos na tabela payments
   const { data: allPayments } = await db.from('payments')
     .select('id, amount, description, method, status, pix_code, pix_qr_url, paid_at, created_at, category')
     .eq('tenant_id', tenantId)
@@ -41,28 +41,60 @@ export default async function handler(req, res) {
   const convPayments = (allPayments || []).filter(p => {
     try {
       const meta = JSON.parse(p.pix_qr_url || '{}')
-      // Match por conversation_id (pagamentos novos do create.js)
       if (meta.conversation_id === conversationId) return true
-      // Match por contact_id (pagamentos do webhook, catálogo, avulsos)
       if (conv.contact_id && meta.contact_id === conv.contact_id) return true
-      // Match por contact_id direto (se a coluna existir no futuro)
-      if (conv.contact_id && p.contact_id === conv.contact_id) return true
     } catch { return false }
     return false
   })
 
-  // Deduplicar por id (caso ambos os critérios peguem o mesmo pagamento)
-  const seen = new Set()
+  // Deduplicar por id
+  const seenIds = new Set()
   const dedupedPayments = convPayments.filter(p => {
-    if (seen.has(p.id)) return false
-    seen.add(p.id)
+    if (seenIds.has(p.id)) return false
+    seenIds.add(p.id)
     return true
   })
 
-  const pending = dedupedPayments.filter(p => p.status === 'pending')
-  const paid = dedupedPayments.filter(p => p.status === 'paid')
+  let pending = dedupedPayments.filter(p => p.status === 'pending')
+  let paid = dedupedPayments.filter(p => p.status === 'paid')
 
-  // Buscar comprovantes da conversa E do contato
+  // 2. Buscar mensagens __pending_charge__ (cobranças antigas que não foram salvas na tabela payments)
+  const { data: pendingMsgs } = await db.from('messages')
+    .select('id, content, created_at, type')
+    .eq('conversation_id', conversationId)
+    .eq('type', 'payment_pending')
+    .order('created_at', { ascending: false }).limit(50)
+
+  // Converter mensagens pending em objetos de pagamento (se ainda não estão na tabela payments)
+  if (pendingMsgs && pendingMsgs.length > 0) {
+    for (const msg of pendingMsgs) {
+      // Parse: __pending_charge__:amount=XX:desc=XX:pix=XX:method=XX
+      const match = msg.content?.match(/amount=([^:]+):desc=([^:]*):pix=([^:]*):method=(.*)/)
+      if (!match) continue
+
+      const [, amount, desc, pix, method] = match
+      const pixCode = decodeURIComponent(pix)
+
+      // Verificar se já existe um payment com este pix_code
+      const alreadyExists = dedupedPayments.some(p => p.pix_code === pixCode || p.pix_qr_url?.includes(pixCode))
+      if (alreadyExists) continue
+
+      pending.push({
+        id: 'msg_' + msg.id,
+        amount: parseFloat(amount),
+        description: decodeURIComponent(desc),
+        method: method || 'PIX',
+        status: 'pending',
+        pix_code: pixCode,
+        pix_qr_url: JSON.stringify({ from_message: true, message_id: msg.id }),
+        paid_at: null,
+        created_at: msg.created_at,
+        category: 'b2c_charge',
+      })
+    }
+  }
+
+  // 3. Buscar comprovantes
   let { data: receipts } = await db.from('payment_receipts')
     .select('id, payment_id, file_url, file_type, file_name, uploaded_by, notes, created_at, category, metadata')
     .eq('conversation_id', conversationId)
@@ -73,7 +105,7 @@ export default async function handler(req, res) {
       .select('id, payment_id, file_url, file_type, file_name, uploaded_by, notes, created_at, category, metadata')
       .eq('contact_id', conv.contact_id)
       .order('created_at', { ascending: false }).limit(100)
-    
+
     if (contactReceipts && contactReceipts.length > 0) {
       const existingIds = new Set((receipts || []).map(r => r.id))
       const merged = [...(receipts || [])]
