@@ -31,30 +31,43 @@ export default async function handler(req, res) {
     .eq('id', conversationId).maybeSingle()
   if (!conv) return res.status(404).json({ error: 'Conversa não encontrada' })
 
-  // Buscar todos os pagamentos do tenant (filtrar por conversation_id no JSON)
+  // Buscar todos os pagamentos do tenant
   const { data: allPayments } = await db.from('payments')
     .select('id, amount, description, method, status, pix_code, pix_qr_url, paid_at, created_at, category')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false }).limit(500)
 
-  // Filtrar pagamentos desta conversa
+  // Filtrar pagamentos desta conversa por conversation_id OU contact_id no JSON
   const convPayments = (allPayments || []).filter(p => {
     try {
       const meta = JSON.parse(p.pix_qr_url || '{}')
-      return meta.conversation_id === conversationId
+      // Match por conversation_id (pagamentos novos do create.js)
+      if (meta.conversation_id === conversationId) return true
+      // Match por contact_id (pagamentos do webhook, catálogo, avulsos)
+      if (conv.contact_id && meta.contact_id === conv.contact_id) return true
+      // Match por contact_id direto (se a coluna existir no futuro)
+      if (conv.contact_id && p.contact_id === conv.contact_id) return true
     } catch { return false }
+    return false
   })
 
-  const pending = convPayments.filter(p => p.status === 'pending')
-  const paid = convPayments.filter(p => p.status === 'paid')
+  // Deduplicar por id (caso ambos os critérios peguem o mesmo pagamento)
+  const seen = new Set()
+  const dedupedPayments = convPayments.filter(p => {
+    if (seen.has(p.id)) return false
+    seen.add(p.id)
+    return true
+  })
 
-  // Buscar comprovantes da conversa
+  const pending = dedupedPayments.filter(p => p.status === 'pending')
+  const paid = dedupedPayments.filter(p => p.status === 'paid')
+
+  // Buscar comprovantes da conversa E do contato
   let { data: receipts } = await db.from('payment_receipts')
     .select('id, payment_id, file_url, file_type, file_name, uploaded_by, notes, created_at, category, metadata')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: false }).limit(100)
 
-  // Buscar também via contact_id (caso não tenham conversation_id direto)
   if (conv.contact_id) {
     const { data: contactReceipts } = await db.from('payment_receipts')
       .select('id, payment_id, file_url, file_type, file_name, uploaded_by, notes, created_at, category, metadata')
