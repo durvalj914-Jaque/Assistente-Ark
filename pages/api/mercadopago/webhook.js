@@ -137,16 +137,31 @@ export default async function handler(req, res) {
           .maybeSingle()
         
         let feePercent = 2.0
+        let feeFixed = 0
+        let feeMin = 0
+        let feeMax = 0
         if (arkielTenant?.mp_access_token) {
           try {
             const mp = JSON.parse(arkielTenant.mp_access_token)
             if (mp.fee_config && mp.fee_config[feeMethod]) {
-              feePercent = mp.fee_config[feeMethod]
+              const cfg = mp.fee_config[feeMethod]
+              // Suporta formato antigo (número) e novo (objeto)
+              if (typeof cfg === 'number') {
+                feePercent = cfg
+              } else if (typeof cfg === 'object') {
+                feePercent = cfg.fee_percent || 0
+                feeFixed = cfg.fee_fixed || 0
+                feeMin = cfg.fee_min || 0
+                feeMax = cfg.fee_max || 0
+              }
             }
           } catch {}
         }
         
-        const feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
+        // Calcula taxa: percentual + valor fixo, respeitando min/max
+        let feeAmount = Number((grossAmount * (feePercent / 100) + feeFixed).toFixed(2))
+        if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin
+        if (feeMax > 0 && feeAmount > feeMax) feeAmount = feeMax
 
         const { data: existingFee } = await db.from('platform_fees')
           .select('id')

@@ -54,7 +54,12 @@ export default function PainelAdminPage() {
   const [loadingPayments, setLoadingPayments] = useState(false)
 
   // ── Fee Config (taxas por método) ──
-  const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
+  const [feeConfig, setFeeConfig] = useState({
+    pix:         { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    credit_card: { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    debit_card:  { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    boleto:      { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+  })
   const [savingFees, setSavingFees] = useState(false)
   const [feeMsg, setFeeMsg] = useState('')
   // ── Platform fees (receitas) ──
@@ -557,7 +562,12 @@ export default function PainelAdminPage() {
       // Ensure values are numbers
       const cleanConfig = {}
       for (const [k, v] of Object.entries(feeConfig)) {
-        cleanConfig[k] = parseFloat(v) || 0
+        cleanConfig[k] = {
+          fee_percent: parseFloat(v.fee_percent) || 0,
+          fee_fixed: parseFloat(v.fee_fixed) || 0,
+          fee_min: parseFloat(v.fee_min) || 0,
+          fee_max: parseFloat(v.fee_max) || 0,
+        }
       }
       const res = await fetch('/api/admin/fee-config', {
         method: 'POST',
@@ -1599,40 +1609,70 @@ export default function PainelAdminPage() {
             <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
               Define a porcentagem que a Arkiel retém de cada transação B2B, por método de pagamento. O valor vai direto para a conta MP do cliente, e o MP retém a taxa automaticamente.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
               {[
                 { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
                 { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
                 { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
                 { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
-              ].map(method => (
-                <div key={method.key} style={{ padding: '14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 18 }}>{method.icon}</span>
-                    <span style={{ color: 'var(--text-secondary)', fontSize: 13, fontWeight: 600 }}>{method.label}</span>
+              ].map(method => {
+                const cfg = feeConfig[method.key] || { fee_percent: 0, fee_fixed: 0, fee_min: 0, fee_max: 0 }
+                const update = (field, val) => setFeeConfig(f => ({
+                  ...f,
+                  [method.key]: { ...f[method.key], [field]: parseFloat(val) || 0 }
+                }))
+                return (
+                  <div key={method.key} style={{ padding: '16px', borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                      <span style={{ fontSize: 18 }}>{method.icon}</span>
+                      <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 700 }}>{method.label}</span>
+                    </div>
+                    {/* Percentual */}
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Percentual (%)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <input type="number" step="0.1" min="0" max="100"
+                          value={cfg.fee_percent}
+                          onChange={e => update('fee_percent', e.target.value)}
+                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
+                        />
+                        <span style={{ color: method.color, fontSize: 14, fontWeight: 700 }}>%</span>
+                      </div>
+                    </div>
+                    {/* Valor fixo */}
+                    <div style={{ marginBottom: 10 }}>
+                      <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor fixo por transação (R$)</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>R$</span>
+                        <input type="number" step="0.01" min="0"
+                          value={cfg.fee_fixed}
+                          onChange={e => update('fee_fixed', e.target.value)}
+                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
+                        />
+                      </div>
+                    </div>
+                    {/* Mínimo e Máximo */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Mínimo (R$)</label>
+                        <input type="number" step="0.01" min="0"
+                          value={cfg.fee_min}
+                          onChange={e => update('fee_min', e.target.value)}
+                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
+                        />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Máximo (R$)</label>
+                        <input type="number" step="0.01" min="0"
+                          value={cfg.fee_max}
+                          onChange={e => update('fee_max', e.target.value)}
+                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="100"
-                      value={feeConfig[method.key] ?? 2.0}
-                      onChange={e => setFeeConfig(f => ({ ...f, [method.key]: parseFloat(e.target.value) || 0 }))}
-                      style={{
-                        width: '100%', padding: '8px 10px', borderRadius: 8,
-                        border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)',
-                        color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, outline: 'none',
-                        textAlign: 'center',
-                      }}
-                    />
-                    <span style={{ color: method.color, fontSize: 16, fontWeight: 700 }}>%</span>
-                  </div>
-                  <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 6, textAlign: 'center' }}>
-                    R$ {((feeConfig[method.key] ?? 2.0) / 100 * 100).toFixed(2)} por cada R$100
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
             {feeMsg && (
               <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
@@ -1891,6 +1931,55 @@ export default function PainelAdminPage() {
             <StatTile label="Recebido" value={'R$ ' + (feeSummary?.totals?.collected_amount || 0).toFixed(2)} icon="✅" sub="Taxas já coletadas" />
             <StatTile label="Volume Total" value={'R$ ' + (feeSummary?.totals?.total_volume || 0).toFixed(2)} icon="📊" sub="Transações processadas" />
           </div>
+
+          {/* ── Taxas Ativas Configuradas ── */}
+          {(() => {
+            const methods = [
+              { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
+              { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
+              { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
+              { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
+            ]
+            const activeMethods = methods.filter(m => {
+              const c = feeConfig[m.key]
+              if (!c) return false
+              const pct = parseFloat(c.fee_percent) || 0
+              const fixed = parseFloat(c.fee_fixed) || 0
+              const min = parseFloat(c.fee_min) || 0
+              const max = parseFloat(c.fee_max) || 0
+              return pct > 0 || fixed > 0 || min > 0 || max > 0
+            })
+            if (activeMethods.length === 0) return null
+            return (
+              <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📋 Taxas Ativas</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 14 }}>Métodos com taxas configuradas. Valores zerados não aparecem.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                  {activeMethods.map(m => {
+                    const c = feeConfig[m.key]
+                    const parts = []
+                    if (parseFloat(c.fee_percent) > 0) parts.push(\`\${c.fee_percent}%\`)
+                    if (parseFloat(c.fee_fixed) > 0) parts.push(\`R$ \${c.fee_fixed} fixo\`)
+                    if (parseFloat(c.fee_min) > 0) parts.push(\`mín R$ \${c.fee_min}\`)
+                    if (parseFloat(c.fee_max) > 0) parts.push(\`máx R$ \${c.fee_max}\`)
+                    return (
+                      <div key={m.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 16 }}>{m.icon}</span>
+                          <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{m.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {parts.map((p, i) => (
+                            <span key={i} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: \`\${m.color}15\`, color: m.color }}>{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* ── Option A: Split Oficial MP (Marketplace) ── */}
           <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
