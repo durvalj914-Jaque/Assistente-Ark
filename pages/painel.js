@@ -1686,6 +1686,56 @@ export default function PainelAdminPage() {
               {savingFees ? 'Salvando...' : '💾 Salvar Taxas'}
             </button>
           </div>
+          {/* ── Taxas Ativas Configuradas ── */}
+          {(() => {
+            const methods = [
+              { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
+              { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
+              { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
+              { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
+            ]
+            const activeMethods = methods.filter(m => {
+              const c = feeConfig[m.key]
+              if (!c) return false
+              const pct = parseFloat(c.fee_percent) || 0
+              const fixed = parseFloat(c.fee_fixed) || 0
+              const min = parseFloat(c.fee_min) || 0
+              const max = parseFloat(c.fee_max) || 0
+              return pct > 0 || fixed > 0 || min > 0 || max > 0
+            })
+            if (activeMethods.length === 0) return null
+            return (
+              <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📋 Taxas Ativas</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 14 }}>Métodos com taxas configuradas. Valores zerados não aparecem.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                  {activeMethods.map(m => {
+                    const c = feeConfig[m.key]
+                    const parts = []
+                    if (parseFloat(c.fee_percent) > 0) parts.push(\`\${c.fee_percent}%\`)
+                    if (parseFloat(c.fee_fixed) > 0) parts.push(\`R$ \${c.fee_fixed} fixo\`)
+                    if (parseFloat(c.fee_min) > 0) parts.push(\`mín R$ \${c.fee_min}\`)
+                    if (parseFloat(c.fee_max) > 0) parts.push(\`máx R$ \${c.fee_max}\`)
+                    return (
+                      <div key={m.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <span style={{ fontSize: 16 }}>{m.icon}</span>
+                          <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{m.label}</span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {parts.map((p, i) => (
+                            <span key={i} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: \`\${m.color}15\`, color: m.color }}>{p}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
+
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
             <StatTile label="Total Recebido" value={'R$ ' + (payments.filter(p => p.status === 'paid').reduce((s, p) => s + parseFloat(p.amount), 0)).toFixed(2)} icon="✅" />
@@ -1931,55 +1981,6 @@ export default function PainelAdminPage() {
             <StatTile label="Recebido" value={'R$ ' + (feeSummary?.totals?.collected_amount || 0).toFixed(2)} icon="✅" sub="Taxas já coletadas" />
             <StatTile label="Volume Total" value={'R$ ' + (feeSummary?.totals?.total_volume || 0).toFixed(2)} icon="📊" sub="Transações processadas" />
           </div>
-
-          {/* ── Taxas Ativas Configuradas ── */}
-          {(() => {
-            const methods = [
-              { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
-              { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
-              { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
-              { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
-            ]
-            const activeMethods = methods.filter(m => {
-              const c = feeConfig[m.key]
-              if (!c) return false
-              const pct = parseFloat(c.fee_percent) || 0
-              const fixed = parseFloat(c.fee_fixed) || 0
-              const min = parseFloat(c.fee_min) || 0
-              const max = parseFloat(c.fee_max) || 0
-              return pct > 0 || fixed > 0 || min > 0 || max > 0
-            })
-            if (activeMethods.length === 0) return null
-            return (
-              <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
-                <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>📋 Taxas Ativas</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 14 }}>Métodos com taxas configuradas. Valores zerados não aparecem.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-                  {activeMethods.map(m => {
-                    const c = feeConfig[m.key]
-                    const parts = []
-                    if (parseFloat(c.fee_percent) > 0) parts.push(\`\${c.fee_percent}%\`)
-                    if (parseFloat(c.fee_fixed) > 0) parts.push(\`R$ \${c.fee_fixed} fixo\`)
-                    if (parseFloat(c.fee_min) > 0) parts.push(\`mín R$ \${c.fee_min}\`)
-                    if (parseFloat(c.fee_max) > 0) parts.push(\`máx R$ \${c.fee_max}\`)
-                    return (
-                      <div key={m.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                          <span style={{ fontSize: 16 }}>{m.icon}</span>
-                          <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{m.label}</span>
-                        </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                          {parts.map((p, i) => (
-                            <span key={i} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: \`\${m.color}15\`, color: m.color }}>{p}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })()}
 
           {/* ── Option A: Split Oficial MP (Marketplace) ── */}
           <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
