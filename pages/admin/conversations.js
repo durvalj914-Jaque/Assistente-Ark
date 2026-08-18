@@ -319,6 +319,24 @@ export default function ConversationsPage() {
     finally { setLoadingCharges(false) }
   }
 
+  async function cancelPayment(payment) {
+    if (!payment) return
+    const pId = payment.id
+    const isMsg = pId?.startsWith('msg_')
+    if (!confirm(`Cancelar cobrança de R$ ${parseFloat(payment.amount).toFixed(2)}?`)) return
+    try {
+      const h = await authHeaders()
+      const res = await fetch('/api/payments/cancel', {
+        method: 'POST', headers: h,
+        body: JSON.stringify({ payment_id: pId, message_id: isMsg ? pId.replace('msg_', '') : null })
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Falha ao cancelar')
+      // Recarregar lista
+      fetchConvCharges()
+    } catch (e) { alert(e.message) }
+  }
+
   async function sendPayment() {
     if (!selected || !payAmount || sendingPayment) return
     setSendingPayment(true)
@@ -1149,9 +1167,22 @@ export default function ConversationsPage() {
                             <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', padding: '2px 8px', borderRadius: 6 }}>⏳ Pendente</span>
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{p.description || 'Pagamento'}</div>
-                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 8 }}>
                             {p.method?.toUpperCase() || 'PIX'} · {new Date(p.created_at).toLocaleString('pt-BR')}
                           </div>
+                          <button onClick={() => cancelPayment(p)}
+                            style={{
+                              width: '100%', padding: '6px 12px', borderRadius: 8, cursor: 'pointer',
+                              border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
+                              color: '#dc2626', fontSize: 11, fontWeight: 600,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+                              transition: 'all .15s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.15)' }}
+                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)' }}
+                          >
+                            ✕ Cancelar cobrança
+                          </button>
                         </div>
                       )
                     })}
