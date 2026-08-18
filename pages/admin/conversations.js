@@ -688,7 +688,7 @@ export default function ConversationsPage() {
                 }} />
             </div>
             <div style={{ display: 'flex', gap: 6, marginTop: 8, overflowX: 'auto' }}>
-              {[{ k: 'all', l: 'Todas' }, { k: 'human', l: '👤 Humano' }, { k: 'bot', l: '🤖 Bot' }, { k: 'closed', l: '🔒 Fechadas' }].map(f => (
+              {[{ k: 'all', l: 'Todas' }, { k: 'human', l: '👤 Humano' }, { k: 'bot', l: '🤖 Bot' }].map(f => (
                 <button key={f.k} onClick={() => setFilter(f.k)}
                   style={{
                     padding: '4px 12px', borderRadius: 16, border: 'none', cursor: 'pointer',
