@@ -172,6 +172,12 @@ export default async function handler(req, res) {
           feeAmount = feeFixed
         } else if (feeType === 'percent_fixed') {
           feeAmount = Number((grossAmount * (feePercent / 100) + feeFixed).toFixed(2))
+        } else if (feeType === 'percent_min') {
+          feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
+          if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin
+        } else if (feeType === 'percent_max') {
+          feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
+          if (feeMax > 0 && feeAmount > feeMax) feeAmount = feeMax
         } else if (feeType === 'percent_min_max') {
           feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
           if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin

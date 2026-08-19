@@ -1637,6 +1637,8 @@ export default function PainelAdminPage() {
                   { value: 'percent', label: 'Apenas %' },
                   { value: 'fixed', label: 'Apenas R$ fixo' },
                   { value: 'percent_fixed', label: '% + R$ fixo' },
+                  { value: 'percent_min', label: '% com Mínimo' },
+                  { value: 'percent_max', label: '% com Máximo' },
                   { value: 'percent_min_max', label: '% com mín e máx' },
                   { value: 'fixed_range', label: 'R$ fixo entre mín e máx' },
                 ]
@@ -1657,7 +1659,7 @@ export default function PainelAdminPage() {
                       </select>
                     </div>
                     {/* Percentual */}
-                    {(ft === 'percent' || ft === 'percent_fixed' || ft === 'percent_min_max') && (
+                    {(ft === 'percent' || ft === 'percent_fixed' || ft === 'percent_min' || ft === 'percent_max' || ft === 'percent_min_max') && (
                       <div style={{ marginBottom: 10 }}>
                         <label style={labelStyle}>Percentual (%)</label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1679,6 +1681,35 @@ export default function PainelAdminPage() {
                           <input type="number" step="0.01" min="0"
                             value={cfg.fee_fixed}
                             onChange={e => update('fee_fixed', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {/* Mínimo e Máximo */}
+                    {/* Apenas Mínimo */}
+                    {ft === 'percent_min' && (
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={labelStyle}>Mínimo (R$)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>R$</span>
+                          <input type="number" step="0.01" min="0"
+                            value={cfg.fee_min}
+                            onChange={e => update('fee_min', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {/* Apenas Máximo */}
+                    {ft === 'percent_max' && (
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={labelStyle}>Máximo (R$)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>R$</span>
+                          <input type="number" step="0.01" min="0"
+                            value={cfg.fee_max}
+                            onChange={e => update('fee_max', e.target.value)}
                             style={inputStyle}
                           />
                         </div>
@@ -1715,6 +1746,18 @@ export default function PainelAdminPage() {
                         if (ft === 'percent') return p > 0 ? p + '% por transação' : '—'
                         if (ft === 'fixed') return f > 0 ? 'R$ ' + f.toFixed(2) + ' por transação' : '—'
                         if (ft === 'percent_fixed') return (p > 0 || f > 0) ? p + '% + R$ ' + f.toFixed(2) : '—'
+                        if (ft === 'percent_min') {
+                          if (p === 0) return '—'
+                          let s = p + '%'
+                          if (mn > 0) s += ' (mín R$ ' + mn.toFixed(2) + ')'
+                          return s
+                        }
+                        if (ft === 'percent_max') {
+                          if (p === 0) return '—'
+                          let s = p + '%'
+                          if (mx > 0) s += ' (máx R$ ' + mx.toFixed(2) + ')'
+                          return s
+                        }
                         if (ft === 'percent_min_max') {
                           if (p === 0) return '—'
                           let s = p + '%'
@@ -1789,14 +1832,12 @@ export default function PainelAdminPage() {
                     const mn = parseFloat(c.fee_min) || 0
                     const mx = parseFloat(c.fee_max) || 0
                     const parts = []
-                    const typeLabels = { percent: '% apenas', fixed: 'R$ fixo', percent_fixed: '% + R$ fixo', percent_min_max: '% c/ limites', fixed_range: 'R$ fixo c/ limites' }
+                    const typeLabels = { percent: '% apenas', fixed: 'R$ fixo', percent_fixed: '% + R$ fixo', percent_min: '% c/ mínimo', percent_max: '% c/ máximo', percent_min_max: '% c/ limites', fixed_range: 'R$ fixo c/ limites' }
                     if (typeLabels[ft]) parts.push(typeLabels[ft])
-                    if (ft === 'percent' || ft === 'percent_fixed' || ft === 'percent_min_max') { if (p > 0) parts.push(`${p}%`) }
+                    if (ft === 'percent' || ft === 'percent_fixed' || ft === 'percent_min' || ft === 'percent_max' || ft === 'percent_min_max') { if (p > 0) parts.push(`${p}%`) }
                     if (ft === 'fixed' || ft === 'percent_fixed' || ft === 'fixed_range') { if (f > 0) parts.push(`R$ ${f.toFixed(2)}`) }
-                    if (ft === 'percent_min_max' || ft === 'fixed_range') {
-                      if (mn > 0) parts.push(`mín R$ ${mn.toFixed(2)}`)
-                      if (mx > 0) parts.push(`máx R$ ${mx.toFixed(2)}`)
-                    }
+                    if (ft === 'percent_min' || ft === 'percent_min_max' || ft === 'fixed_range') { if (mn > 0) parts.push(`mín R$ ${mn.toFixed(2)}`) }
+                    if (ft === 'percent_max' || ft === 'percent_min_max' || ft === 'fixed_range') { if (mx > 0) parts.push(`máx R$ ${mx.toFixed(2)}`) }
                     return (
                       <div key={m.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
