@@ -338,32 +338,48 @@ export default function PainelAdminPage() {
 
   // ── Load platform fees summary ──
   async function loadFeeSummary() {
-    const h = await getAuthHeaders()
-    if (!h) return
-    const res = await fetch('/api/admin/fees?summary=true', { headers: h })
-    if (res.ok) {
-      const json = await res.json()
-      setFeeSummary(json)
+    try {
+      const h = await authHeader()
+      if (!h) return
+      const res = await fetch('/api/admin/fees?summary=true', { headers: h })
+      if (res.ok) {
+        const json = await res.json()
+        setFeeSummary(json)
+      } else {
+        // API returned error (table might not exist yet) — set empty default
+        setFeeSummary({ tenants: [], totals: { pending_amount: 0, collected_amount: 0, invoiced_amount: 0, total_volume: 0 } })
+      }
+    } catch (e) {
+      console.error('[loadFeeSummary]', e)
+      setFeeSummary({ tenants: [], totals: { pending_amount: 0, collected_amount: 0, invoiced_amount: 0, total_volume: 0 } })
     }
   }
 
   // ── Load fee list (detailed) ──
   async function loadFeeList(status) {
-    const h = await getAuthHeaders()
-    if (!h) return
-    setLoadingFees(true)
-    const res = await fetch('/api/admin/fees?status=' + (status || 'pending'), { headers: h })
-    if (res.ok) {
-      const json = await res.json()
-      setFeeList(json.fees || [])
+    try {
+      const h = await authHeader()
+      if (!h) return
+      setLoadingFees(true)
+      const res = await fetch('/api/admin/fees?status=' + (status || 'pending'), { headers: h })
+      if (res.ok) {
+        const json = await res.json()
+        setFeeList(json.fees || [])
+      } else {
+        setFeeList([])
+      }
+    } catch (e) {
+      console.error('[loadFeeList]', e)
+      setFeeList([])
+    } finally {
+      setLoadingFees(false)
     }
-    setLoadingFees(false)
   }
 
   // ── Generate monthly invoice for a tenant ──
   async function generateInvoice(tenantId, tenantName) {
     if (!confirm('Gerar cobrança PIX de todas as taxas pendentes de ' + tenantName + '?')) return
-    const h = await getAuthHeaders()
+    const h = await authHeader()
     if (!h) return
     setFeeActionMsg('Gerando cobrança...')
     try {
@@ -386,7 +402,7 @@ export default function PainelAdminPage() {
 
   // ── Mark fees as collected ──
   async function markCollected(feeIds) {
-    const h = await getAuthHeaders()
+    const h = await authHeader()
     if (!h) return
     const res = await fetch('/api/admin/fees', {
       method: 'POST',
@@ -402,7 +418,7 @@ export default function PainelAdminPage() {
 
   // ── Save marketplace config ──
   async function saveMarketplaceConfig() {
-    const h = await getAuthHeaders()
+    const h = await authHeader()
     if (!h) return
     setSavingMarketplace(true)
     setMarketplaceMsg('')
