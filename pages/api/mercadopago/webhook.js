@@ -125,14 +125,14 @@ export default async function handler(req, res) {
         const grossAmount = parseFloat(order.total) || 0
         const paymentMethod = payment.payment_method_id || 'pix'
         
-        let feeMethod = 'pix'
-        if (paymentMethod.includes('credit')) feeMethod = 'credit_card'
-        else if (paymentMethod.includes('debit')) feeMethod = 'debit_card'
-        else if (paymentMethod === 'ticket' || paymentMethod.includes('boleto')) feeMethod = 'boleto'
-        else if (paymentMethod.includes('bank_transfer') || paymentMethod.includes('transfer')) feeMethod = 'bank_transfer'
-        else if (paymentMethod.includes('account_balance') || paymentMethod === 'money' || paymentMethod.includes('saldo')) feeMethod = 'account_balance'
-        else if (paymentMethod.includes('paypal')) feeMethod = 'paypal'
-        else if (paymentMethod.includes('prepaid')) feeMethod = 'prepaid_card'
+        // Tudo processado via Mercado Pago — taxa unificada
+        let feeMethod = 'mercado_pago'
+        // Fallback: se nao houver config para 'mercado_pago', tenta metodo especifico (legacy)
+        const legacyMethodMap = {
+          pix: 'pix', credit_card: 'credit_card', debit_card: 'debit_card',
+          boleto: 'boleto', bank_transfer: 'bank_transfer',
+          account_balance: 'account_balance', paypal: 'paypal', prepaid_card: 'prepaid_card'
+        }
 
         const ARKIEL_TENANT_ID = 'cc629c88-c072-4593-84dc-e9cd8d2b06d2'
         const { data: arkielTenant } = await db.from('tenants')
@@ -148,8 +148,23 @@ export default async function handler(req, res) {
         if (arkielTenant?.mp_access_token) {
           try {
             const mp = JSON.parse(arkielTenant.mp_access_token)
-            if (mp.fee_config && mp.fee_config[feeMethod]) {
-              const cfg = mp.fee_config[feeMethod]
+            // Prioriza config unificada 'mercado_pago'; fallback para metodo especifico (legacy)
+            let cfgKey = mp.fee_config?.mercado_pago ? 'mercado_pago' : null
+            if (!cfgKey) {
+              // Tenta mapear payment_method do MP para chave legacy
+              const pm = payment.payment_method_id || ''
+              let legacyKey = 'pix'
+              if (pm.includes('credit')) legacyKey = 'credit_card'
+              else if (pm.includes('debit')) legacyKey = 'debit_card'
+              else if (pm === 'ticket' || pm.includes('boleto')) legacyKey = 'boleto'
+              else if (pm.includes('bank_transfer') || pm.includes('transfer')) legacyKey = 'bank_transfer'
+              else if (pm.includes('account_balance') || pm === 'money') legacyKey = 'account_balance'
+              else if (pm.includes('paypal')) legacyKey = 'paypal'
+              else if (pm.includes('prepaid')) legacyKey = 'prepaid_card'
+              if (mp.fee_config?.[legacyKey]) cfgKey = legacyKey
+            }
+            if (cfgKey && mp.fee_config[cfgKey]) {
+              const cfg = mp.fee_config[cfgKey]
               // Suporta formato antigo (número) e novo (objeto)
               if (typeof cfg === 'number') {
                 feePercent = cfg

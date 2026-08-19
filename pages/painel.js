@@ -55,14 +55,7 @@ export default function PainelAdminPage() {
 
   // ── Fee Config (taxas por método) ──
   const [feeConfig, setFeeConfig] = useState({
-    pix:            { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    credit_card:    { fee_type: 'percent', fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    debit_card:     { fee_type: 'percent', fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    boleto:         { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    bank_transfer:  { fee_type: 'percent', fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    account_balance:{ fee_type: 'percent', fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    paypal:         { fee_type: 'percent', fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    prepaid_card:   { fee_type: 'percent', fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    mercado_pago:   { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
   })
   const [savingFees, setSavingFees] = useState(false)
   const [feeMsg, setFeeMsg] = useState('')
@@ -1598,20 +1591,13 @@ export default function PainelAdminPage() {
 
           {/* ── Taxas por método de pagamento ── */}
           <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
-            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📊 Taxas da Plataforma (Marketplace Fee)</h3>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📊 Taxa da Plataforma (Mercado Pago)</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
-              Define como a Arkiel ganha por transação B2B. Escolha o modelo de taxa para cada método de pagamento — percentual, valor fixo, ou combinações com limites.
+              Define como a Arkiel ganha por transação B2B processada via Mercado Pago. Escolha o modelo de taxa — percentual, valor fixo, ou combinações com limites.
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 16 }}>
               {[
-                { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
-                { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
-                { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
-                { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
-                { key: 'bank_transfer', label: 'Transferência Bancária', icon: '🏦', color: '#06b6d4' },
-                { key: 'account_balance', label: 'Saldo Mercado Pago', icon: '💰', color: '#0ea5e9' },
-                { key: 'paypal', label: 'PayPal', icon: '🅿️', color: '#3b82f6' },
-                { key: 'prepaid_card', label: 'Cartão Pré-pago', icon: '💳', color: '#ec4899' },
+                { key: 'mercado_pago', label: 'Mercado Pago', icon: '💳', color: '#4f8ef7' },
               ].map(method => {
                 const cfg = feeConfig[method.key] || { fee_type: 'percent', fee_percent: 0, fee_fixed: 0, fee_min: 0, fee_max: 0 }
                 const ft = cfg.fee_type || 'percent'
@@ -1788,14 +1774,7 @@ export default function PainelAdminPage() {
           {/* ── Taxas Ativas Configuradas ── */}
           {(() => {
             const methods = [
-              { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
-              { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
-              { key: 'debit_card', label: 'Cartão de Débito', icon: '💳', color: '#8b5cf6' },
-              { key: 'boleto', label: 'Boleto', icon: '🧾', color: '#f59e0b' },
-              { key: 'bank_transfer', label: 'Transferência Bancária', icon: '🏦', color: '#06b6d4' },
-              { key: 'account_balance', label: 'Saldo Mercado Pago', icon: '💰', color: '#0ea5e9' },
-              { key: 'paypal', label: 'PayPal', icon: '🅿️', color: '#3b82f6' },
-              { key: 'prepaid_card', label: 'Cartão Pré-pago', icon: '💳', color: '#ec4899' },
+              { key: 'mercado_pago', label: 'Mercado Pago', icon: '💳', color: '#4f8ef7' },
             ]
             const activeMethods = methods.filter(m => {
               const c = feeConfig[m.key]
