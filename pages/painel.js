@@ -1579,25 +1579,13 @@ export default function PainelAdminPage() {
       {tab === 'payments' && (
         <div>
           <div className="ark-card" style={{ padding: 20, marginBottom: 20 }}>
-            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 16 }}>💰 Configuração de Pagamentos</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>💰 Configuração de Pagamentos</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
+              O Assistente Ark utiliza exclusivamente o Mercado Pago para processar cobranças (PIX, cartão, boleto e mais). Configure seu token abaixo.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12, maxWidth: 500 }}>
               <div>
-                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Chave PIX</label>
-                <input value={payConfig.pix_key} onChange={e => setPayConfig(c => ({ ...c, pix_key: e.target.value }))} placeholder="ex: arkieltech@gmail.com"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
-              </div>
-              <div>
-                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Nome do Recebedor</label>
-                <input value={payConfig.merchant_name} onChange={e => setPayConfig(c => ({ ...c, merchant_name: e.target.value }))} placeholder="ex: Arkiel Tech"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
-              </div>
-              <div>
-                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Cidade</label>
-                <input value={payConfig.merchant_city} onChange={e => setPayConfig(c => ({ ...c, merchant_city: e.target.value }))} placeholder="ex: SAO PAULO"
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
-              </div>
-              <div>
-                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Token Mercado Pago (opcional)</label>
+                <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Token do Mercado Pago</label>
                 <input value={payConfig.mp_access_token} onChange={e => setPayConfig(c => ({ ...c, mp_access_token: e.target.value }))} placeholder="APP_USR-..." type="password"
                   style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, marginTop: 4 }} />
               </div>
