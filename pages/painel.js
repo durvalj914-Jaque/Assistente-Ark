@@ -1805,7 +1805,7 @@ export default function PainelAdminPage() {
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                           {parts.map((p, i) => (
-                            <span key={i} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: \`\${m.color}15\`, color: m.color }}>{p}</span>
+                            <span key={i} style={{ padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 600, background: `${m.color}15`, color: m.color }}>{p}</span>
                           ))}
                         </div>
                       </div>
