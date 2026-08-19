@@ -3,14 +3,14 @@
  * POST /api/admin/fee-config  — Salva a config de taxas
  *
  * fee_config: {
- *   pix:           { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   credit_card:   { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   debit_card:    { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   boleto:        { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   bank_transfer: { fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   account_balance:{ fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   paypal:        { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
- *   prepaid_card:  { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   pix:            { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   credit_card:    { fee_type: 'percent', fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   debit_card:     { fee_type: 'percent', fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   boleto:         { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   bank_transfer:  { fee_type: 'percent', fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   account_balance:{ fee_type: 'percent', fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   paypal:         { fee_type: 'percent', fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+ *   prepaid_card:   { fee_type: 'percent', fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
  * }
  *
  * fee_percent: % da transação (0-100)
@@ -65,13 +65,14 @@ export default async function handler(req, res) {
         result[key] = { ...DEFAULT_FEES[key], fee_percent: val }
       } else if (val && typeof val === 'object') {
         result[key] = {
+          fee_type: val.fee_type || 'percent',
           fee_percent: parseFloat(val.fee_percent) || 0,
           fee_fixed: parseFloat(val.fee_fixed) || 0,
           fee_min: parseFloat(val.fee_min) || 0,
           fee_max: parseFloat(val.fee_max) || 0,
         }
       } else {
-        result[key] = { ...DEFAULT_FEES[key] }
+        result[key] = { ...DEFAULT_FEES[key], fee_type: 'percent' }
       }
     }
     return result
@@ -89,6 +90,7 @@ export default async function handler(req, res) {
     }
 
     const validKeys = ['pix', 'credit_card', 'debit_card', 'boleto', 'bank_transfer', 'account_balance', 'paypal', 'prepaid_card']
+    const validTypes = ['percent', 'fixed', 'percent_fixed', 'percent_min_max', 'fixed_range']
     const sanitized = {}
 
     for (const key of validKeys) {
@@ -115,7 +117,8 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `Valor máximo inválido para ${key}` })
       }
 
-      sanitized[key] = { fee_percent, fee_fixed, fee_min, fee_max }
+      const fee_type = typeof cfg.fee_type === 'string' && validTypes.includes(cfg.fee_type) ? cfg.fee_type : 'percent'
+      sanitized[key] = { fee_type, fee_percent, fee_fixed, fee_min, fee_max }
     }
 
     const json = await readJson()

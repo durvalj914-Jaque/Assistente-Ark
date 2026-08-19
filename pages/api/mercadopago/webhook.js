@@ -144,6 +144,7 @@ export default async function handler(req, res) {
         let feeFixed = 0
         let feeMin = 0
         let feeMax = 0
+        let feeType = 'percent'
         if (arkielTenant?.mp_access_token) {
           try {
             const mp = JSON.parse(arkielTenant.mp_access_token)
@@ -157,15 +158,34 @@ export default async function handler(req, res) {
                 feeFixed = cfg.fee_fixed || 0
                 feeMin = cfg.fee_min || 0
                 feeMax = cfg.fee_max || 0
+                feeType = cfg.fee_type || 'percent'
               }
             }
           } catch {}
         }
         
-        // Calcula taxa: percentual + valor fixo, respeitando min/max
-        let feeAmount = Number((grossAmount * (feePercent / 100) + feeFixed).toFixed(2))
-        if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin
-        if (feeMax > 0 && feeAmount > feeMax) feeAmount = feeMax
+        // Calcula taxa baseado no modelo escolhido (fee_type)
+        let feeAmount = 0
+        if (feeType === 'percent') {
+          feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
+        } else if (feeType === 'fixed') {
+          feeAmount = feeFixed
+        } else if (feeType === 'percent_fixed') {
+          feeAmount = Number((grossAmount * (feePercent / 100) + feeFixed).toFixed(2))
+        } else if (feeType === 'percent_min_max') {
+          feeAmount = Number((grossAmount * (feePercent / 100)).toFixed(2))
+          if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin
+          if (feeMax > 0 && feeAmount > feeMax) feeAmount = feeMax
+        } else if (feeType === 'fixed_range') {
+          feeAmount = feeFixed || feeMin
+          if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin
+          if (feeMax > 0 && feeAmount > feeMax) feeAmount = feeMax
+        } else {
+          // Fallback: percentual + fixo com min/max (legado)
+          feeAmount = Number((grossAmount * (feePercent / 100) + feeFixed).toFixed(2))
+          if (feeMin > 0 && feeAmount < feeMin) feeAmount = feeMin
+          if (feeMax > 0 && feeAmount > feeMax) feeAmount = feeMax
+        }
 
         const { data: existingFee } = await db.from('platform_fees')
           .select('id')

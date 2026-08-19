@@ -55,14 +55,14 @@ export default function PainelAdminPage() {
 
   // ── Fee Config (taxas por método) ──
   const [feeConfig, setFeeConfig] = useState({
-    pix:            { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    credit_card:    { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    debit_card:     { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    boleto:         { fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    bank_transfer:  { fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    account_balance:{ fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    paypal:         { fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
-    prepaid_card:   { fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    pix:            { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    credit_card:    { fee_type: 'percent', fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    debit_card:     { fee_type: 'percent', fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    boleto:         { fee_type: 'percent', fee_percent: 2.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    bank_transfer:  { fee_type: 'percent', fee_percent: 1.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    account_balance:{ fee_type: 'percent', fee_percent: 1.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    paypal:         { fee_type: 'percent', fee_percent: 3.0, fee_fixed: 0, fee_min: 0, fee_max: 0 },
+    prepaid_card:   { fee_type: 'percent', fee_percent: 2.5, fee_fixed: 0, fee_min: 0, fee_max: 0 },
   })
   const [savingFees, setSavingFees] = useState(false)
   const [feeMsg, setFeeMsg] = useState('')
@@ -567,6 +567,7 @@ export default function PainelAdminPage() {
       const cleanConfig = {}
       for (const [k, v] of Object.entries(feeConfig)) {
         cleanConfig[k] = {
+          fee_type: v.fee_type || 'percent',
           fee_percent: parseFloat(v.fee_percent) || 0,
           fee_fixed: parseFloat(v.fee_fixed) || 0,
           fee_min: parseFloat(v.fee_min) || 0,
@@ -1611,9 +1612,9 @@ export default function PainelAdminPage() {
           <div className="ark-card" style={{ padding: 20, marginBottom: 20, border: '1px solid rgba(79,142,247,0.15)' }}>
             <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 6 }}>📊 Taxas da Plataforma (Marketplace Fee)</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>
-              Define a porcentagem que a Arkiel retém de cada transação B2B, por método de pagamento. O valor vai direto para a conta MP do cliente, e o MP retém a taxa automaticamente.
+              Define como a Arkiel ganha por transação B2B. Escolha o modelo de taxa para cada método de pagamento — percentual, valor fixo, ou combinações com limites.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))', gap: 16 }}>
               {[
                 { key: 'pix', label: 'PIX', icon: '💠', color: '#22c55e' },
                 { key: 'credit_card', label: 'Cartão de Crédito', icon: '💳', color: '#4f8ef7' },
@@ -1624,59 +1625,118 @@ export default function PainelAdminPage() {
                 { key: 'paypal', label: 'PayPal', icon: '🅿️', color: '#3b82f6' },
                 { key: 'prepaid_card', label: 'Cartão Pré-pago', icon: '💳', color: '#ec4899' },
               ].map(method => {
-                const cfg = feeConfig[method.key] || { fee_percent: 0, fee_fixed: 0, fee_min: 0, fee_max: 0 }
+                const cfg = feeConfig[method.key] || { fee_type: 'percent', fee_percent: 0, fee_fixed: 0, fee_min: 0, fee_max: 0 }
+                const ft = cfg.fee_type || 'percent'
                 const update = (field, val) => setFeeConfig(f => ({
                   ...f,
-                  [method.key]: { ...f[method.key], [field]: parseFloat(val) || 0 }
+                  [method.key]: { ...f[method.key], [field]: field === 'fee_type' ? val : (parseFloat(val) || 0) }
                 }))
+                const inputStyle = { width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }
+                const labelStyle = { fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }
+                const feeTypes = [
+                  { value: 'percent', label: 'Apenas %' },
+                  { value: 'fixed', label: 'Apenas R$ fixo' },
+                  { value: 'percent_fixed', label: '% + R$ fixo' },
+                  { value: 'percent_min_max', label: '% com mín e máx' },
+                  { value: 'fixed_range', label: 'R$ fixo entre mín e máx' },
+                ]
                 return (
                   <div key={method.key} style={{ padding: '16px', borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
                       <span style={{ fontSize: 18 }}>{method.icon}</span>
                       <span style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 700 }}>{method.label}</span>
                     </div>
+                    {/* Modelo de taxa */}
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={labelStyle}>Modelo de ganho</label>
+                      <select value={ft} onChange={e => update('fee_type', e.target.value)}
+                        style={{ ...inputStyle, cursor: 'pointer', appearance: 'auto', padding: '7px 8px' }}>
+                        {feeTypes.map(t => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
                     {/* Percentual */}
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Percentual (%)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <input type="number" step="0.1" min="0" max="100"
-                          value={cfg.fee_percent}
-                          onChange={e => update('fee_percent', e.target.value)}
-                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
-                        />
-                        <span style={{ color: method.color, fontSize: 14, fontWeight: 700 }}>%</span>
+                    {(ft === 'percent' || ft === 'percent_fixed' || ft === 'percent_min_max') && (
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={labelStyle}>Percentual (%)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input type="number" step="0.1" min="0" max="100"
+                            value={cfg.fee_percent}
+                            onChange={e => update('fee_percent', e.target.value)}
+                            style={inputStyle}
+                          />
+                          <span style={{ color: method.color, fontSize: 14, fontWeight: 700 }}>%</span>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     {/* Valor fixo */}
-                    <div style={{ marginBottom: 10 }}>
-                      <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Valor fixo por transação (R$)</label>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>R$</span>
-                        <input type="number" step="0.01" min="0"
-                          value={cfg.fee_fixed}
-                          onChange={e => update('fee_fixed', e.target.value)}
-                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
-                        />
+                    {(ft === 'fixed' || ft === 'percent_fixed' || ft === 'fixed_range') && (
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={labelStyle}>Valor fixo por transação (R$)</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ color: 'var(--text-muted)', fontSize: 13, fontWeight: 600 }}>R$</span>
+                          <input type="number" step="0.01" min="0"
+                            value={cfg.fee_fixed}
+                            onChange={e => update('fee_fixed', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                     {/* Mínimo e Máximo */}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Mínimo (R$)</label>
-                        <input type="number" step="0.01" min="0"
-                          value={cfg.fee_min}
-                          onChange={e => update('fee_min', e.target.value)}
-                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
-                        />
+                    {(ft === 'percent_min_max' || ft === 'fixed_range') && (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <label style={labelStyle}>Mínimo (R$)</label>
+                          <input type="number" step="0.01" min="0"
+                            value={cfg.fee_min}
+                            onChange={e => update('fee_min', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <label style={labelStyle}>Máximo (R$)</label>
+                          <input type="number" step="0.01" min="0"
+                            value={cfg.fee_max}
+                            onChange={e => update('fee_max', e.target.value)}
+                            style={inputStyle}
+                          />
+                        </div>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <label style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: 4 }}>Máximo (R$)</label>
-                        <input type="number" step="0.01" min="0"
-                          value={cfg.fee_max}
-                          onChange={e => update('fee_max', e.target.value)}
-                          style={{ width: '100%', padding: '7px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, outline: 'none' }}
-                        />
-                      </div>
+                    )}
+                    {/* Preview da taxa */}
+                    <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: method.color + '12', fontSize: 11, color: method.color, fontWeight: 600, textAlign: 'center' }}>
+                      {(() => {
+                        const p = parseFloat(cfg.fee_percent) || 0
+                        const f = parseFloat(cfg.fee_fixed) || 0
+                        const mn = parseFloat(cfg.fee_min) || 0
+                        const mx = parseFloat(cfg.fee_max) || 0
+                        if (ft === 'percent') return p > 0 ? p + '% por transação' : '—'
+                        if (ft === 'fixed') return f > 0 ? 'R$ ' + f.toFixed(2) + ' por transação' : '—'
+                        if (ft === 'percent_fixed') return (p > 0 || f > 0) ? p + '% + R$ ' + f.toFixed(2) : '—'
+                        if (ft === 'percent_min_max') {
+                          if (p === 0) return '—'
+                          let s = p + '%'
+                          if (mn > 0 || mx > 0) s += ' ('
+                          if (mn > 0) s += 'mín R$ ' + mn.toFixed(2)
+                          if (mn > 0 && mx > 0) s += ', '
+                          if (mx > 0) s += 'máx R$ ' + mx.toFixed(2)
+                          if (mn > 0 || mx > 0) s += ')'
+                          return s
+                        }
+                        if (ft === 'fixed_range') {
+                          if (f === 0 && mn === 0 && mx === 0) return '—'
+                          let s = f > 0 ? 'R$ ' + f.toFixed(2) : '—'
+                          if (mn > 0 || mx > 0) s += ' ('
+                          if (mn > 0) s += 'mín R$ ' + mn.toFixed(2)
+                          if (mn > 0 && mx > 0) s += ', '
+                          if (mx > 0) s += 'máx R$ ' + mx.toFixed(2)
+                          if (mn > 0 || mx > 0) s += ')'
+                          return s
+                        }
+                        return '—'
+                      })()}
                     </div>
                   </div>
                 )
@@ -1723,11 +1783,20 @@ export default function PainelAdminPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
                   {activeMethods.map(m => {
                     const c = feeConfig[m.key]
+                    const ft = c.fee_type || 'percent'
+                    const p = parseFloat(c.fee_percent) || 0
+                    const f = parseFloat(c.fee_fixed) || 0
+                    const mn = parseFloat(c.fee_min) || 0
+                    const mx = parseFloat(c.fee_max) || 0
                     const parts = []
-                    if (parseFloat(c.fee_percent) > 0) parts.push(\`\${c.fee_percent}%\`)
-                    if (parseFloat(c.fee_fixed) > 0) parts.push(\`R$ \${c.fee_fixed} fixo\`)
-                    if (parseFloat(c.fee_min) > 0) parts.push(\`mín R$ \${c.fee_min}\`)
-                    if (parseFloat(c.fee_max) > 0) parts.push(\`máx R$ \${c.fee_max}\`)
+                    const typeLabels = { percent: '% apenas', fixed: 'R$ fixo', percent_fixed: '% + R$ fixo', percent_min_max: '% c/ limites', fixed_range: 'R$ fixo c/ limites' }
+                    if (typeLabels[ft]) parts.push(typeLabels[ft])
+                    if (ft === 'percent' || ft === 'percent_fixed' || ft === 'percent_min_max') { if (p > 0) parts.push(`${p}%`) }
+                    if (ft === 'fixed' || ft === 'percent_fixed' || ft === 'fixed_range') { if (f > 0) parts.push(`R$ ${f.toFixed(2)}`) }
+                    if (ft === 'percent_min_max' || ft === 'fixed_range') {
+                      if (mn > 0) parts.push(`mín R$ ${mn.toFixed(2)}`)
+                      if (mx > 0) parts.push(`máx R$ ${mx.toFixed(2)}`)
+                    }
                     return (
                       <div key={m.key} style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
