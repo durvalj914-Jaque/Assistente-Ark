@@ -1529,8 +1529,9 @@ export default function PainelAdminPage() {
                 </div>
               </div>
             </div>
-        </div>
           )}
+        </div>
+      )}
       {tab === 'payments' && (
         <div>
           <div className="ark-card" style={{ padding: 20, marginBottom: 20 }}>
