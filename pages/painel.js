@@ -77,11 +77,8 @@ export default function PainelAdminPage() {
   const [plans, setPlans] = useState([])
   const [planModal, setPlanModal] = useState(null) // null | 'new' | {editing plan}
   const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '', resource_ids: [] })
+  const resources = [] // Catálogo de recursos removido — planos usam preço direto
   const [planSaving, setPlanSaving] = useState(false)
-  const [resources, setResources] = useState([])
-  const [resourceModal, setResourceModal] = useState(null) // null | 'new' | {editing}
-  const [resourceForm, setResourceForm] = useState({ name: '', price: '', description: '', category: 'geral' })
-  const [resourceSaving, setResourceSaving] = useState(false)
   const [mpDiag, setMpDiag] = useState(null)
   const [mpDiagLoading, setMpDiagLoading] = useState(false)
   const [mpClearing, setMpClearing] = useState(false)
@@ -153,7 +150,7 @@ export default function PainelAdminPage() {
   useEffect(() => {
     if (tab === 'payments') { loadPayments() }
     if (tab === 'receipts') { loadReceipts('all') }
-    if (tab === 'planos') { loadPlans(); loadResources() }
+    if (tab === 'planos') { loadPlans() }
   }, [tab])
 
   async function checkGoogle(tenantId) {
@@ -454,64 +451,7 @@ export default function PainelAdminPage() {
     } catch (e) { console.error('loadPlans', e) }
   }
 
-  async function loadResources() {
-    try {
-      const h = await authHeader()
-      const res = await fetch('/api/admin/plan-resources', { headers: h })
-      const json = await res.json()
-      if (json.resources) setResources(json.resources)
-    } catch (e) { console.error('loadResources', e) }
-  }
-
-  async function saveResource(isEdit) {
-    setResourceSaving(true)
-    try {
-      const h = await authHeader()
-      const body = {
-        name: resourceForm.name,
-        price: parseFloat(resourceForm.price) || 0,
-        description: resourceForm.description,
-        category: resourceForm.category,
-      }
-      const res = await fetch('/api/admin/plan-resources', {
-        method: isEdit ? 'PATCH' : 'POST',
-        headers: { ...h, 'Content-Type': 'application/json' },
-        body: JSON.stringify(isEdit ? { id: resourceModal.id, ...body } : body)
-      })
-      const json = await res.json()
-      if (json.ok) {
-        setResourceModal(null)
-        setResourceForm({ name: '', price: '', description: '', category: 'geral' })
-        loadResources()
-      } else {
-        alert('Erro: ' + (json.error || 'Desconhecido'))
-      }
-    } catch (e) { alert('Erro: ' + e.message) }
-    finally { setResourceSaving(false) }
-  }
-
-  async function deleteResource(id) {
-    if (!confirm('Excluir este recurso?')) return
-    try {
-      const h = await authHeader()
-      await fetch('/api/admin/plan-resources', { method: 'DELETE', headers: { ...h, 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-      loadResources()
-    } catch (e) {}
-  }
-
-  function toggleResourceInPlan(resId) {
-    setPlanForm(prev => {
-      const ids = prev.resource_ids || []
-      const has = ids.includes(resId)
-      const newIds = has ? ids.filter(x => x !== resId) : [...ids, resId]
-      // Auto-calc price from selected resources
-      const sum = newIds.reduce((acc, rid) => {
-        const r = resources.find(x => x.id === rid)
-        return acc + (r ? r.price : 0)
-      }, 0)
-      return { ...prev, resource_ids: newIds, price: sum > 0 ? String(sum.toFixed(2)) : prev.price }
-    })
-  }
+  function toggleResourceInPlan(resId) { /* no-op: recursos removidos */ }
 
   async function savePlan(isEdit) {
     setPlanSaving(true)
@@ -1293,47 +1233,7 @@ export default function PainelAdminPage() {
       {/* ── ABA PAGAMENTOS ── */}
       {tab === 'planos' && (
         <div>
-          {/* ── Catálogo de Recursos ── */}
-          <div style={{ marginBottom: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <div>
-                <h2 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>🧩 Catálogo de Recursos</h2>
-                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Defina o preço de cada recurso. Ao montar um plano, os valores se somam automaticamente.</p>
-              </div>
-              <button onClick={() => { setResourceForm({ name: '', price: '', description: '', category: 'geral' }); setResourceModal('new') }}
-                style={{ padding: '10px 18px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-                ➕ Novo Recurso
-              </button>
-            </div>
-
-            {resources.length === 0 ? (
-              <div className="ark-card" style={{ padding: 24, textAlign: 'center' }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>🧩</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 13 }}>Nenhum recurso cadastrado. Crie recursos com preços individuais para montar planos.</div>
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-                {resources.map((r, i) => (
-                  <div key={i} className="ark-card" style={{ padding: 14 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                      <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600, flex: 1 }}>{r.name}</div>
-                      <div style={{ color: '#4f8ef7', fontSize: 15, fontWeight: 800, whiteSpace: 'nowrap' }}>R$ {r.price.toFixed(2).replace('.', ',')}</div>
-                    </div>
-                    {r.description && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 8 }}>{r.description}</div>}
-                    <div style={{ display: 'flex', gap: 6, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-soft)' }}>
-                      <button onClick={() => { setResourceForm({ name: r.name, price: String(r.price), description: r.description || '', category: r.category || 'geral' }); setResourceModal(r) }}
-                        style={{ flex: 1, padding: '5px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>✏️ Editar</button>
-                      <button onClick={() => deleteResource(r.id)}
-                        style={{ flex: 1, padding: '5px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>🗑️ Excluir</button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ── Separador ── */}
-          <div style={{ borderTop: '1px solid var(--border-soft)', margin: '20px 0' }} />
+          {/* ── Planos ── */}
 
           {/* ── Planos ── */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
@@ -1535,56 +1435,6 @@ export default function PainelAdminPage() {
             </div>
           )}
 
-          {/* Modal de criar/editar recurso */}
-          {resourceModal && (
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-              <div className="ark-card" style={{ width: '100%', maxWidth: 400, padding: 24 }}>
-                <h3 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, marginBottom: 20 }}>
-                  {resourceModal === 'new' ? '🧩 Novo Recurso' : '✏️ Editar Recurso'}
-                </h3>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome do Recurso *</label>
-                  <input type="text" value={resourceForm.name} onChange={e => setResourceForm({ ...resourceForm, name: e.target.value })}
-                    placeholder="Ex: 1 Bot ativo, 5000 mensagens/mês..."
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
-                </div>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Preço (R$) *</label>
-                  <input type="number" step="0.01" value={resourceForm.price} onChange={e => setResourceForm({ ...resourceForm, price: e.target.value })}
-                    placeholder="49.90"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
-                </div>
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição (opcional)</label>
-                  <input type="text" value={resourceForm.description} onChange={e => setResourceForm({ ...resourceForm, description: e.target.value })}
-                    placeholder="Breve descrição do recurso"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
-                </div>
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Categoria</label>
-                  <select value={resourceForm.category} onChange={e => setResourceForm({ ...resourceForm, category: e.target.value })}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
-                    <option value="geral">Geral</option>
-                    <option value="bot">Bot</option>
-                    <option value="mensagens">Mensagens</option>
-                    <option value="suporte">Suporte</option>
-                    <option value="storage">Armazenamento</option>
-                    <option value="integracao">Integração</option>
-                  </select>
-                </div>
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <button onClick={() => setResourceModal(null)}
-                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                    Cancelar
-                  </button>
-                  <button onClick={() => saveResource(resourceModal !== 'new')} disabled={resourceSaving || !resourceForm.name}
-                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: (resourceSaving || !resourceForm.name) ? 0.5 : 1 }}>
-                    {resourceSaving ? 'Salvando...' : (resourceModal === 'new' ? 'Criar' : 'Salvar')}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
