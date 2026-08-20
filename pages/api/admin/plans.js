@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ plans })
 
   } else if (req.method === 'POST') {
-    const { name, price, billing_cycle, duration_days, description, features, active, resource_ids } = req.body
+    const { name, price, billing_cycle, duration_days, description, features, active, resource_ids, limits } = req.body
     if (!name) return res.status(400).json({ error: 'Nome é obrigatório' })
 
     const plans = await readPlans()
@@ -78,6 +78,7 @@ export default async function handler(req, res) {
       description: description || '',
       features: features || [],
       resource_ids: resource_ids || [],
+      limits: limits || {},
       active: active !== false,
       created_at: new Date().toISOString(),
     }
@@ -95,6 +96,7 @@ export default async function handler(req, res) {
         description: newPlan.description,
         features: newPlan.features,
         resource_ids: newPlan.resource_ids,
+        limits: newPlan.limits,
         active: newPlan.active,
       })
       if (!error) return res.status(200).json({ ok: true, plan: newPlan })
@@ -106,7 +108,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, plan: newPlan })
 
   } else if (req.method === 'PATCH') {
-    const { id, name, price, billing_cycle, duration_days, description, features, active, resource_ids } = req.body
+    const { id, name, price, billing_cycle, duration_days, description, features, active, resource_ids, limits } = req.body
     if (!id) return res.status(400).json({ error: 'ID é obrigatório' })
 
     const updates = {}
@@ -118,6 +120,7 @@ export default async function handler(req, res) {
     if (features !== undefined) updates.features = features
     if (active !== undefined) updates.active = active
     if (resource_ids !== undefined) updates.resource_ids = resource_ids
+    if (limits !== undefined) updates.limits = limits
 
     // Tentar tabela plans
     try {

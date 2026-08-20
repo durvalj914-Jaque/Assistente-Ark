@@ -75,10 +75,20 @@ export default function PainelAdminPage() {
   const [savingBank, setSavingBank] = useState(false)
   const [bankMsg, setBankMsg] = useState('')
   const [plans, setPlans] = useState([])
-  const [planModal, setPlanModal] = useState(null) // null | 'new' | {editing plan}
-  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '', resource_ids: [] })
-  const resources = [] // Catálogo de recursos removido — planos usam preço direto
+  const [planModal, setPlanModal] = useState(null)
+  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: {} })
   const [planSaving, setPlanSaving] = useState(false)
+  const [ newRowModal, setNewRowModal ] = useState(false)
+  const [ newRowForm, setNewRowForm ] = useState({ key: '', label: '' })
+  // Linhas padrão da tabela de planos (chave -> label)
+  const [ planRows, setPlanRows ] = useState([
+    { key: 'bots',         label: 'Bots' },
+    { key: 'whatsapps',    label: 'WhatsApps' },
+    { key: 'catalog',      label: 'Catálogo' },
+    { key: 'messages_meta',label: 'Mensagens Meta' },
+    { key: 'volume_target',label: 'Volume-alvo' },
+    { key: 'commission',   label: 'Comissão efetiva' },
+  ])
   const [mpDiag, setMpDiag] = useState(null)
   const [mpDiagLoading, setMpDiagLoading] = useState(false)
   const [mpClearing, setMpClearing] = useState(false)
@@ -451,20 +461,17 @@ export default function PainelAdminPage() {
     } catch (e) { console.error('loadPlans', e) }
   }
 
-  function toggleResourceInPlan(resId) { /* no-op: recursos removidos */ }
-
   async function savePlan(isEdit) {
     setPlanSaving(true)
     try {
       const h = await authHeader()
-      const features = planForm.features ? planForm.features.split('\n').filter(f => f.trim()) : []
       const body = {
         name: planForm.name,
         price: parseFloat(planForm.price) || 0,
         billing_cycle: planForm.billing_cycle,
         duration_days: planForm.duration_days ? parseInt(planForm.duration_days) : null,
         description: planForm.description,
-        features,
+        limits: planForm.limits || {},
       }
       const res = await fetch('/api/admin/plans', {
         method: isEdit ? 'PATCH' : 'POST',
@@ -474,13 +481,44 @@ export default function PainelAdminPage() {
       const json = await res.json()
       if (json.ok) {
         setPlanModal(null)
-        setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '' })
+        setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: {} })
         loadPlans()
       } else {
         alert('Erro: ' + (json.error || 'Desconhecido'))
       }
     } catch (e) { alert('Erro: ' + e.message) }
     finally { setPlanSaving(false) }
+  }
+
+  // Inline edit de um limite de plano direto na tabela
+  async function updatePlanLimit(planId, key, value) {
+    const plan = plans.find(p => p.id === planId)
+    if (!plan) return
+    const newLimits = { ...(plan.limits || {}), [key]: value }
+    // Atualiza otimisticamente
+    setPlans(prev => prev.map(p => p.id === planId ? { ...p, limits: newLimits } : p))
+    try {
+      const h = await authHeader()
+      await fetch('/api/admin/plans', {
+        method: 'PATCH',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: planId, limits: newLimits })
+      })
+    } catch (e) { console.error('updatePlanLimit', e) }
+  }
+
+  async function addPlanRow() {
+    const key = newRowForm.key.trim().toLowerCase().replace(/\s+/g, '_')
+    if (!key || !newRowForm.label.trim()) return
+    if (planRows.some(r => r.key === key)) { alert('Esta linha já existe'); return }
+    setPlanRows(prev => [...prev, { key, label: newRowForm.label.trim() }])
+    setNewRowForm({ key: '', label: '' })
+    setNewRowModal(false)
+  }
+
+  function removePlanRow(key) {
+    if (!confirm('Remover esta linha de todos os planos?')) return
+    setPlanRows(prev => prev.filter(r => r.key !== key))
   }
 
   async function deletePlan(id) {
@@ -1234,100 +1272,178 @@ export default function PainelAdminPage() {
       {tab === 'planos' && (
         <div>
           {/* ── Planos ── */}
-
-          {/* ── Planos ── */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <div>
               <h2 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>📋 Planos da Plataforma</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Monte planos selecionando recursos. O valor total é a soma dos itens.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Defina os limites de cada recurso por plano. Clique nas c\u00e9lulas para editar.</p>
             </div>
-            <button onClick={() => { setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', features: '', resource_ids: [] }); setPlanModal('new') }}
-              style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
-              ➕ Novo Plano
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setNewRowModal(true)}
+                style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                ➕ Nova Linha
+              </button>
+              <button onClick={() => { setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: {} }); setPlanModal('new') }}
+                style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                ➕ Novo Plano
+              </button>
+            </div>
           </div>
 
-          {plans.length === 0 && (
+          {plans.length === 0 ? (
             <div className="ark-card" style={{ padding: 40, textAlign: 'center' }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
               <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Nenhum plano criado ainda.</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 4 }}>Clique em "Novo Plano" para começar.</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 4 }}>Clique em "Novo Plano" para come\u00e7ar.</div>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary)' }}>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg-secondary)', zIndex: 2 }}>
+                      Recurso
+                    </th>
+                    {plans.map((p) => (
+                      <th key={p.id} style={{ padding: '12px 14px', textAlign: 'center', borderBottom: '2px solid var(--border-medium)', minWidth: 130 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{p.name}</span>
+                          <span style={{ fontSize: 16, fontWeight: 800, color: '#4f8ef7' }}>
+                            R$ {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : p.price}
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                            {p.billing_cycle === 'monthly' ? 'Mensal' :
+                             p.billing_cycle === 'quarterly' ? 'Trimestral' :
+                             p.billing_cycle === 'yearly' ? 'Anual' :
+                             p.billing_cycle === 'lifetime' ? 'Vital\u00edcio' :
+                             p.billing_cycle === 'custom' ? `${p.duration_days || 0} dias` : p.billing_cycle}
+                          </span>
+                          <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
+                            <button onClick={() => togglePlanActive(p)}
+                              title={p.active === false ? 'Ativar' : 'Pausar'}
+                              style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-soft)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>
+                              {p.active === false ? '▶️' : '⏸️'}
+                            </button>
+                            <button onClick={() => { setPlanForm({ name: p.name, price: String(p.price), billing_cycle: p.billing_cycle, duration_days: p.duration_days ? String(p.duration_days) : '', description: p.description || '', limits: p.limits || {} }); setPlanModal(p) }}
+                              title="Editar plano"
+                              style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-soft)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>✏️</button>
+                            <button onClick={() => deletePlan(p.id)}
+                              title="Excluir plano"
+                              style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>🗑️</button>
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {planRows.map((row, ri) => (
+                    <tr key={row.key} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                      <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', position: 'sticky', left: 0, background: ri % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-secondary)', zIndex: 1, whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <span>{row.label}</span>
+                          <button onClick={() => removePlanRow(row.key)} title="Remover linha"
+                            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 11, padding: 0, opacity: 0.4 }}>×</button>
+                        </div>
+                      </td>
+                      {plans.map((p) => {
+                        const val = (p.limits || {})[row.key] ?? ''
+                        return (
+                          <td key={p.id} style={{ padding: '6px 8px', textAlign: 'center' }}>
+                            <input
+                              type="text"
+                              defaultValue={val}
+                              key={p.id + '_' + row.key + '_' + val}
+                              onBlur={(e) => { if (e.target.value !== String(val)) updatePlanLimit(p.id, row.key, e.target.value) }}
+                              placeholder="—"
+                              style={{
+                                width: '100%', maxWidth: 100, padding: '6px 8px', borderRadius: 6,
+                                border: '1px solid transparent', background: 'transparent',
+                                color: 'var(--text-primary)', fontSize: 13, fontWeight: 500,
+                                textAlign: 'center', outline: 'none', transition: 'all 0.15s',
+                              }}
+                              onFocus={(e) => { e.target.style.border = '1px solid #4f8ef7'; e.target.style.background = 'var(--bg-card)' }}
+                              onBlurCapture={(e) => { e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent' }}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                  {/* Linha de Preço */}
+                  <tr style={{ borderBottom: '1px solid var(--border-soft)', background: 'rgba(79,142,247,0.04)' }}>
+                    <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', position: 'sticky', left: 0, background: 'rgba(79,142,247,0.08)', zIndex: 1 }}>
+                      Preço (R$)
+                    </td>
+                    {plans.map((p) => (
+                      <td key={p.id} style={{ padding: '6px 8px', textAlign: 'center', fontSize: 14, fontWeight: 700, color: '#4f8ef7' }}>
+                        {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : p.price}
+                      </td>
+                    ))}
+                  </tr>
+                  {/* Status */}
+                  <tr style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                    <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', position: 'sticky', left: 0, background: 'var(--bg-card)', zIndex: 1 }}>
+                      Status
+                    </td>
+                    {plans.map((p) => (
+                      <td key={p.id} style={{ padding: '6px 8px', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                          background: p.active === false ? 'var(--bg-secondary)' : 'rgba(34,197,94,0.1)',
+                          color: p.active === false ? 'var(--text-dim)' : '#22c55e'
+                        }}>
+                          {p.active === false ? 'INATIVO' : 'ATIVO'}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                  {plans.some(p => p.description) && (
+                    <tr>
+                      <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', position: 'sticky', left: 0, background: 'var(--bg-secondary)', zIndex: 1 }}>
+                        Descrição
+                      </td>
+                      {plans.map((p) => (
+                        <td key={p.id} style={{ padding: '10px 8px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center', maxWidth: 200 }}>
+                          {p.description || '—'}
+                        </td>
+                      ))}
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-            {plans.map((p, i) => (
-              <div key={i} className="ark-card" style={{ padding: 20, position: 'relative', opacity: p.active === false ? 0.6 : 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <div>
-                    <div style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>{p.name}</div>
-                    <div style={{ color: '#4f8ef7', fontSize: 22, fontWeight: 800, marginTop: 4 }}>
-                      R$ {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : p.price}
-                    </div>
-                  </div>
-                  <span style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 600,
-                    background: p.active === false ? 'var(--bg-secondary)' : 'rgba(34,197,94,0.1)',
-                    color: p.active === false ? 'var(--text-dim)' : '#22c55e'
-                  }}>
-                    {p.active === false ? 'INATIVO' : 'ATIVO'}
-                  </span>
+          {/* Modal Nova Linha */}
+          {newRowModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <div className="ark-card" style={{ width: '100%', maxWidth: 360, padding: 24 }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, marginBottom: 20 }}>➕ Nova Linha de Recurso</h3>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome exibido *</label>
+                  <input type="text" value={newRowForm.label} onChange={e => setNewRowForm({ ...newRowForm, label: e.target.value })}
+                    placeholder="Ex: Bots, WhatsApps, Armazenamento..."
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
                 </div>
-
-                <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
-                  <span style={{ padding: '3px 8px', borderRadius: 6, background: 'var(--bg-secondary)', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>
-                    {p.billing_cycle === 'monthly' ? '🔄 Mensal' :
-                     p.billing_cycle === 'quarterly' ? '🔄 Trimestral' :
-                     p.billing_cycle === 'yearly' ? '🔄 Anual' :
-                     p.billing_cycle === 'lifetime' ? '♾️ Vitalício' :
-                     p.billing_cycle === 'custom' ? `⏱️ ${p.duration_days || 0} dias` : p.billing_cycle}
-                  </span>
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Chave interna (opcional)</label>
+                  <input type="text" value={newRowForm.key} onChange={e => setNewRowForm({ ...newRowForm, key: e.target.value })}
+                    placeholder="gerado automaticamente do nome"
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
                 </div>
-
-                {p.description && (
-                  <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.5, marginBottom: 10 }}>{p.description}</p>
-                )}
-
-                {p.resource_ids && p.resource_ids.length > 0 && (
-                  <div style={{ marginBottom: 10 }}>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 10, fontWeight: 600, marginBottom: 6 }}>RECURSOS INCLUSOS:</div>
-                    {p.resource_ids.map((rid, j) => {
-                      const r = resources.find(x => x.id === rid)
-                      return r ? (
-                        <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-soft)' }}>
-                          <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>{r.name}</span>
-                          <span style={{ color: 'var(--text-muted)', fontSize: 12, fontWeight: 600 }}>R$ {r.price.toFixed(2).replace('.', ',')}</span>
-                        </div>
-                      ) : null
-                    })}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 6, marginTop: 4, borderTop: '1px solid var(--border-soft)' }}>
-                      <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>Total</span>
-                      <span style={{ color: '#4f8ef7', fontSize: 13, fontWeight: 800 }}>R$ {(p.resource_ids.reduce((acc, rid) => acc + (resources.find(x => x.id === rid)?.price || 0), 0)).toFixed(2).replace('.', ',')}</span>
-                    </div>
-                  </div>
-                )}
-                {p.features && p.features.length > 0 && (
-                  <ul style={{ margin: '0 0 12px 0', paddingLeft: 18, color: 'var(--text-secondary)', fontSize: 12, lineHeight: 1.6 }}>
-                    {p.features.map((f, j) => <li key={j} style={{ marginBottom: 2 }}>{f}</li>)}
-                  </ul>
-                )}
-
-                <div style={{ display: 'flex', gap: 6, paddingTop: 12, borderTop: '1px solid var(--border-soft)' }}>
-                  <button onClick={() => togglePlanActive(p)}
-                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                    {p.active === false ? '▶️ Ativar' : '⏸️ Pausar'}
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setNewRowModal(false)}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    Cancelar
                   </button>
-                  <button onClick={() => { setPlanForm({ name: p.name, price: String(p.price), billing_cycle: p.billing_cycle, duration_days: p.duration_days ? String(p.duration_days) : '', description: p.description || '', features: (p.features || []).join('\n') }); setPlanModal(p) }}
-                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                    ✏️ Editar
-                  </button>
-                  <button onClick={() => deletePlan(p.id)}
-                    style={{ flex: 1, padding: '7px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                    🗑️ Excluir
+                  <button onClick={addPlanRow} disabled={!newRowForm.label.trim()}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: !newRowForm.label.trim() ? 0.5 : 1 }}>
+                    Adicionar
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          )}
 
           {/* Modal de criar/editar plano */}
           {planModal && (
@@ -1340,20 +1456,28 @@ export default function PainelAdminPage() {
                 <div style={{ marginBottom: 14 }}>
                   <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome do Plano *</label>
                   <input type="text" value={planForm.name} onChange={e => setPlanForm({ ...planForm, name: e.target.value })}
-                    placeholder="Ex: Plano Starter, Plano Pro..."
+                    placeholder="Ex: Free, Starter, Pro..."
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
                 </div>
 
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Ciclo de Cobrança</label>
-                  <select value={planForm.billing_cycle} onChange={e => setPlanForm({ ...planForm, billing_cycle: e.target.value })}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
-                    <option value="monthly">Mensal</option>
-                    <option value="quarterly">Trimestral</option>
-                    <option value="yearly">Anual</option>
-                    <option value="lifetime">Vitalício</option>
-                    <option value="custom">Personalizado (dias)</option>
-                  </select>
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Preço (R$) *</label>
+                    <input type="number" step="0.01" value={planForm.price} onChange={e => setPlanForm({ ...planForm, price: e.target.value })}
+                      placeholder="99.90"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Ciclo de Cobrança</label>
+                    <select value={planForm.billing_cycle} onChange={e => setPlanForm({ ...planForm, billing_cycle: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
+                      <option value="monthly">Mensal</option>
+                      <option value="quarterly">Trimestral</option>
+                      <option value="yearly">Anual</option>
+                      <option value="lifetime">Vitalício</option>
+                      <option value="custom">Personalizado (dias)</option>
+                    </select>
+                  </div>
                 </div>
 
                 {planForm.billing_cycle === 'custom' && (
@@ -1366,60 +1490,32 @@ export default function PainelAdminPage() {
                 )}
 
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição</label>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição (opcional)</label>
                   <textarea value={planForm.description} onChange={e => setPlanForm({ ...planForm, description: e.target.value })}
                     placeholder="Descrição do plano..."
                     rows={2}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', resize: 'vertical' }} />
                 </div>
 
-                {resources.length > 0 && (
+                {planRows.length > 0 && (
                   <div style={{ marginBottom: 14 }}>
-                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 8 }}>🧩 Recursos do Plano (soma automática)</label>
-                    <div style={{ maxHeight: 200, overflow: 'auto', borderRadius: 8, border: '1px solid var(--border-soft)', padding: 8 }}>
-                      {resources.map((r, ri) => {
-                        const checked = (planForm.resource_ids || []).includes(r.id)
-                        return (
-                          <div key={ri} onClick={() => toggleResourceInPlan(r.id)}
-                            style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 6, cursor: 'pointer', marginBottom: 4,
-                              background: checked ? 'rgba(79,142,247,0.08)' : 'transparent',
-                              border: '1px solid ' + (checked ? 'rgba(79,142,247,0.2)' : 'transparent'),
-                              transition: 'all 0.15s'
-                            }}>
-                            <span style={{ fontSize: 14 }}>{checked ? '✅' : '⬜'}</span>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 600 }}>{r.name}</div>
-                              {r.description && <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>{r.description}</div>}
-                            </div>
-                            <div style={{ color: '#4f8ef7', fontSize: 13, fontWeight: 700 }}>R$ {r.price.toFixed(2).replace('.', ',')}</div>
-                          </div>
-                        )
-                      })}
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 8 }}>Limites por Recurso (preencha os valores)</label>
+                    <div style={{ borderRadius: 8, border: '1px solid var(--border-soft)', padding: 10 }}>
+                      {planRows.map((row) => (
+                        <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px dashed var(--border-soft)' }}>
+                          <span style={{ flex: 1, color: 'var(--text-primary)', fontSize: 13, fontWeight: 500 }}>{row.label}</span>
+                          <input type="text"
+                            value={planForm.limits?.[row.key] ?? ''}
+                            onChange={e => setPlanForm(prev => ({ ...prev, limits: { ...prev.limits, [row.key]: e.target.value } }))}
+                            placeholder="—"
+                            style={{ width: 120, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none', textAlign: 'center' }}
+                          />
+                        </div>
+                      ))}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, padding: '8px 12px', borderRadius: 6, background: 'var(--bg-secondary)' }}>
-                      <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>Soma dos recursos:</span>
-                      <span style={{ color: '#4f8ef7', fontSize: 14, fontWeight: 800 }}>
-                        R$ {((planForm.resource_ids || []).reduce((acc, rid) => acc + (resources.find(x => x.id === rid)?.price || 0), 0)).toFixed(2).replace('.', ',')}
-                      </span>
-                    </div>
-                    <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 4 }}>O valor do plano é preenchido automaticamente. Você pode ajustar manualmente abaixo.</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 6 }}>Os valores podem ser n\u00fameros, textos ou percentuais (ex: 10, 2.000, 5%, ~3k)</div>
                   </div>
                 )}
-
-                <div style={{ marginBottom: 14 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Valor do Plano (R$) {resources.length > 0 ? '— editável' : '*'}</label>
-                  <input type="number" step="0.01" value={planForm.price} onChange={e => setPlanForm({ ...planForm, price: e.target.value })}
-                    placeholder="99.90"
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
-                </div>
-
-                <div style={{ marginBottom: 20 }}>
-                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Recursos extras (um por linha, opcional)</label>
-                  <textarea value={planForm.features} onChange={e => setPlanForm({ ...planForm, features: e.target.value })}
-                    placeholder={"Ex:\n1 bot ativo\n1000 mensagens/mês\nSuporte por email"}
-                    rows={4}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none', resize: 'vertical' }} />
-                </div>
 
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setPlanModal(null)}
@@ -1434,10 +1530,6 @@ export default function PainelAdminPage() {
               </div>
             </div>
           )}
-
-        </div>
-      )}
-
       {tab === 'payments' && (
         <div>
           <div className="ark-card" style={{ padding: 20, marginBottom: 20 }}>
