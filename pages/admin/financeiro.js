@@ -342,6 +342,7 @@ export default function FinanceiroPage() {
     loadPayConfig()
     loadBillingStatus()
     if (subTab === 'payment_methods') { loadPaymentMethods('payment'); loadArkielPayments() }
+    else if (subTab === 'billing_methods') { loadPaymentMethods('billing') }
     else if (subTab === 'receipts') { loadReceipts('all'); loadPayments() }
     else if (subTab === 'history') { loadPayments() }
   }, [user, subTab])
@@ -352,6 +353,7 @@ export default function FinanceiroPage() {
 
   const SUB_TABS = [
     { key: 'payment_methods', label: 'Formas de Pagamento', icon: '💳', desc: 'Como você paga' },
+    { key: 'billing_methods', label: 'Formas de Cobrança', icon: '📥', desc: 'Como você recebe' },
     { key: 'receipts', label: 'Comprovantes', icon: '📄', desc: 'Seus comprovantes salvos' },
   ]
 
@@ -440,70 +442,6 @@ export default function FinanceiroPage() {
               }}>
               {mpConnecting ? 'Conectando...' : '🔗 Conectar minha conta'}
             </button>
-          </div>
-        )}
-      </div>
-
-      {/* ── Formas de Cobrança Vinculadas à Conta MP ── */}
-      <div className="ark-card" style={{ padding: 16, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-          <span style={{ fontSize: 16 }}>🔗</span>
-          <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Formas de Cobrança Vinculadas à Conta</span>
-          {mpConnected && (
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#22c55e', fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-              ✓ Ativas
-            </span>
-          )}
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
-          {/* PIX */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18 }}>💠</span>
-              <div>
-                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>PIX</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Instantâneo</div>
-              </div>
-            </div>
-            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
-          </div>
-          {/* Crédito */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18 }}>💳</span>
-              <div>
-                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>Crédito</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Até 12x</div>
-              </div>
-            </div>
-            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
-          </div>
-          {/* Débito */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18 }}>💳</span>
-              <div>
-                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>Débito</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>À vista</div>
-              </div>
-            </div>
-            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
-          </div>
-          {/* Boleto */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 18 }}>🧾</span>
-              <div>
-                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>Boleto</div>
-                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>1-3 dias úteis</div>
-              </div>
-            </div>
-            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
-          </div>
-        </div>
-        {!mpConnected && (
-          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(0,158,227,0.06)', border: '1px solid rgba(0,158,227,0.15)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            💡 Conecte sua conta do Mercado Pago acima para ativar todas as formas de cobrança automaticamente.
           </div>
         )}
       </div>
@@ -795,6 +733,140 @@ export default function FinanceiroPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── FORMAS DE COBRANÇA: Mercado Pago ── */}
+      {subTab === 'billing_methods' && (
+        <div>
+          <div style={{ marginBottom: 16 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 4 }}>
+              📥 Formas de Cobrança — Mercado Pago
+            </h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+              Formas de recebimento disponíveis via Mercado Pago {mpConnected ? '(conta conectada)' : '(conta da plataforma)'}.
+            </p>
+          </div>
+
+          {/* ── Point Tap: Smartphone como maquininha ── */}
+          <div className="ark-card" style={{ padding: 24, marginBottom: 20, border: '1px solid rgba(34,197,94,0.2)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0, width: 140, height: 140, background: 'linear-gradient(135deg, rgba(34,197,94,0.06), rgba(79,142,247,0.04))', borderRadius: '0 0 0 100%' }} />
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <span style={{ fontSize: 28 }}>📱</span>
+                <div>
+                  <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Point Tap — Celular como Maquininha</h3>
+                  <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Receba pagamentos por aproximação (NFC) sem hardware extra</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+                {/* Android */}
+                <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 18 }}>🤖</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Android (Point Tap)</span>
+                  </div>
+                  <ol style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
+                    <li>Abra o app <strong style={{ color: 'var(--text-secondary)' }}>Mercado Pago</strong></li>
+                    <li>Na tela inicial, toque em <strong style={{ color: '#22c55e' }}>Cobrar com Point Tap</strong></li>
+                    <li>Digite o valor da venda</li>
+                    <li>Peça para o cliente aproximar o cartão ou celular no NFC do aparelho</li>
+                    <li>Pronto! O dinheiro cai na sua conta MP na hora</li>
+                  </ol>
+                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(34,197,94,0.08)', fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
+                    ✓ Requisitos: Android com NFC + app Mercado Pago + internet
+                  </div>
+                </div>
+
+                {/* iPhone */}
+                <div style={{ padding: 16, borderRadius: 12, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 18 }}>🍎</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>iPhone (Tap to Pay)</span>
+                  </div>
+                  <ol style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.8, paddingLeft: 18, margin: 0 }}>
+                    <li>Abra o app <strong style={{ color: 'var(--text-secondary)' }}>Mercado Pago</strong></li>
+                    <li>Toque em <strong style={{ color: '#4f8ef7' }}>Cobrar</strong> e selecione <strong style={{ color: '#4f8ef7' }}>Tap to Pay no iPhone</strong></li>
+                    <li>Digite o valor e confirme</li>
+                    <li>Aproxime o cartão ou iPhone/Apple Watch do cliente na parte superior do aparelho</li>
+                    <li>Pagamento aprovado na hora</li>
+                  </ol>
+                  <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 6, background: 'rgba(79,142,247,0.08)', fontSize: 11, color: '#4f8ef7', fontWeight: 600 }}>
+                    ✓ Requisitos: iPhone XS ou superior + iOS 15.4+ + app Mercado Pago
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: 'rgba(79,142,247,0.06)', border: '1px solid rgba(79,142,247,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 16 }}>💡</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Como funciona com a taxa da Arkiel</span>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                  As transações do Point Tap entram no mesmo ecossistema do Mercado Pago. A taxa da Arkiel de <strong style={{ color: 'var(--text-secondary)' }}>{feeVal('pix')}%</strong> (PIX) / <strong style={{ color: 'var(--text-secondary)' }}>{feeVal('credit_card')}%</strong> (Crédito) é retida automaticamente, igual às transações online. Você não precisa configurar nada extra — basta ter a conta PJ ativa no Mercado Pago.
+                </p>
+              </div>
+
+              {/* Taxas do provedor (Mercado Pago) */}
+              <div style={{ marginTop: 16, padding: 16, borderRadius: 12, background: 'rgba(255,196,0,0.05)', border: '1px solid rgba(255,196,0,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <span style={{ fontSize: 16 }}>🟡</span>
+                  <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Taxas do Mercado Pago (Provedor)</span>
+                </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: 11, lineHeight: 1.5, margin: '0 0 10px 0' }}>
+                  Além da taxa da Arkiel, o Mercado Pago cobra sua própria taxa por processamento. Os valores abaixo são os praticados oficialmente pelo MP para contas PJ no Brasil:
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>💠</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>PIX</span>
+                    </div>
+                    <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>Grátis</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>💳</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>Crédito</span>
+                    </div>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>~4,99% a.vista</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>💳</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>Débito</span>
+                    </div>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>~2,39%</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ fontSize: 14 }}>🧾</span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600 }}>Boleto</span>
+                    </div>
+                    <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>R$ 3,99 fixo</span>
+                  </div>
+                </div>
+                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,196,0,0.06)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                  <strong style={{ color: 'var(--text-secondary)' }}>Exemplo:</strong> Uma venda de R$ 100 no crédito: o MP cobra ~R$ 4,99 (taxa dele) + a Arkiel cobra <strong style={{ color: 'var(--text-secondary)' }}>R$ {feeVal('credit_card')}</strong> (taxa da plataforma). O cliente B2B recebe líquido ~R$ {100 - 4.99 - feeVal('credit_card')}.
+                </div>
+                <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+                  * Taxas do MP podem variar conforme plano da conta (Standard/Pro/Premium) e promoções. Confirme sempre no app do Mercado Pago.
+                </div>
+              </div>
+
+              <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <a href="https://www.mercadopago.com.br/ferramentas-para-vender/point-tap/ios" target="_blank" rel="noopener"
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(34,197,94,0.3)', background: 'rgba(34,197,94,0.08)', color: '#22c55e', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                  📖 Saber mais no Mercado Pago
+                </a>
+                <a href="https://wa.me/5511913751590?text=Preciso%20de%20ajuda%20com%20o%20Point%20Tap" target="_blank" rel="noopener"
+                  style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontSize: 12, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}>
+                  🎧 Falar com suporte Arkiel
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}
