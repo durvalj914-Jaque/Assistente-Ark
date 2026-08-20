@@ -1300,15 +1300,17 @@ export default function PainelAdminPage() {
             </div>
           </div>
 
-          {plans.length === 0 ? (
-            <div className="ark-card" style={{ padding: 40, textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-              <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Nenhum plano criado ainda.</div>
-              <div style={{ color: 'var(--text-dim)', fontSize: 12, marginTop: 4 }}>Clique em "Novo Plano" para começar.</div>
+          {plans.length === 0 && (
+            <div className="ark-card" style={{ padding: '14px 18px', marginBottom: 12, border: '1px solid rgba(79,142,247,0.2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 20 }}>💡</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                Nenhum plano criado ainda. Clique em <b>"Novo Plano"</b> acima para adicionar colunas e definir os limites de cada recurso.
+              </span>
             </div>
-          ) : (
-            <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+          )}
+
+          <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg-secondary)', zIndex: 2 }}>
@@ -1423,7 +1425,6 @@ export default function PainelAdminPage() {
                 </tbody>
               </table>
             </div>
-          )}
 
           {/* Modal Nova Linha */}
           {newRowModal && (
