@@ -59,7 +59,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
   )
 
   if (hideTopBar) {
-    return <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}>{children}</div>
+    return <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}><div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>{children}</div></div>
   }
 
   return (
@@ -230,6 +230,8 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
         padding: '24px 28px',
         display: 'flex',
         flexDirection: 'column',
+        minHeight: 0,
+        WebkitOverflowScrolling: 'touch',
       }}>
         {children}
       </div>
