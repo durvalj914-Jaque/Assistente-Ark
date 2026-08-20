@@ -366,15 +366,7 @@ export default function FinanceiroPage() {
       { name: 'Dinheiro', icon: '💵', key_label: '' },
       { name: 'Transferência Bancária', icon: '🏦', key_label: 'Conta' },
     ],
-    billing: [
-      { name: 'PIX', icon: '💠', key_label: 'Chave PIX para recebimento' },
-      { name: 'Mercado Pago', icon: '🟡', key_label: 'Token ou Email MP' },
-      { name: 'Cartão (Maquininha)', icon: '💳', key_label: 'Modelo da maquininha' },
-      { name: 'Dinheiro', icon: '💵', key_label: '' },
-      { name: 'Transferência Bancária', icon: '🏦', key_label: 'Conta bancária' },
-      { name: 'PayPal', icon: '🅿️', key_label: 'Email PayPal' },
-      { name: 'Stripe', icon: '🔷', key_label: 'Stripe Key' },
-    ],
+    billing: [],
   }
 
   const currentType = 'billing'
@@ -878,14 +870,16 @@ export default function FinanceiroPage() {
           )}
 
           {/* Presets rápidos */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-            {currentPresets.map(preset => (
-              <button key={preset.name} onClick={() => { setPmForm({ method_name: preset.name, method_key: '', is_active: true }); setPmModal({ type: currentType, editing: null }) }}
-                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}>
-                <span>{preset.icon}</span> {preset.name}
-              </button>
-            ))}
-          </div>
+          {currentPresets.length > 0 && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              {currentPresets.map(preset => (
+                <button key={preset.name} onClick={() => { setPmForm({ method_name: preset.name, method_key: '', is_active: true }); setPmModal({ type: currentType, editing: null }) }}
+                  style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}>
+                  <span>{preset.icon}</span> {preset.name}
+                </button>
+              ))}
+            </div>
+          )}
 
           {loadingPM ? (
             <p style={{ color: 'var(--text-muted)' }}>Carregando...</p>
