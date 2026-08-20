@@ -408,7 +408,7 @@ export default function FinanceiroPage() {
       <div style={{ marginBottom: 16, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border-soft)' }}>
         {/* Header / Botão expansível */}
         <button
-          onClick={() => setMpExpanded(!mpExpanded)}
+          onClick={() => { if (!mpExpanded && mpConnected && tenant?.id) fetchMPMethods(tenant.id); setMpExpanded(!mpExpanded) }}
           style={{
             width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '16px 20px', cursor: 'pointer', border: 'none',
@@ -495,6 +495,54 @@ export default function FinanceiroPage() {
                 </div>
               )}
             </div>
+
+            {/* ── Formas de Cobrança vinculadas à conta MP ── */}
+            {mpConnected && (
+              <div className="ark-card" style={{ padding: 16, marginBottom: 16, border: '1px solid rgba(34,197,94,0.2)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 16 }}>📥</span>
+                    <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Formas de Cobrança vinculadas</span>
+                  </div>
+                  {mpAccount && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                      Conta: {mpAccount.nickname || mpAccount.email || '—'}
+                    </span>
+                  )}
+                </div>
+                {loadingMpMethods ? (
+                  <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: 13 }}>Carregando formas...</div>
+                ) : mpAvailableMethods.length === 0 ? (
+                  <div style={{ padding: 14, borderRadius: 10, background: 'var(--bg-secondary)', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
+                    Nenhuma forma de cobrança encontrada. Verifique se sua conta MP está ativa.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {mpAvailableMethods.map(cat => (
+                      <div key={cat.key} style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <span style={{ fontSize: 18 }}>{cat.icon}</span>
+                          <div>
+                            <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>{cat.label}</div>
+                            <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{cat.desc}</div>
+                          </div>
+                          <span style={{ marginLeft: 'auto', padding: '2px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                            {cat.methods.length} disponíve{cat.methods.length === 1 ? 'l' : 'is'}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                          {cat.methods.map(m => (
+                            <span key={m.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 6, background: 'var(--bg-card, #fff)', border: '1px solid var(--border-soft)', fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+                              {m.name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Resumo de taxas (Arkiel + Provedor) ── */}
             <div className="ark-card" style={{ padding: 16, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
