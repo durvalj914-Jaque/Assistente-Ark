@@ -443,6 +443,71 @@ export default function FinanceiroPage() {
           </div>
         )}
       </div>
+
+      {/* ── Formas de Cobrança Vinculadas à Conta MP ── */}
+      <div className="ark-card" style={{ padding: 16, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 16 }}>🔗</span>
+          <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Formas de Cobrança Vinculadas à Conta</span>
+          {mpConnected && (
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#22c55e', fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
+              ✓ Ativas
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+          {/* PIX */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>💠</span>
+              <div>
+                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>PIX</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Instantâneo</div>
+              </div>
+            </div>
+            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
+          </div>
+          {/* Crédito */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>💳</span>
+              <div>
+                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>Crédito</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Até 12x</div>
+              </div>
+            </div>
+            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
+          </div>
+          {/* Débito */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>💳</span>
+              <div>
+                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>Débito</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>À vista</div>
+              </div>
+            </div>
+            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
+          </div>
+          {/* Boleto */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 10, background: mpConnected ? 'rgba(34,197,94,0.06)' : 'var(--bg-secondary)', border: mpConnected ? '1px solid rgba(34,197,94,0.15)' : '1px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 18 }}>🧾</span>
+              <div>
+                <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 12 }}>Boleto</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>1-3 dias úteis</div>
+              </div>
+            </div>
+            <span style={{ fontSize: 14 }}>{mpConnected ? '✅' : '⏳'}</span>
+          </div>
+        </div>
+        {!mpConnected && (
+          <div style={{ marginTop: 12, padding: '10px 12px', borderRadius: 8, background: 'rgba(0,158,227,0.06)', border: '1px solid rgba(0,158,227,0.15)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+            💡 Conecte sua conta do Mercado Pago acima para ativar todas as formas de cobrança automaticamente.
+          </div>
+        )}
+      </div>
+
       {/* ── Resumo de taxas (Arkiel + Provedor) ── */}
       <div className="ark-card" style={{ padding: 16, marginBottom: 16, border: '1px solid var(--border-soft)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
