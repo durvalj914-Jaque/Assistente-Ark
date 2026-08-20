@@ -216,7 +216,7 @@ export default function FinanceiroPage() {
     setLoadingMpMethods(true)
     try {
       const h = await authHeader()
-      const res = await fetch(`/api/mercadopago/methods?tenant_id=${tenantId}`, { headers: h })
+      const res = await fetch(`/api/mercadopago/methods?tenant_id=${tenantId}&platform_fallback=true`, { headers: h })
       const json = await res.json()
       if (json.connected && json.methods) setMpAvailableMethods(json.methods)
       else setMpAvailableMethods([])
