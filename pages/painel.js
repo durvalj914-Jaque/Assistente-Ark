@@ -82,12 +82,23 @@ export default function PainelAdminPage() {
   const [ newRowForm, setNewRowForm ] = useState({ key: '', label: '' })
   // Linhas padrão da tabela de planos (chave -> label)
   const [ planRows, setPlanRows ] = useState([
-    { key: 'bots',         label: 'Bots' },
-    { key: 'whatsapps',    label: 'WhatsApps' },
-    { key: 'catalog',      label: 'Catálogo' },
-    { key: 'messages_meta',label: 'Mensagens Meta' },
-    { key: 'volume_target',label: 'Volume-alvo' },
-    { key: 'commission',   label: 'Comissão efetiva' },
+    { key: 'max_bots',              label: 'Bots ativos' },
+    { key: 'max_messages_month',    label: 'Mensagens/mês' },
+    { key: 'max_contacts',          label: 'Contatos' },
+    { key: 'has_catalog',           label: 'Catálogo de Produtos' },
+    { key: 'has_pix',               label: 'Pagamentos via PIX' },
+    { key: 'has_mercadopago',        label: 'Mercado Pago' },
+    { key: 'has_flow_editor',       label: 'Flow Editor Avançado' },
+    { key: 'has_ai',                label: 'Respostas com IA' },
+    { key: 'has_human_transfer',    label: 'Transferência para Humano' },
+    { key: 'has_push',              label: 'Notificações Web Push' },
+    { key: 'has_multiuser',         label: 'Multiusuário' },
+    { key: 'has_google_import',     label: 'Importação Google' },
+    { key: 'has_api',               label: 'Acesso à API' },
+    { key: 'has_reports',           label: 'Relatórios Avançados' },
+    { key: 'storage_gb',            label: 'Armazenamento (GB)' },
+    { key: 'support_level',         label: 'Nível de Suporte' },
+    { key: 'has_dedicated_number',  label: 'Número WhatsApp Dedicado' },
   ])
   const [mpDiag, setMpDiag] = useState(null)
   const [mpDiagLoading, setMpDiagLoading] = useState(false)
