@@ -43,7 +43,6 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
     { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', expandable: true, children: [
       { href: '/admin/financeiro?tab=payment_methods', label: 'Formas de Pagamentos', icon: '💳' },
-      { href: '/admin/financeiro?tab=billing_methods', label: 'Formas de Cobranças', icon: '📥' },
       { href: '/admin/financeiro?tab=receipts', label: 'Comprovantes', icon: '📄' },
     ]},
     { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
