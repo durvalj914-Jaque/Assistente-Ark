@@ -66,6 +66,43 @@ export default function FinanceiroPage() {
     if (v && typeof v === "object") return v.fee_percent || 0
     return 0
   }
+  // Returns formatted fee label: "5%" or "R$ 1.50" or "5% + R$ 1.50"
+  function feeLabel(method) {
+    const v = feeConfig[method]
+    if (typeof v === "number") return v + '%'
+    if (!v || typeof v !== "object") return '—'
+    const p = parseFloat(v.fee_percent) || 0
+    const f = parseFloat(v.fee_fixed) || 0
+    const ft = v.fee_type || 'percent'
+    if (ft === 'fixed') return f > 0 ? 'R$ ' + f.toFixed(2) : '—'
+    if (ft === 'percent_fixed') return (p > 0 || f > 0) ? p + '% + R$ ' + f.toFixed(2) : '—'
+    if (ft === 'percent_min') return p > 0 ? p + '% (mín R$ ' + (parseFloat(v.fee_min) || 0).toFixed(2) + ')' : '—'
+    if (ft === 'percent_max') return p > 0 ? p + '% (máx R$ ' + (parseFloat(v.fee_max) || 0).toFixed(2) + ')' : '—'
+    if (ft === 'percent_min_max') return p > 0 ? p + '% (R$ ' + (parseFloat(v.fee_min) || 0).toFixed(2) + '-' + (parseFloat(v.fee_max) || 0).toFixed(2) + ')' : '—'
+    if (ft === 'fixed_range') return 'R$ ' + (parseFloat(v.fee_min) || 0).toFixed(2) + '-' + (parseFloat(v.fee_max) || 0).toFixed(2)
+    return p > 0 ? p + '%' : '—'
+  }
+  // Returns the fee amount in R$ for a given transaction value
+  function feeAmount(method, amount) {
+    const v = feeConfig[method]
+    if (typeof v === "number") return amount * v / 100
+    if (!v || typeof v !== "object") return 0
+    const p = parseFloat(v.fee_percent) || 0
+    const f = parseFloat(v.fee_fixed) || 0
+    const mn = parseFloat(v.fee_min) || 0
+    const mx = parseFloat(v.fee_max) || 0
+    const ft = v.fee_type || 'percent'
+    let fee = 0
+    if (ft === 'percent') fee = amount * p / 100
+    else if (ft === 'fixed') fee = f
+    else if (ft === 'percent_fixed') fee = amount * p / 100 + f
+    else if (ft === 'percent_min') fee = Math.max(amount * p / 100, mn)
+    else if (ft === 'percent_max') fee = Math.min(amount * p / 100, mx)
+    else if (ft === 'percent_min_max') fee = Math.min(Math.max(amount * p / 100, mn), mx)
+    else if (ft === 'fixed_range') fee = Math.min(Math.max(f, mn), mx)
+    else fee = amount * p / 100
+    return fee
+  }
   // ── BILLING ARKIEL (planos) ──
   async function loadBillingStatus() {
     if (!tenant?.id) return
@@ -194,6 +231,14 @@ export default function FinanceiroPage() {
       if (json.config) {
         setPayConfig({ pix_key: json.config.pix_key || '', merchant_name: json.config.merchant_name || '', merchant_city: json.config.merchant_city || '', mp_access_token: json.config.mp_access_token || '' })
         if (json.config.fee_config) setFeeConfig(json.config.fee_config)
+        // Também buscar taxas direto da API admin (mesma fonte do painel) para garantir sincronia
+        try {
+          const feeRes = await fetch('/api/admin/fee-config', { headers: h })
+          if (feeRes.ok) {
+            const feeJson = await feeRes.json()
+            if (feeJson.fee_config) setFeeConfig(feeJson.fee_config)
+          }
+        } catch (e2) { /* non-admin: keep fee_config from payments/config */ }
         // Usar o status endpoint para determinar conexao (mais confiavel)
         setMpConnected(status.mp_connected === true)
         if (status.mp_connected && status.token_info) {
@@ -431,8 +476,8 @@ export default function FinanceiroPage() {
               </div>
               <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
                 {mpConnected
-                  ? `${mpUser || 'Sua conta'} • Taxa Arkiel: ${feeVal('pix')}% (PIX) / ${feeVal('credit_card')}% (Crédito)`
-                  : `Conecte sua conta para receber direto • Taxa: ${feeVal('pix')}%-${feeVal('credit_card')}% por transação`}
+                  ? `${mpUser || 'Sua conta'} • Taxa Arkiel: ${feeLabel('pix')} (PIX) / ${feeLabel('credit_card')} (Crédito)`
+                  : `Conecte sua conta para receber direto • Taxa: ${feeLabel('pix')}-${feeLabel('credit_card')} por transação`}
               </div>
             </div>
           </div>
@@ -464,8 +509,8 @@ export default function FinanceiroPage() {
                   </div>
                   <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 2 }}>
                     {mpConnected
-                      ? `Sua conta própria • Taxa Arkiel: ${feeVal('pix')}% (PIX) / ${feeVal('credit_card')}% (Crédito) • Confirmação automática via webhook`
-                      : `Conecte sua própria conta para receber direto • Taxa Arkiel: ${feeVal('pix')}%-${feeVal('credit_card')}% por transação`}
+                      ? `Sua conta própria • Taxa Arkiel: ${feeLabel('pix')} (PIX) / ${feeLabel('credit_card')} (Crédito) • Confirmação automática via webhook`
+                      : `Conecte sua própria conta para receber direto • Taxa Arkiel: ${feeLabel('pix')}-${feeLabel('credit_card')} por transação`}
                   </div>
                 </div>
               </div>
@@ -558,13 +603,13 @@ export default function FinanceiroPage() {
                     <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>PIX</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeVal('pix')}%</span>
+                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeLabel('pix')}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
                     <span>Taxa MP:</span><span style={{ color: '#22c55e', fontWeight: 700 }}>Grátis</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-soft)' }}>
-                    <span>Você recebe (R$100):</span><span>R$ {(100 - 100 * feeVal('pix') / 100 - 0).toFixed(2)}</span>
+                    <span>Você recebe (R$100):</span><span>R$ {(100 - feeAmount('pix', 100) - 0).toFixed(2)}</span>
                   </div>
                 </div>
                 {/* Crédito */}
@@ -574,13 +619,13 @@ export default function FinanceiroPage() {
                     <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>Crédito</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeVal('credit_card')}%</span>
+                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeLabel('credit_card')}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
                     <span>Taxa MP:</span><span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>~4,99%</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-soft)' }}>
-                    <span>Você recebe (R$100):</span><span>R$ {(100 - 100 * feeVal('credit_card') / 100 - 4.99).toFixed(2)}</span>
+                    <span>Você recebe (R$100):</span><span>R$ {(100 - feeAmount('credit_card', 100) - 4.99).toFixed(2)}</span>
                   </div>
                 </div>
                 {/* Débito */}
@@ -590,13 +635,13 @@ export default function FinanceiroPage() {
                     <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>Débito</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeVal('debit_card')}%</span>
+                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeLabel('debit_card')}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
                     <span>Taxa MP:</span><span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>~2,39%</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-soft)' }}>
-                    <span>Você recebe (R$100):</span><span>R$ {(100 - 100 * feeVal('debit_card') / 100 - 2.39).toFixed(2)}</span>
+                    <span>Você recebe (R$100):</span><span>R$ {(100 - feeAmount('debit_card', 100) - 2.39).toFixed(2)}</span>
                   </div>
                 </div>
                 {/* Boleto */}
@@ -606,13 +651,13 @@ export default function FinanceiroPage() {
                     <span style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 12 }}>Boleto</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
-                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeVal('boleto')}%</span>
+                    <span>Taxa Arkiel:</span><span style={{ color: '#4f8ef7', fontWeight: 700 }}>{feeLabel('boleto')}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
                     <span>Taxa MP:</span><span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>R$ 3,99</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-primary)', fontWeight: 700, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border-soft)' }}>
-                    <span>Você recebe (R$100):</span><span>R$ {(100 - 100 * feeVal('boleto') / 100 - 3.99).toFixed(2)}</span>
+                    <span>Você recebe (R$100):</span><span>R$ {(100 - feeAmount('boleto', 100) - 3.99).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -674,7 +719,7 @@ export default function FinanceiroPage() {
                     <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13 }}>Como funciona com a taxa da Arkiel</span>
                   </div>
                   <p style={{ color: 'var(--text-muted)', fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-                    As transações do Point Tap entram no mesmo ecossistema do Mercado Pago. A taxa da Arkiel de <strong style={{ color: 'var(--text-secondary)' }}>{feeVal('pix')}%</strong> (PIX) / <strong style={{ color: 'var(--text-secondary)' }}>{feeVal('credit_card')}%</strong> (Crédito) é retida automaticamente, igual às transações online. Você não precisa configurar nada extra — basta ter a conta PJ ativa no Mercado Pago.
+                    As transações do Point Tap entram no mesmo ecossistema do Mercado Pago. A taxa da Arkiel de <strong style={{ color: 'var(--text-secondary)' }}>{feeLabel('pix')}</strong> (PIX) / <strong style={{ color: 'var(--text-secondary)' }}>{feeLabel('credit_card')}</strong> (Crédito) é retida automaticamente, igual às transações online. Você não precisa configurar nada extra — basta ter a conta PJ ativa no Mercado Pago.
                   </p>
                 </div>
 
@@ -718,7 +763,7 @@ export default function FinanceiroPage() {
                     </div>
                   </div>
                   <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(255,196,0,0.06)', fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                    <strong style={{ color: 'var(--text-secondary)' }}>Exemplo:</strong> Uma venda de R$ 100 no crédito: o MP cobra ~R$ 4,99 (taxa dele) + a Arkiel cobra <strong style={{ color: 'var(--text-secondary)' }}>R$ {feeVal('credit_card')}</strong> (taxa da plataforma). O cliente B2B recebe líquido ~R$ {(100 - 4.99 - feeVal('credit_card')).toFixed(2)}.
+                    <strong style={{ color: 'var(--text-secondary)' }}>Exemplo:</strong> Uma venda de R$ 100 no crédito: o MP cobra ~R$ 4,99 (taxa dele) + a Arkiel cobra <strong style={{ color: 'var(--text-secondary)' }}>R$ {feeAmount('credit_card', 100).toFixed(2)}</strong> (taxa da plataforma). O cliente B2B recebe líquido ~R$ {(100 - 4.99 - feeAmount('credit_card', 100)).toFixed(2)}.
                   </div>
                   <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
                     * Taxas do MP podem variar conforme plano da conta (Standard/Pro/Premium) e promoções. Confirme sempre no app do Mercado Pago.
