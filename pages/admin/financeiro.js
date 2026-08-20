@@ -403,8 +403,8 @@ export default function FinanceiroPage() {
         ))}
       </div>
 
-      {/* ── Status Mercado Pago (sempre visivel) ── */}
-      {/* ── Mercado Pago (Expansível) ── */}
+      {/* ── MERCADO PAGO (apenas na aba Formas de Pagamento) ── */}
+      {subTab === 'payment_methods' && (
       <div style={{ marginBottom: 16, borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border-soft)' }}>
         {/* Header / Botão expansível */}
         <button
@@ -740,6 +740,7 @@ export default function FinanceiroPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── COMPROVANTES ── */}
       {subTab === 'receipts' && (
