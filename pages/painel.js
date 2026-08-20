@@ -1529,6 +1529,7 @@ export default function PainelAdminPage() {
                 </div>
               </div>
             </div>
+        </div>
           )}
       {tab === 'payments' && (
         <div>
