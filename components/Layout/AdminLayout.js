@@ -228,8 +228,6 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
         flex: 1, 
         overflowY: 'auto',
         padding: '24px 28px',
-        display: 'flex',
-        flexDirection: 'column',
         minHeight: 0,
         WebkitOverflowScrolling: 'touch',
       }}>
