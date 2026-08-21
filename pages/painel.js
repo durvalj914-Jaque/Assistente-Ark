@@ -797,6 +797,7 @@ export default function PainelAdminPage() {
     { key: 'bots',      icon: '\uD83E\uDD16', label: 'Bots' },
     { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
     { key: 'planos',    icon: '\uD83D\uDCC4', label: 'Planos' },
+    { key: 'comissoes', icon: '\uD83D\uDC8E', label: 'Comissões' },
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
     { key: 'revenue',  icon: '\uD83D\uDCB0', label: 'Receitas' },
