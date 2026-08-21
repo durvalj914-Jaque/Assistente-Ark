@@ -41,6 +41,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖' },
     { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
+    { href: '/admin/upgrade', label: 'Upgrades', icon: '⬆️' },
     { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', expandable: true, children: [
       { href: '/admin/financeiro?tab=payment_methods', label: 'Formas de Pagamentos', icon: '💳' },
       { href: '/admin/financeiro?tab=receipts', label: 'Comprovantes', icon: '📄' },
