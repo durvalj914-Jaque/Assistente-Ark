@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../../../lib/supabase'
+import { processCommissionCycle } from '../../../lib/commissionEngine'
 import { sendText } from '../../../lib/meta'
 
 export default async function handler(req, res) {
@@ -228,6 +229,37 @@ export default async function handler(req, res) {
         }
       } catch (feeErr) {
         console.error('[mp-webhook] Error recording platform fee:', feeErr.message)
+      }
+
+      // ── COMMISSION CYCLES: Processar comissão por ciclos líquidos ──
+      try {
+        // Calcular taxa real do processador (taxa do MP, não a taxa da Arkiel)
+        // MP fees variam por método: PIX ~0%, crédito ~4.99%, débito ~2.49%, boleto ~R$3,49
+        const mpMethod = payment.payment_method_id || 'pix'
+        let processorFeeRate = 0
+        let processorFeeFixed = 0
+        if (mpMethod.includes('credit')) { processorFeeRate = 0.0499 }
+        else if (mpMethod.includes('debit')) { processorFeeRate = 0.0249 }
+        else if (mpMethod === 'ticket' || mpMethod.includes('boleto')) { processorFeeFixed = 3.49 }
+        else if (mpMethod.includes('bank_transfer') || mpMethod.includes('transfer')) { processorFeeRate = 0.0099 }
+        // PIX é grátis para o recebedor
+        const grossForCommission = parseFloat(order.total) || 0
+        const calculatedProcessorFee = Number((grossForCommission * processorFeeRate + processorFeeFixed).toFixed(2))
+
+        const commissionResult = await processCommissionCycle(db, {
+          tenant_id: order.tenant_id,
+          order_id: order.id,
+          payment_id: String(payment.id),
+          gross_amount: grossForCommission,
+          processor_fee: calculatedProcessorFee,
+          payment_method: mpMethod,
+        })
+
+        if (commissionResult?.ok && commissionResult.cycles_completed > 0) {
+          console.log(`[mp-webhook] 💎 Commission cycles: ${commissionResult.cycles_completed}, commission: R$${commissionResult.commission_amount}, fragmentation: R$${commissionResult.fragmentation_carry}`)
+        }
+      } catch (commErr) {
+        console.error('[mp-webhook] Error processing commission cycle:', commErr.message)
       }
 
       // Send confirmation to customer

@@ -76,7 +76,7 @@ export default function PainelAdminPage() {
   const [bankMsg, setBankMsg] = useState('')
   const [plans, setPlans] = useState([])
   const [planModal, setPlanModal] = useState(null)
-  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: {} })
+  const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: { commission_cycle_threshold: '10', commission_amount: '0.50' } })
   const [planSaving, setPlanSaving] = useState(false)
   const [ newRowModal, setNewRowModal ] = useState(false)
   const [ newRowForm, setNewRowForm ] = useState({ key: '', label: '' })
@@ -99,6 +99,8 @@ export default function PainelAdminPage() {
     { key: 'storage_gb',            label: 'Armazenamento (GB)' },
     { key: 'support_level',         label: 'Nível de Suporte' },
     { key: 'has_dedicated_number',  label: 'Número WhatsApp Dedicado' },
+    { key: 'commission_cycle_threshold', label: '💎 Ciclo de Comissão (R$)' },
+    { key: 'commission_amount',          label: '💎 Comissão/Ciclo (R$)' },
   ])
   const [mpDiag, setMpDiag] = useState(null)
   const [mpDiagLoading, setMpDiagLoading] = useState(false)
@@ -106,6 +108,11 @@ export default function PainelAdminPage() {
 
   // ── Receipts ──
   const [receipts, setReceipts] = useState([])
+  const [commissionCycles, setCommissionCycles] = useState([])
+  const [commissionEvents, setCommissionEvents] = useState([])
+  const [commissionTotals, setCommissionTotals] = useState({ total_commission_earned: 0, total_cycles_completed: 0, total_fragmentation: 0 })
+  const [commissionLoading, setCommissionLoading] = useState(false)
+  const [commissionFilter, setCommissionFilter] = useState('summary')
   const [loadingReceipts, setLoadingReceipts] = useState(false)
   const [receiptCategory, setReceiptCategory] = useState('all')
   const [editingReceipt, setEditingReceipt] = useState(null)
@@ -172,6 +179,7 @@ export default function PainelAdminPage() {
     if (tab === 'payments') { loadPayments() }
     if (tab === 'receipts') { loadReceipts('all') }
     if (tab === 'planos') { loadPlans() }
+    if (tab === 'comissoes') { loadCommissions() }
   }, [tab])
 
   async function checkGoogle(tenantId) {
@@ -463,6 +471,24 @@ export default function PainelAdminPage() {
   }
 
 
+  async function loadCommissions() {
+    setCommissionLoading(true)
+    try {
+      const res = await fetch('/api/admin/commissions')
+      if (res.ok) {
+        const data = await res.json()
+        setCommissionCycles(data.cycles || [])
+        setCommissionTotals(data.totals || { total_commission_earned: 0, total_cycles_completed: 0, total_fragmentation: 0 })
+      }
+      const evRes = await fetch('/api/admin/commissions?events=true')
+      if (evRes.ok) {
+        const evData = await evRes.json()
+        setCommissionEvents(evData.events || [])
+      }
+    } catch (e) { console.error('loadCommissions:', e) }
+    setCommissionLoading(false)
+  }
+
   async function loadPlans() {
     try {
       const h = await authHeader()
@@ -492,7 +518,7 @@ export default function PainelAdminPage() {
       const json = await res.json()
       if (json.ok) {
         setPlanModal(null)
-        setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: {} })
+        setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: { commission_cycle_threshold: '10', commission_amount: '0.50' } })
         loadPlans()
       } else {
         alert('Erro: ' + (json.error || 'Desconhecido'))
@@ -1293,7 +1319,7 @@ export default function PainelAdminPage() {
                 style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                 ➕ Nova Linha
               </button>
-              <button onClick={() => { setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: {} }); setPlanModal('new') }}
+              <button onClick={() => { setPlanForm({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: { commission_cycle_threshold: '10', commission_amount: '0.50' } }); setPlanModal('new') }}
                 style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                 ➕ Novo Plano
               </button>
@@ -1336,7 +1362,7 @@ export default function PainelAdminPage() {
                               style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-soft)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>
                               {p.active === false ? '▶️' : '⏸️'}
                             </button>
-                            <button onClick={() => { setPlanForm({ name: p.name, price: String(p.price), billing_cycle: p.billing_cycle, duration_days: p.duration_days ? String(p.duration_days) : '', description: p.description || '', limits: p.limits || {} }); setPlanModal(p) }}
+                            <button onClick={() => { setPlanForm({ name: p.name, price: String(p.price), billing_cycle: p.billing_cycle, duration_days: p.duration_days ? String(p.duration_days) : '', description: p.description || '', limits: { commission_cycle_threshold: p.limits?.commission_cycle_threshold || '10', commission_amount: p.limits?.commission_amount || '0.50', ...(p.limits || {}) } }); setPlanModal(p) }}
                               title="Editar plano"
                               style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-soft)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>✏️</button>
                             <button onClick={() => deletePlan(p.id)}
@@ -1529,6 +1555,39 @@ export default function PainelAdminPage() {
                   </div>
                 )}
 
+                {/* Commission cycle config */}
+                <div style={{ marginBottom: 14, padding: 14, borderRadius: 10, border: '1px solid rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.04)' }}>
+                  <label style={{ color: '#10b981', fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 10 }}>
+                    💎 Configuração de Comissão por Ciclo
+                  </label>
+                  <p style={{ color: 'var(--text-dim)', fontSize: 11, marginBottom: 10, lineHeight: 1.5 }}>
+                    Define a cada quanto a Arkiel cobra comissão. A cada R$ X líquidos no bolso do cliente, retém R$ Y via split.
+                  </p>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, display: 'block', marginBottom: 4 }}>Threshold do Ciclo (R$)</label>
+                      <input type="number" step="0.01"
+                        value={planForm.limits?.commission_cycle_threshold ?? '10'}
+                        onChange={e => setPlanForm(prev => ({ ...prev, limits: { ...prev.limits, commission_cycle_threshold: e.target.value } }))}
+                        placeholder="10.00"
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ color: 'var(--text-muted)', fontSize: 10, fontWeight: 600, display: 'block', marginBottom: 4 }}>Comissão por Ciclo (R$)</label>
+                      <input type="number" step="0.01"
+                        value={planForm.limits?.commission_amount ?? '0.50'}
+                        onChange={e => setPlanForm(prev => ({ ...prev, limits: { ...prev.limits, commission_amount: e.target.value } }))}
+                        placeholder="0.50"
+                        style={{ width: '100%', padding: '8px 10px', borderRadius: 6, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 13, outline: 'none' }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
+                    Ex: Threshold R$10 + Comissão R$0,50 = a cada R$10 líquidos, Arkiel recebe R$0,50. Valores em branco usam o padrão (R$10 / R$0,50).
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button onClick={() => setPlanModal(null)}
                     style={{ flex: 1, padding: '12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
@@ -1542,6 +1601,141 @@ export default function PainelAdminPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* COMISSÕES */}
+      {tab === 'comissoes' && (
+        <div>
+          {/* Summary cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div className="ark-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Comissão Total</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#10b981' }}>R$ {(commissionTotals.total_commission_earned || 0).toFixed(2)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Acumulado de todos os tenants</div>
+            </div>
+            <div className="ark-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Ciclos Completos</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{commissionTotals.total_cycles_completed || 0}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Total de ciclos processados</div>
+            </div>
+            <div className="ark-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Fragmentação Total</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: '#f59e0b' }}>R$ {(commissionTotals.total_fragmentation || 0).toFixed(2)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Aguardando completar ciclos</div>
+            </div>
+            <div className="ark-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>Tenants Ativos</div>
+              <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--text-primary)' }}>{commissionCycles.length}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>Com processamento de comissão</div>
+            </div>
+          </div>
+
+          {/* Filter toggle */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid rgba(79,142,247,0.1)' }}>
+            <button onClick={() => setCommissionFilter('summary')}
+              style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: commissionFilter === 'summary' ? '2px solid #4f8ef7' : '2px solid transparent', color: commissionFilter === 'summary' ? '#4f8ef7' : 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              Resumo por Tenant
+            </button>
+            <button onClick={() => setCommissionFilter('events')}
+              style={{ padding: '10px 16px', background: 'none', border: 'none', borderBottom: commissionFilter === 'events' ? '2px solid #4f8ef7' : '2px solid transparent', color: commissionFilter === 'events' ? '#4f8ef7' : 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              Eventos Individuais
+            </button>
+          </div>
+
+          {commissionLoading ? (
+            <div className="ark-card" style={{ padding: 40, textAlign: 'center' }}>
+              <div style={{ color: 'var(--text-muted)', fontSize: 14 }}>Carregando comissões...</div>
+            </div>
+          ) : commissionFilter === 'summary' ? (
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary)' }}>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Tenant</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Threshold (Ciclo)</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Comissão/Ciclo</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Fragmentação</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Ciclos Completos</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Comissão Acumulada</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Último Ciclo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commissionCycles.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                        Nenhuma comissão processada ainda. As comissões aparecem automaticamente quando clientes processam pagamentos.
+                      </td>
+                    </tr>
+                  ) : (
+                    commissionCycles.map((c) => (
+                      <tr key={c.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{c.tenant_name || c.tenant_id.substring(0, 8)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>R$ {Number(c.cycle_threshold).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-muted)', textAlign: 'center' }}>R$ {Number(c.commission_amount).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: '#f59e0b', textAlign: 'center', fontWeight: 600 }}>R$ {Number(c.accumulated_net).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)', textAlign: 'center', fontWeight: 600 }}>{c.total_cycles_completed || 0}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: '#10b981', textAlign: 'center', fontWeight: 700 }}>R$ {Number(c.total_commission_earned).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-dim)', textAlign: 'center' }}>{c.last_cycle_at ? new Date(c.last_cycle_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-secondary)' }}>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Data</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Tenant</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Bruto</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Taxa Proc.</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Líquido</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Ciclos</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Comissão</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Fragmento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {commissionEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 14 }}>
+                        Nenhum evento de comissão registrado ainda.
+                      </td>
+                    </tr>
+                  ) : (
+                    commissionEvents.map((e) => (
+                      <tr key={e.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                        <td style={{ padding: '10px 14px', fontSize: 11, color: 'var(--text-dim)' }}>{new Date(e.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{e.tenant_name || e.tenant_id.substring(0, 8)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-muted)', textAlign: 'center' }}>R$ {Number(e.gross_amount).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, color: '#ef4444', textAlign: 'center' }}>R$ {Number(e.processor_fee).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, color: 'var(--text-primary)', textAlign: 'center', fontWeight: 600 }}>R$ {Number(e.net_amount).toFixed(2)}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 13, color: e.cycles_this_payment > 0 ? '#10b981' : 'var(--text-dim)', textAlign: 'center', fontWeight: 600 }}>{e.cycles_this_payment}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, color: '#10b981', textAlign: 'center', fontWeight: 700 }}>{e.commission_this_payment > 0 ? 'R$ ' + Number(e.commission_this_payment).toFixed(2) : '—'}</td>
+                        <td style={{ padding: '10px 14px', fontSize: 12, color: '#f59e0b', textAlign: 'center' }}>R$ {Number(e.fragmentation_carry).toFixed(2)}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Info card explaining the model */}
+          <div className="ark-card" style={{ padding: 20, marginTop: 20, border: '1px solid rgba(16,185,129,0.15)' }}>
+            <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700, marginBottom: 12 }}>💎 Como funciona o comissionamento por ciclos</h3>
+            <div style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.8 }}>
+              <p style={{ margin: '0 0 8px' }}><b>Modelo:</b> O Assistente Ark é gratuito. A Arkiel cobra comissão apenas quando o cliente B2B recebe dinheiro via processamento de cobranças.</p>
+              <p style={{ margin: '0 0 8px' }}><b>Ciclo padrão:</b> A cada R$ 10,00 líquidos (após taxa do processador de pagamento) que o cliente recebe no bolso, a Arkiel retém R$ 0,50 via split.</p>
+              <p style={{ margin: '0 0 8px' }}><b>Fragmentação:</b> Se um pagamento não completar um ciclo inteiro, o valor líquido fica acumulando (fragmentação) e é somado ao próximo pagamento. Quando o acumulado atinge o threshold, o ciclo é completado e a comissão é gerada.</p>
+              <p style={{ margin: '0 0 8px' }}><b>Múltiplos ciclos:</b> Se um pagamento for grande o suficiente para completar mais de um ciclo de uma vez, a comissão é calculada para cada ciclo completo. O restante vira fragmentação.</p>
+              <p style={{ margin: '0' }}><b>Configurável:</b> Os valores de threshold e comissão podem ser ajustados por plano na aba <b>Planos</b> (campos "Commission Cycle Threshold" e "Commission Amount").</p>
+            </div>
+          </div>
         </div>
       )}
       {tab === 'payments' && (
