@@ -30,10 +30,10 @@ export default async function handler(req, res) {
 
   const { data: usage } = await db
     .from('usage')
-    .select('messages,conversations')
+    .select('messages,conversations,business_initiated_conversations,service_messages,total_messages')
     .eq('tenant_id', tenantId)
     .eq('month', new Date().toISOString().slice(0,7))
     .maybeSingle()
 
-  return res.status(200).json({ tenant, usage: usage || { messages: 0, conversations: 0 } })
+  return res.status(200).json({ tenant, usage: usage || { messages: 0, conversations: 0, business_initiated_conversations: 0, service_messages: 0, total_messages: 0 } })
 }

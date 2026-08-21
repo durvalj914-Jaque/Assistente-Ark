@@ -84,6 +84,7 @@ export default function PainelAdminPage() {
   const [ planRows, setPlanRows ] = useState([
     { key: 'max_bots',              label: 'Bots ativos' },
     { key: 'max_messages_month',    label: 'Mensagens/mês' },
+    { key: 'max_conversations_month', label: 'Conversas Iniciadas/mês' },
     { key: 'max_contacts',          label: 'Contatos' },
     { key: 'has_catalog',           label: 'Catálogo de Produtos' },
     { key: 'has_pix',               label: 'Pagamentos via PIX' },
@@ -149,6 +150,14 @@ export default function PainelAdminPage() {
     const todayLogs = logList.filter(l => (l.created_at || '').startsWith(todayStr))
     const errorLogs = logList.filter(l => l.status === 'error' || l.error)
 
+    // Buscar uso agregado (conversas iniciadas + service) do mês atual
+    let businessConversations = 0, serviceMessages = 0
+    try {
+      const usageRes = await fetch('/api/admin/usage', { headers: h }).then(r => r.json()).catch(() => ({}))
+      businessConversations = usageRes?.business_initiated_conversations || 0
+      serviceMessages = usageRes?.service_messages || 0
+    } catch {}
+
     setStats({
       totalClients: clientList.length,
       activeBots,
@@ -156,7 +165,9 @@ export default function PainelAdminPage() {
       totalLogs: logList.length,
       todayLogs: todayLogs.length,
       errorLogs: errorLogs.length,
-      totalMessages: clientList.reduce((sum, c) => sum + (c.bots?.reduce((s, b) => s + (b.total_messages || 0), 0) || 0), 0)
+      totalMessages: clientList.reduce((sum, c) => sum + (c.bots?.reduce((s, b) => s + (b.total_messages || 0), 0) || 0), 0),
+      businessConversations,
+      serviceMessages
     })
     setRecentActivity(logList.slice(0, 15))
     setClients(clientList)

@@ -184,6 +184,8 @@ export default async function handler(req, res) {
           template: { name: 'nova_cobranca_arkiel', language: { code: 'pt_BR' } }
         })
         templateSent = true
+        // Template enviado = conversa iniciada pelo negócio (custa na Meta)
+        try { await db.rpc('increment_business_conversation', { p_tenant_id: tenant_id, p_month: new Date().toISOString().slice(0,7) }) } catch(_) {}
         await saveMessage(`📨 *Notificação de cobrança enviada* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n\n_Cliente deve clicar em "Ver detalhes" para receber o PIX._`, 'text')
         console.log('[payments/create] Template custom enviado (fora janela 24h)')
       } catch (tmplErr) {
@@ -199,6 +201,8 @@ export default async function handler(req, res) {
             template: { name: 'hello_world', language: { code: 'en_US' } }
           })
           templateSent = true
+        // Template enviado = conversa iniciada pelo negócio (custa na Meta)
+        try { await db.rpc('increment_business_conversation', { p_tenant_id: tenant_id, p_month: new Date().toISOString().slice(0,7) }) } catch(_) {}
           await saveMessage(`📨 *Notificação enviada* - R$ ${parseFloat(amount).toFixed(2)}\n${description || ''}\n\n_Cliente recebeu notificação. Quando responder, receberá o PIX automaticamente._`, 'text')
           console.log('[payments/create] Template hello_world enviado (fallback)')
         } catch (hwErr) {

@@ -349,7 +349,7 @@ async function processWebhook(body) {
     let sub = null
     try { sub = JSON.parse(tenantData.subscription || '{}') } catch {}
 
-    let maxMessages = 500 // default free
+    let maxMessages = 50 // default free — 50 conversas iniciadas/mês
     let planActive = false
 
     if (sub && sub.status === 'active') {
@@ -357,17 +357,17 @@ async function processWebhook(body) {
         // Expirou
         planActive = false
       } else {
-        maxMessages = sub.limits?.max_messages_month || 500
+        maxMessages = sub.limits?.max_conversations_month || sub.limits?.max_messages_month || 50
         planActive = true
       }
     }
 
     if (!planActive && tenantData.status === 'active' && tenantData.plan !== 'free') {
-      maxMessages = tenantData.max_messages_month || 500
+      maxMessages = tenantData.max_messages_month || 50
       planActive = true
     }
 
-    if (tenantData.plan === 'free' && !sub) planActive = true
+    if (tenantData.plan === 'free' && !sub) { planActive = true; maxMessages = 50 }
 
     if (!planActive && tenantData.status !== 'active') {
       // Tenant suspenso
@@ -381,15 +381,15 @@ async function processWebhook(body) {
       return
     }
 
-    // Verificar cota de mensagens
+    // Verificar cota de conversas iniciadas (business-initiated)
     const { data: usageData } = await db.rpc('get_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) }).single()
-    const currentMessages = usageData?.message_count || 0
-    if (maxMessages < 999999 && currentMessages >= maxMessages) {
-      await savelog(db, 'quota_exceeded', null, { current: currentMessages, max: maxMessages })
+    const currentConversations = usageData?.business_initiated_conversations || 0
+    if (maxMessages < 999999 && currentConversations >= maxMessages) {
+      await savelog(db, 'quota_exceeded', null, { current_conversations: currentConversations, max: maxMessages })
       try {
         await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
           method: 'POST', headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: '⚠️ Limite de mensagens do plano atingido. Entre em contato para fazer upgrade.' } })
+          body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: '⚠️ Limite de conversas iniciadas do plano atingido. Entre em contato para fazer upgrade.' } })
         })
       } catch {}
       return

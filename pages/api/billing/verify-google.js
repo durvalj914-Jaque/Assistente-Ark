@@ -84,6 +84,7 @@ export default async function handler(req, res) {
     plan_expires_at:       expiresAt,
     max_bots:              planCfg.max_bots,
     max_messages_month:    planCfg.max_messages_month,
+    max_conversations_month: planCfg.max_conversations_month,
     updated_at:            new Date().toISOString()
   }).eq('id', tenantId)
 
@@ -91,6 +92,6 @@ export default async function handler(req, res) {
     success: true,
     plan:    newPlan,
     expires: expiresAt,
-    limits:  { max_bots: planCfg.max_bots, max_messages_month: planCfg.max_messages_month }
+    limits:  { max_bots: planCfg.max_bots, max_messages_month: planCfg.max_messages_month, max_conversations_month: planCfg.max_conversations_month }
   })
 }

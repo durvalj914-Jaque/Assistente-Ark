@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   await db.from('messages').insert({ tenant_id: tenant.id, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', type: 'text', content: message })
   await db.from('conversations').update({ last_message: message, last_message_at: new Date().toISOString() }).eq('id', conv.id)
 
-  try { await db.rpc('increment_usage', { p_tenant_id: tenant.id, p_month: new Date().toISOString().slice(0, 7) }) } catch (_) {}
+  try { await db.rpc('increment_business_conversation', { p_tenant_id: tenant.id, p_month: new Date().toISOString().slice(0, 7) }) } catch (_) {}
 
   return res.status(200).json({ ok: true })
 }

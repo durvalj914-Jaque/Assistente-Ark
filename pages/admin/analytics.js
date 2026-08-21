@@ -69,8 +69,9 @@ export default function AnalyticsPage() {
       {/* Cards de uso */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 24 }}>
         {[
-          { label: 'Mensagens este mês', value: (usage?.messages || 0).toLocaleString('pt-BR'), icon: '💬', color: '#4f8ef7' },
-          { label: 'Conversas este mês', value: (usage?.conversations || 0).toLocaleString('pt-BR'), icon: '🗂', color: '#8b5cf6' },
+          { label: 'Conversas Iniciadas', value: (usage?.business_initiated_conversations || 0).toLocaleString('pt-BR'), icon: '📤', color: '#4f8ef7' },
+          { label: 'Mensagens Service (grátis)', value: (usage?.service_messages || 0).toLocaleString('pt-BR'), icon: '💬', color: '#22c55e' },
+          { label: 'Total mensagens', value: (usage?.total_messages || 0).toLocaleString('pt-BR'), icon: '🗂', color: '#8b5cf6' },
           { label: 'Total de conversas', value: total.toLocaleString('pt-BR'), icon: '📁', color: '#10b981' },
           { label: 'Limite do plano', value: `${pct}%`, icon: '⚡', color: pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#10b981' },
         ].map(s => (

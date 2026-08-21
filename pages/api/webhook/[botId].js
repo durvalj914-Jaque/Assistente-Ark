@@ -60,8 +60,8 @@ export default async function handler(req, res) {
     const phoneId = bot.phone_number_id
     const month = new Date().toISOString().slice(0, 7)
 
-    // Controle de uso
-    await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month })
+    // Controle de uso — service messages (inbound, grátis na Meta)
+    try { await db.rpc('increment_usage', { p_tenant_id: tenantId, p_month: month }) } catch(_) {}
 
     // Upsert contato
     const { data: contact } = await db.from('contacts')
