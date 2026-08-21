@@ -382,17 +382,26 @@ async function processWebhook(body) {
     }
 
     // Verificar cota de conversas iniciadas (business-initiated)
+    // IMPORTANTE: nao bloqueia respostas a mensagens inbound (service = gratis na Meta)
+    // O cliente (B2C) iniciou a conversa -> o bot PODE responder (janela 24h service)
+    // O limite so se aplica a CONVERSAS INICIADAS PELO BOT (templates fora da janela)
+    // Cobrancas (payments/create) NAO passam por este check e sempre sao enviadas
     const { data: usageData } = await db.rpc('get_usage', { p_tenant_id: tenantId, p_month: new Date().toISOString().slice(0,7) }).single()
     const currentConversations = usageData?.business_initiated_conversations || 0
-    if (maxMessages < 999999 && currentConversations >= maxMessages) {
-      await savelog(db, 'quota_exceeded', null, { current_conversations: currentConversations, max: maxMessages })
+    const quotaExceeded = maxMessages < 999999 && currentConversations >= maxMessages
+    if (quotaExceeded) {
+      await savelog(db, 'quota_exceeded', null, { current_conversations: currentConversations, max: maxMessages, note: 'nao bloqueia inbound service' })
+      // NAO bloqueia — o cliente mandou msg (inbound), bot pode responder (service = gratis)
+      // Avisar o tenant por push que estourou a cota (mas nao interrompe o atendimento)
       try {
-        await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
-          method: 'POST', headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'text', text: { body: '⚠️ Limite de conversas iniciadas do plano atingido. Entre em contato para fazer upgrade.' } })
-        })
-      } catch {}
-      return
+        const pushPayload = {
+          title: '⚠️ Cota de conversas iniciadas atingida',
+          body: `${currentConversations}/${maxMessages} conversas iniciadas este mes. Respostas continuam funcionando (gratuitas), mas novas conversas proativas serao bloqueadas.`,
+          url: '/painel?tab=planos', tag: 'ark-quota-warning',
+          type: 'quota_exceeded',
+        }
+        await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
+      } catch (_) {}
     }
   } catch(e) { await savelog(db, 'limit_check_err', e?.message) }
 

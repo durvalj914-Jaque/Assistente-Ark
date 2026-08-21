@@ -20,12 +20,39 @@ export default async function handler(req, res) {
 
   const db = getDB()
 
-  const { data: tenant } = await db.from('tenants').select('id, status').eq('api_key', apiKey).maybeSingle()
+  const { data: tenant } = await db.from('tenants').select('id, status, subscription').eq('api_key', apiKey).maybeSingle()
   if (!tenant) return res.status(401).json({ error: 'invalid_api_key' })
   if (tenant.status !== 'active') return res.status(403).json({ error: 'tenant_inactive' })
 
   const { data: bot } = await db.from('bots').select('*').eq('tenant_id', tenant.id).eq('status', 'active').order('created_at').limit(1).maybeSingle()
   if (!bot || !bot.phone_number_id || !bot.access_token) return res.status(409).json({ error: 'no_active_bot_connected' })
+
+  // Verificar cota de conversas iniciadas
+  const month = new Date().toISOString().slice(0, 7)
+  const { data: usageData } = await db.rpc('get_usage', { p_tenant_id: tenant.id, p_month: month }).single()
+  const currentConversations = usageData?.business_initiated_conversations || 0
+
+  // Ler limite do plano
+  let maxConversations = 50
+  try {
+    const sub = JSON.parse(tenant.subscription || '{}')
+    if (sub?.status === 'active' && sub.limits?.max_conversations_month) {
+      maxConversations = sub.limits.max_conversations_month
+    }
+  } catch {}
+
+  // Mensagens de cobranca SEMPRE passam (geram comissao)
+  const isPaymentMsg = /cobran|pagamento|pix|fatura|boleto|comprov/i.test(message)
+  
+  if (!isPaymentMsg && maxConversations < 999999 && currentConversations >= maxConversations) {
+    return res.status(429).json({ 
+      error: 'quota_exceeded', 
+      message: 'Limite de conversas iniciadas atingido. Upgrade necessario para novas conversas.',
+      current: currentConversations, 
+      max: maxConversations,
+      hint: 'Mensagens de cobranca/pagamento sao isentas do limite.'
+    })
+  }
 
   try {
     await sendText(bot.phone_number_id, bot.access_token, to, message)
