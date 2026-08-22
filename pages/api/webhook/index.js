@@ -252,6 +252,38 @@ async function processWebhook(body) {
                 console.error('[webhook] Erro track_conversation:', trackErr.message)
               } else if (trackResult && !trackResult.already_counted) {
                 console.log('[webhook] Nova conversa business-initiated:', originType, 'cost R$', trackResult.cost_brl, 'conv_id:', conv.id)
+
+                // ── DEBITAR CRÉDITO PRÉ-PAGO ──
+                const creditType = originType === 'marketing' ? 'marketing' : 'utility'
+                try {
+                  const { data: deductResult, error: deductErr } = await db.rpc('deduct_credit', {
+                    p_tenant_id: bot.tenant_id,
+                    p_credit_type: creditType,
+                    p_conversation_id: conv.id,
+                    p_origin_type: originType,
+                    p_bot_id: bot.id,
+                    p_contact_phone: phoneNumberId,
+                  })
+                  if (deductErr) {
+                    console.error('[webhook] Erro deduct_credit:', deductErr.message)
+                  } else if (deductResult && !deductResult.has_credit) {
+                    console.log('[webhook] Sem créditos', creditType, '- saldo:', deductResult.balance)
+                    // TODO: notificar tenant que está sem créditos
+                    try {
+                      const pushPayload = {
+                        title: '⚠️ Créditos esgotados',
+                        body: `Seus créditos de ${creditType === 'marketing' ? 'marketing' : 'mensagens iniciais'} acabaram. Compre mais no painel.`,
+                        url: '/painel?tab=creditos', tag: 'ark-no-credits',
+                        type: 'credits_warning',
+                      }
+                      await Promise.all([sendPushToTenant(bot.tenant_id, pushPayload), sendFcmToTenant(bot.tenant_id, pushPayload)])
+                    } catch (_) {}
+                  } else if (deductResult) {
+                    console.log('[webhook] Crédito debitado:', creditType, 'restam:', deductResult.remaining)
+                  }
+                } catch (deductErr) {
+                  console.error('[webhook] Erro ao debitar crédito:', deductErr.message)
+                }
               }
             }
           } catch (trackErr) {

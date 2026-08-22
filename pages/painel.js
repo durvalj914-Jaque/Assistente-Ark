@@ -809,6 +809,7 @@ export default function PainelAdminPage() {
     { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
     { key: 'planos',    icon: '\uD83D\uDCC4', label: 'Planos' },
     { key: 'comissoes', icon: '\uD83D\uDC8E', label: 'Comissões' },
+    { key: 'credits',  icon: '\uD83D\uDC53', label: 'Créditos' },
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
     { key: 'revenue',  icon: '\uD83D\uDCB0', label: 'Receitas' },
@@ -1746,6 +1747,36 @@ export default function PainelAdminPage() {
               <p style={{ margin: '0 0 8px' }}><b>Fragmentação:</b> Se um pagamento não completar um ciclo inteiro, o valor líquido fica acumulando (fragmentação) e é somado ao próximo pagamento. Quando o acumulado atinge o threshold, o ciclo é completado e a comissão é gerada.</p>
               <p style={{ margin: '0 0 8px' }}><b>Múltiplos ciclos:</b> Se um pagamento for grande o suficiente para completar mais de um ciclo de uma vez, a comissão é calculada para cada ciclo completo. O restante vira fragmentação.</p>
               <p style={{ margin: '0' }}><b>Configurável:</b> Os valores de threshold e comissão podem ser ajustados por plano na aba <b>Planos</b> (campos "Commission Cycle Threshold" e "Commission Amount").</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === 'credits' && (
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>🎯 Créditos Pré-pagos — Conversas WhatsApp</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginBottom: 24 }}>
+            <div className="ark-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>💬 Mensagens Iniciais</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>R$ 0,05</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>por conversa (R$0,04 Meta + R$0,01 Arkiel)</div>
+            </div>
+            <div className="ark-card" style={{ padding: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 8 }}>📣 Marketing</div>
+              <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>R$ 0,36</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>por conversa (R$0,34 Meta + R$0,02 Arkiel)</div>
+            </div>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Os clientes compram créditos pré-pagos no portal (<a href="/admin/marketing" style={{ color: '#4f8ef7' }}>/admin/marketing</a>).
+            Cada conversa business-initiated debita 1 crédito automaticamente. A margem da Arkiel (R$0,01 utility / R$0,02 marketing) é creditada ao saldo de comissões.
+          </p>
+          <iframe src="/api/admin/usage-costs" style={{ display: 'none' }} />
+          <div className="ark-card" style={{ padding: 20 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>📊 Resumo de Custos Meta por Tenant (mês atual)</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+              Acesse <a href="/api/admin/usage-costs" target="_blank" style={{ color: '#4f8ef7' }}>→ /api/admin/usage-costs</a> para ver o detalhamento completo de custos por tipo de conversa.
             </div>
           </div>
         </div>
