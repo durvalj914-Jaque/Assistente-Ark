@@ -118,14 +118,39 @@ CREATE TABLE IF NOT EXISTS messages (
 -- USAGE (consumo mensal por tenant)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS usage (
-  id            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  tenant_id     uuid REFERENCES tenants(id) ON DELETE CASCADE,
-  month         text NOT NULL,
-  messages      int DEFAULT 0,
-  conversations int DEFAULT 0,
-  updated_at    timestamptz DEFAULT now(),
+  id                            uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  tenant_id                     uuid REFERENCES tenants(id) ON DELETE CASCADE,
+  month                         text NOT NULL,
+  messages                      int DEFAULT 0,
+  conversations                 int DEFAULT 0,
+  business_initiated_conversations int DEFAULT 0,
+  service_messages              int DEFAULT 0,
+  total_messages                int DEFAULT 0,
+  marketing_conversations       int DEFAULT 0,
+  utility_conversations         int DEFAULT 0,
+  auth_conversations            int DEFAULT 0,
+  meta_cost_brl                 numeric(10,4) DEFAULT 0,
+  updated_at                    timestamptz DEFAULT now(),
   UNIQUE(tenant_id, month)
 );
+
+-- Tabela para rastrear janelas de conversa únicas da Meta (evita dupla contagem)
+CREATE TABLE IF NOT EXISTS conversation_windows (
+  id            text NOT NULL,           -- Meta conversation.id
+  tenant_id     uuid REFERENCES tenants(id) ON DELETE CASCADE,
+  bot_id        uuid REFERENCES bots(id) ON DELETE SET NULL,
+  origin_type   text NOT NULL,           -- marketing | utility | authentication | service
+  category      text,                    -- pricing.category da Meta
+  phone_number  text,                    -- phone_number_id que enviou
+  opened_at     timestamptz DEFAULT now(),
+  expires_at    timestamptz,             -- conversation.expiration_timestamp
+  cost_brl      numeric(10,4) DEFAULT 0,
+  month         text NOT NULL,           -- YYYY-MM
+  UNIQUE(id, month)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conv_windows_tenant_month 
+  ON conversation_windows(tenant_id, month);
 
 -- ============================================================
 -- BILLING_EVENTS (auditoria de pagamentos)
@@ -242,3 +267,104 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user_tenant();
+
+
+-- ============================================================
+-- CONVERSATION COST TRACKING FUNCTIONS
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION track_conversation(
+  p_conversation_id text,
+  p_tenant_id uuid,
+  p_bot_id uuid DEFAULT NULL,
+  p_origin_type text DEFAULT 'utility',
+  p_category text DEFAULT NULL,
+  p_phone_number text DEFAULT NULL,
+  p_month text DEFAULT NULL
+)
+RETURNS json LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_month text := COALESCE(p_month, to_char(now(), 'YYYY-MM'));
+  v_exists boolean;
+  v_cost numeric(10,4) := 0;
+  v_result json;
+BEGIN
+  SELECT EXISTS(
+    SELECT 1 FROM conversation_windows 
+    WHERE id = p_conversation_id AND month = v_month
+  ) INTO v_exists;
+  
+  IF v_exists THEN
+    RETURN json_build_object('already_counted', true, 'conversation_id', p_conversation_id);
+  END IF;
+  
+  -- Custos Meta Brasil (USD → BRL @ ~5.50)
+  CASE p_origin_type
+    WHEN 'marketing'       THEN v_cost := 0.3438;
+    WHEN 'utility'         THEN v_cost := 0.0374;
+    WHEN 'authentication'  THEN v_cost := 0.0374;
+    WHEN 'service'         THEN v_cost := 0;
+    WHEN 'referral'        THEN v_cost := 0;
+    WHEN 'customer_initiated' THEN v_cost := 0;
+    ELSE v_cost := 0.0374;
+  END CASE;
+  
+  INSERT INTO conversation_windows (id, tenant_id, bot_id, origin_type, category, phone_number, month, cost_brl)
+  VALUES (p_conversation_id, p_tenant_id, p_bot_id, p_origin_type, p_category, p_phone_number, v_month, v_cost)
+  ON CONFLICT (id, month) DO NOTHING;
+  
+  INSERT INTO usage (tenant_id, month, business_initiated_conversations, total_messages, meta_cost_brl)
+  VALUES (p_tenant_id, v_month, 1, 1, v_cost)
+  ON CONFLICT (tenant_id, month)
+  DO UPDATE SET
+    business_initiated_conversations = usage.business_initiated_conversations + 1,
+    total_messages = usage.total_messages + 1,
+    meta_cost_brl = usage.meta_cost_brl + v_cost,
+    updated_at = now();
+  
+  IF p_origin_type = 'marketing' THEN
+    UPDATE usage SET marketing_conversations = marketing_conversations + 1 
+    WHERE tenant_id = p_tenant_id AND month = v_month;
+  ELSIF p_origin_type = 'utility' THEN
+    UPDATE usage SET utility_conversations = utility_conversations + 1 
+    WHERE tenant_id = p_tenant_id AND month = v_month;
+  ELSIF p_origin_type = 'authentication' THEN
+    UPDATE usage SET auth_conversations = auth_conversations + 1 
+    WHERE tenant_id = p_tenant_id AND month = v_month;
+  END IF;
+  
+  SELECT json_build_object(
+    'already_counted', false, 'conversation_id', p_conversation_id,
+    'origin_type', p_origin_type, 'cost_brl', v_cost, 'month', v_month
+  ) INTO v_result;
+  RETURN v_result;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION get_usage_detailed(p_tenant_id uuid, p_month text)
+RETURNS json LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE result json;
+BEGIN
+  SELECT json_build_object(
+    'messages', COALESCE(u.messages, 0),
+    'conversations', COALESCE(u.conversations, 0),
+    'business_initiated_conversations', COALESCE(u.business_initiated_conversations, 0),
+    'service_messages', COALESCE(u.service_messages, 0),
+    'total_messages', COALESCE(u.total_messages, 0),
+    'marketing_conversations', COALESCE(u.marketing_conversations, 0),
+    'utility_conversations', COALESCE(u.utility_conversations, 0),
+    'auth_conversations', COALESCE(u.auth_conversations, 0),
+    'meta_cost_brl', COALESCE(u.meta_cost_brl, 0)
+  ) INTO result
+  FROM usage u WHERE u.tenant_id = p_tenant_id AND u.month = p_month;
+  
+  IF result IS NULL THEN
+    result := json_build_object(
+      'messages', 0, 'conversations', 0, 'business_initiated_conversations', 0,
+      'service_messages', 0, 'total_messages', 0, 'marketing_conversations', 0,
+      'utility_conversations', 0, 'auth_conversations', 0, 'meta_cost_brl', 0
+    );
+  END IF;
+  RETURN result;
+END;
+$$;

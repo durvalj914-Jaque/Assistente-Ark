@@ -207,9 +207,72 @@ async function processWebhook(body) {
   await savelog(db, 'received', null, { object: body?.object })
 
   if (change?.statuses?.length) {
+    const phoneNumberId = change?.metadata?.phone_number_id || PHONE_ID
+
     for (const s of change.statuses) {
       console.log('[webhook] Status:', s.id, '→', s.status, s.errors?.[0]?.message || '')
-      await savelog(db, 'status_update', null, { id: s.id, status: s.status, error: s.errors?.[0]?.message || null })
+
+      // ── CAPTURAR OBJETO CONVERSATION DA META ──
+      // A Meta envia conversation.origin.type e pricing nos status updates
+      // quando uma mensagem enviada pelo bot abre uma nova janela de conversa
+      const conv = s.conversation
+      const pricing = s.pricing
+
+      if (conv?.id && conv?.origin?.type) {
+        const originType = conv.origin.type  // marketing | utility | authentication | service | referral | customer_initiated
+        const category = pricing?.category || originType
+        const billable = pricing?.billable !== false
+        const isBusinessInitiated = ['marketing', 'utility', 'authentication'].includes(originType)
+
+        if (billable && isBusinessInitiated) {
+          // Buscar o bot/tenant pelo phone_number_id
+          try {
+            const { data: botArr } = await db.from('bots')
+              .select('id,tenant_id,name')
+              .eq('phone_number_id', phoneNumberId)
+              .eq('status', 'active')
+              .limit(1)
+
+            if (botArr?.length) {
+              const bot = botArr[0]
+              const month = new Date().toISOString().slice(0, 7)
+
+              // Chamar função SQL que registra a conversa (deduplica por conversation.id)
+              const { data: trackResult, error: trackErr } = await db.rpc('track_conversation', {
+                p_conversation_id: conv.id,
+                p_tenant_id: bot.tenant_id,
+                p_bot_id: bot.id,
+                p_origin_type: originType,
+                p_category: category,
+                p_phone_number: phoneNumberId,
+                p_month: month,
+              })
+
+              if (trackErr) {
+                console.error('[webhook] Erro track_conversation:', trackErr.message)
+              } else if (trackResult && !trackResult.already_counted) {
+                console.log('[webhook] Nova conversa business-initiated:', originType, 'cost R$', trackResult.cost_brl, 'conv_id:', conv.id)
+              }
+            }
+          } catch (trackErr) {
+            console.error('[webhook] Erro ao rastrear conversa:', trackErr.message)
+          }
+        }
+
+        // Log detalhado com dados do conversation object
+        await savelog(db, 'status_update', null, {
+          id: s.id,
+          status: s.status,
+          error: s.errors?.[0]?.message || null,
+          conversation_id: conv.id || null,
+          origin_type: conv.origin?.type || null,
+          expiration: conv.expiration_timestamp || null,
+          pricing_category: pricing?.category || null,
+          billable: pricing?.billable ?? null,
+        })
+      } else {
+        await savelog(db, 'status_update', null, { id: s.id, status: s.status, error: s.errors?.[0]?.message || null })
+      }
     }
     return
   }
