@@ -6,6 +6,7 @@
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 import { generatePixCode } from '../../../lib/pix'
 import QRCode from 'qrcode'
+import { guardSendTemplate } from '../../../lib/messageGuard'
 
 const WA_API = 'https://graph.facebook.com/v25.0'
 
@@ -172,7 +173,24 @@ export default async function handler(req, res) {
       await saveMessage(textMsg, 'text')
       console.log('[payments/create] Texto PIX enviado OK (janela aberta)')
     } catch (textErr) {
-      console.error('[payments/create] Texto falhou:', textErr.message)
+      console.error('[payments/create] Texto falhou (janela 24h expirada):', textErr.message)
+      
+      // ── VERIFICAR CRÉDITOS ANTES DE ENVIAR TEMPLATE ──
+      // Se o tenant não tem créditos, bloquear o envio do template
+      const creditCheck = await guardSendTemplate(conv.tenant_id, conv.bot_id, conv.contact_id, 'utility')
+      if (creditCheck.blocked) {
+        console.log('[payments/create] Envio bloqueado: sem créditos e janela 24h expirada')
+        await saveMessage(`⚠️ *Cobrança não enviada:* ${creditCheck.error}`, 'text')
+        return res.status(402).json({
+          error: creditCheck.error,
+          code: 'NO_CREDITS',
+          details: creditCheck.details,
+          pix_code: pixCode,
+          payment_id: paymentId,
+        })
+      }
+      console.log('[payments/create] Créditos OK, enviando template (saldo:', creditCheck.balance, 'créditos)')
+
       // 3. SE FALHOU (janela 24h), ENVIAR TEMPLATE COM BOTÃO "Ver detalhes"
       // 3a. TENTAR TEMPLATE CUSTOMIZADO (se aprovado)
       let templateSent = false

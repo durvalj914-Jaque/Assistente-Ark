@@ -5,12 +5,13 @@
  * Header: Authorization: Bearer <supabase_session_token>
  *
  * - Confirma que o usuário autenticado pertence ao tenant da conversa.
+ * - Verifica janela 24h: se aberta, envia grátis. Se fechada, bloqueia sem créditos.
  * - Envia via WhatsApp usando o token do bot.
  * - Salva a mensagem (sent_by: 'human') e muda a conversa para status 'human'
- *   automaticamente (assumir o atendimento ao responder).
  */
 import { supabaseAdmin } from '../../lib/supabase'
 import { sendText } from '../../lib/meta'
+import { canSendToB2C } from '../../lib/messageGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -57,10 +58,42 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuração do bot incompleta para envio' })
   }
 
+  // ── VERIFICAR JANELA 24h E CRÉDITOS ──
+  const sendCheck = await canSendToB2C(conv.tenant_id, bot.id, contact.id, 'utility')
+  if (!sendCheck.canSend) {
+    return res.status(402).json({
+      error: 'A janela de 24h expirou e você não tem créditos de mensagens iniciais. O cliente precisa enviar uma mensagem primeiro (abre a janela grátis) ou compre créditos no painel de Marketing.',
+      code: 'WINDOW_CLOSED_NO_CREDITS',
+      window_open: false,
+      needs_credits: true,
+      credit_type: 'utility',
+      balance: sendCheck.balance,
+      purchase_url: '/admin/marketing',
+    })
+  }
+
+  // Se a janela está fechada mas tem créditos, avisa que vai usar template
+  if (!sendCheck.window_open && sendCheck.needs_template) {
+    // Para mensagens manuais, tentar enviar texto mesmo (pode falhar se janela fechada)
+    // Mas o cliente tem créditos, então se falhar, tentar template
+    console.log('[send-message] Janela fechada, tenant tem', sendCheck.balance, 'créditos')
+  }
+
   try {
     await sendText(bot.phone_number_id, token, contact.phone, text.trim())
   } catch (err) {
     console.error('[send-message] erro ao enviar WhatsApp:', err?.response?.data || err.message)
+    
+    // Se erro for por janela 24h e tem créditos, tentar template
+    if (!sendCheck.window_open && sendCheck.has_credit) {
+      return res.status(402).json({
+        error: 'A janela de 24h expirou. Mensagens manuais fora da janela precisam de template aprovado. Use a aba Marketing para enviar broadcasts ou aguarde o cliente enviar uma mensagem.',
+        code: 'WINDOW_CLOSED_NEED_TEMPLATE',
+        has_credits: true,
+        balance: sendCheck.balance,
+      })
+    }
+    
     return res.status(502).json({ error: 'Falha ao enviar mensagem via WhatsApp', detail: err?.response?.data || err.message })
   }
 
@@ -84,5 +117,5 @@ export default async function handler(req, res) {
 
   await db.from('conversations').update(convUpdate).eq('id', conv.id)
 
-  return res.status(200).json({ ok: true })
+  return res.status(200).json({ ok: true, window_open: sendCheck.window_open })
 }

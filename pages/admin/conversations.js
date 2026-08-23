@@ -574,10 +574,22 @@ export default function ConversationsPage() {
     try {
       const headers = await authHeaders()
       const res = await fetch('/api/send-message', { method: 'POST', headers, body: JSON.stringify({ conversation_id: selected.id, text }) })
-      if (!res.ok) throw new Error('Falha ao enviar')
+      const json = await res.json()
+      if (!res.ok) {
+        if (json.code === 'WINDOW_CLOSED_NO_CREDITS') {
+          alert('⏰ Janela de 24h expirada\n\n' + json.error + '\n\nCompre créditos em: Marketing → Comprar créditos')
+          throw new Error('blocked')
+        }
+        if (json.code === 'WINDOW_CLOSED_NEED_TEMPLATE') {
+          alert('⏰ Janela de 24h expirada\n\nPara enviar mensagens fora da janela, use a aba Marketing para broadcasts com template.')
+          throw new Error('blocked')
+        }
+        throw new Error(json.error || 'Falha ao enviar')
+      }
       if (selected.status === 'bot') { setSelected(p => ({ ...p, status: 'human' })); loadConversations() }
     } catch (e) {
-      alert(e.message); setMessages(m => m.filter(msg => msg.id !== optimistic.id)); setDraft(text)
+      if (e.message !== 'blocked') { alert(e.message) }
+      setMessages(m => m.filter(msg => msg.id !== optimistic.id)); setDraft(text)
     } finally { setSending(false) }
   }
 
