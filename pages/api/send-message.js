@@ -58,7 +58,47 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuração do bot incompleta para envio' })
   }
 
-  // ── VERIFICAR JANELA 24h E CRÉDITOS ──
+  // ── VERIFICAR JANELA 24h, INBOUND E CRÉDITOS ──
+  // 1. Verificar se o cliente já enviou alguma mensagem (inbound)
+  const { data: inboundMessages } = await db.from('messages')
+    .select('id, created_at')
+    .eq('conversation_id', conv.id)
+    .eq('direction', 'inbound')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (!inboundMessages) {
+    // Cliente nunca mandou mensagem — bloquear no plano free
+    // Verificar se é plano free
+    let isFreePlan = true
+    try {
+      const sub = JSON.parse(conv.tenant?.subscription || '{}') || JSON.parse((await db.from('tenants').select('subscription, plan').eq('id', conv.tenant_id).maybeSingle()).data?.subscription || '{}')
+      if (sub?.status === 'active' && (!sub.expires_at || new Date(sub.expires_at) >= new Date())) {
+        isFreePlan = false
+      }
+    } catch {}
+    try {
+      const { data: tenantData } = await db.from('tenants').select('plan, subscription').eq('id', conv.tenant_id).maybeSingle()
+      const sub = JSON.parse(tenantData?.subscription || '{}')
+      if (sub?.status === 'active' && (!sub.expires_at || new Date(sub.expires_at) >= new Date())) {
+        isFreePlan = false
+      } else if (tenantData?.plan && tenantData.plan !== 'free') {
+        isFreePlan = false
+      }
+    } catch {}
+
+    if (isFreePlan) {
+      return res.status(402).json({
+        error: 'O cliente ainda não iniciou esta conversa. No plano gratuito, você só pode responder após o cliente enviar a primeira mensagem.',
+        code: 'NO_INBOUND_FREE_PLAN',
+        window_open: false,
+        needs_inbound: true,
+      })
+    }
+  }
+
+  // 2. Verificar janela 24h e créditos
   const sendCheck = await canSendToB2C(conv.tenant_id, bot.id, contact.id, 'utility')
   if (!sendCheck.canSend) {
     return res.status(402).json({

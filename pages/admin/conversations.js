@@ -233,6 +233,8 @@ export default function ConversationsPage() {
   const [mpChargeMethods, setMpChargeMethods] = useState([])
   const [mpChargeAccount, setMpChargeAccount] = useState(null)
   const [loadingChargeMethods, setLoadingChargeMethods] = useState(false)
+  const [hasInbound, setHasInbound] = useState(false)
+  const [windowInfo, setWindowInfo] = useState({ open: false, hoursLeft: 0 })
   const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   // Taxas reais do provedor (Mercado Pago) — atualizado conforme plano da conta
   const MP_PROVIDER_FEES = { pix: 0, credit_card: 4.99, debit_card: 2.39, boleto: 3.99 }
@@ -306,6 +308,16 @@ export default function ConversationsPage() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `tenant_id=eq.${tenant.id}` }, (payload) => {
         setSelected(prev => {
           if (prev && payload.new.conversation_id === prev.id) {
+            // Se é uma mensagem inbound do cliente, reavaliar a trava do chat
+            if (payload.new.direction === 'inbound') {
+              setHasInbound(true)
+              const lastInAt = new Date(payload.new.created_at)
+              const expiresAt = new Date(lastInAt.getTime() + 24 * 60 * 60 * 1000)
+              const now = new Date()
+              const isOpen = now < expiresAt
+              const hoursLeft = isOpen ? Math.round((expiresAt - now) / (60 * 60 * 1000) * 10) / 10 : 0
+              setWindowInfo({ open: isOpen, hoursLeft })
+            }
             setMessages(m => {
               // Evita duplicatas por id
               if (m.some(msg => msg.id === payload.new.id)) return m
@@ -521,6 +533,24 @@ export default function ConversationsPage() {
       .limit(100)
     // Substitui completamente (limpa otimistas antigos)
     setMessages(data || [])
+
+    // ── VERIFICAR JANELA 24h E INBOUND ──
+    const inboundMsgs = (data || []).filter(m => m.direction === 'inbound')
+    const hasIn = inboundMsgs.length > 0
+    setHasInbound(hasIn)
+
+    if (hasIn) {
+      // Última mensagem inbound do cliente
+      const lastIn = inboundMsgs[inboundMsgs.length - 1]
+      const lastInAt = new Date(lastIn.created_at)
+      const expiresAt = new Date(lastInAt.getTime() + 24 * 60 * 60 * 1000)
+      const now = new Date()
+      const isOpen = now < expiresAt
+      const hoursLeft = isOpen ? Math.round((expiresAt - now) / (60 * 60 * 1000) * 10) / 10 : 0
+      setWindowInfo({ open: isOpen, hoursLeft })
+    } else {
+      setWindowInfo({ open: false, hoursLeft: 0 })
+    }
   }
 
   async function authHeaders() {
@@ -549,6 +579,30 @@ export default function ConversationsPage() {
 
   const isHuman = selected?.status === 'human'
   const isClosed = selected?.status === 'closed'
+
+  // ── TRAVA DE CHAT GRATUITO (PLANO FREE) ──
+  // Verifica se o plano é free (sem subscription ativa)
+  let isFreePlan = true
+  try {
+    const sub = JSON.parse(tenant?.subscription || '{}')
+    if (sub?.status === 'active' && (!sub.expires_at || new Date(sub.expires_at) >= new Date())) {
+      isFreePlan = false
+    }
+  } catch {}
+  if (tenant?.plan && tenant.plan !== 'free') isFreePlan = false
+
+  // Chat bloqueado se:
+  // 1. Cliente nunca mandou mensagem (não há inbound) → precisa do cliente iniciar
+  // 2. Janela 24h expirou → precisa de créditos ou cliente responder de novo
+  const chatLocked = !isClosed && (
+    !hasInbound ||  // Cliente nunca iniciou conversa
+    (hasInbound && !windowInfo.open && isFreePlan)  // Janela expirou e plano free
+  )
+  const chatLockedReason = !hasInbound
+    ? 'Aguarde o cliente iniciar a conversa para responder gratuitamente'
+    : (hasInbound && !windowInfo.open && isFreePlan)
+    ? 'Janela gratuita de 24h expirou. Aguarde o cliente enviar uma nova mensagem'
+    : ''
   const selectedBotId = selected?.bots?.id || selected?.bot_id
 
   async function handleToggleMode() {
@@ -576,6 +630,10 @@ export default function ConversationsPage() {
       const res = await fetch('/api/send-message', { method: 'POST', headers, body: JSON.stringify({ conversation_id: selected.id, text }) })
       const json = await res.json()
       if (!res.ok) {
+        if (json.code === 'NO_INBOUND_FREE_PLAN') {
+          alert('🔒 Cliente não iniciou a conversa\n\n' + json.error + '\n\nAguarde o cliente enviar a primeira mensagem no WhatsApp.')
+          throw new Error('blocked')
+        }
         if (json.code === 'WINDOW_CLOSED_NO_CREDITS') {
           alert('⏰ Janela de 24h expirada\n\n' + json.error + '\n\nCompre créditos em: Marketing → Comprar créditos')
           throw new Error('blocked')
@@ -964,6 +1022,19 @@ export default function ConversationsPage() {
                   <div style={{ textAlign: 'center', color: 'var(--text-faint)', fontSize: 12, padding: '8px 0' }}>
                     Conversa encerrada. Altere o status para reabrir.
                   </div>
+                ) : chatLocked ? (
+                  <div style={{ textAlign: 'center', padding: '12px 16px', background: 'rgba(245,158,11,0.06)', borderRadius: 10, border: '1px solid rgba(245,158,11,0.2)' }}>
+                    <div style={{ fontSize: 20, marginBottom: 6 }}>🔒</div>
+                    <div style={{ fontSize: 12, color: '#f59e0b', fontWeight: 600, marginBottom: 4 }}>
+                      {chatLockedReason}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                      {!hasInbound
+                        ? 'No plano gratuito, o cliente deve enviar a primeira mensagem para abrir o chat. Você poderá responder livremente por 24h após o primeiro contato.'
+                        : 'Na janela gratuita de 24h você pode responder livremente. Aguarde o cliente reenviar uma mensagem para abrir uma nova janela.'
+                      }
+                    </div>
+                  </div>
                 ) : selected.status === 'no_bot' ? (
                   <>
                     <div style={{ textAlign: 'center', color: '#6b7280', fontSize: 11, marginBottom: 6, padding: '4px 0' }}>
@@ -993,6 +1064,11 @@ export default function ConversationsPage() {
                   </>
                 ) : (
                   <>
+                    {hasInbound && windowInfo.open && (
+                      <div style={{ fontSize: 10, color: '#22c55e', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        🟢 Janela gratuita ativa — {windowInfo.hoursLeft}h restantes
+                      </div>
+                    )}
                     {!isHuman && <div style={{ color: '#8b5cf6', fontSize: 11, marginBottom: 8 }}>🤖 O bot está atendendo. Envie uma mensagem para assumir.</div>}
                     {mediaPreview && (
                       <div style={{ marginBottom: 8, padding: '8px 12px', background: 'var(--blue-tint)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
