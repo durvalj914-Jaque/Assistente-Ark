@@ -78,6 +78,10 @@ export default function PainelAdminPage() {
   const [planModal, setPlanModal] = useState(null)
   const [planForm, setPlanForm] = useState({ name: '', price: '', billing_cycle: 'monthly', duration_days: '', description: '', limits: { commission_cycle_threshold: '10', commission_amount: '0.50' } })
   const [planSaving, setPlanSaving] = useState(false)
+  const [addons, setAddons] = useState([])
+  const [addonModal, setAddonModal] = useState(null)
+  const [addonForm, setAddonForm] = useState({ name: "", description: "", price: "", billing_type: "one_time", category: "conversas", quantity: "1" })
+  const [addonSaving, setAddonSaving] = useState(false)
   const [ newRowModal, setNewRowModal ] = useState(false)
   const [ newRowForm, setNewRowForm ] = useState({ key: '', label: '' })
   // Linhas padrão da tabela de planos (chave -> label)
@@ -189,7 +193,7 @@ export default function PainelAdminPage() {
   useEffect(() => {
     if (tab === 'payments') { loadPayments() }
     if (tab === 'receipts') { loadReceipts('all') }
-    if (tab === 'planos') { loadPlans() }
+    if (tab === 'planos') { loadPlans(); loadAddons() }
     if (tab === 'comissoes') { loadCommissions() }
   }, [tab])
 
@@ -507,6 +511,71 @@ export default function PainelAdminPage() {
       const json = await res.json()
       if (json.plans) setPlans(json.plans)
     } catch (e) { console.error('loadPlans', e) }
+
+  async function loadAddons() {
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/admin/addons', { headers: h })
+      const json = await res.json()
+      if (json.addons) setAddons(json.addons)
+    } catch (e) { console.error('loadAddons', e) }
+  }
+
+  async function saveAddon(isEdit) {
+    setAddonSaving(true)
+    try {
+      const h = await authHeader()
+      const body = {
+        name: addonForm.name,
+        description: addonForm.description,
+        price: parseFloat(addonForm.price) || 0,
+        billing_type: addonForm.billing_type,
+        category: addonForm.category,
+        quantity: parseInt(addonForm.quantity) || 1,
+      }
+      const res = await fetch('/api/admin/addons', {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify(isEdit ? { id: addonModal.id, ...body } : body),
+      })
+      const json = await res.json()
+      if (json.ok || json.addon) {
+        setAddonModal(null)
+        setAddonForm({ name: '', description: '', price: '', billing_type: 'one_time', category: 'conversas', quantity: '1' })
+        loadAddons()
+      } else {
+        alert(json.error || 'Erro ao salvar pacote')
+      }
+    } catch (e) { console.error('saveAddon', e) }
+    setAddonSaving(false)
+  }
+
+  async function toggleAddon(addonId) {
+    try {
+      const h = await authHeader()
+      const addon = addons.find(a => a.id === addonId)
+      await fetch('/api/admin/addons', {
+        method: 'PATCH',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: addonId, active: !addon.active }),
+      })
+      setAddons(prev => prev.map(a => a.id === addonId ? { ...a, active: !a.active } : a))
+    } catch (e) { console.error('toggleAddon', e) }
+  }
+
+  async function deleteAddon(addonId) {
+    if (!confirm('Excluir este pacote?')) return
+    try {
+      const h = await authHeader()
+      await fetch('/api/admin/addons', {
+        method: 'DELETE',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: addonId }),
+      })
+      setAddons(prev => prev.filter(a => a.id !== addonId))
+    } catch (e) { console.error('deleteAddon', e) }
+  }
+
   }
 
   async function savePlan(isEdit) {
@@ -1490,6 +1559,171 @@ export default function PainelAdminPage() {
                   <button onClick={addPlanRow} disabled={!newRowForm.label.trim()}
                     style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: !newRowForm.label.trim() ? 0.5 : 1 }}>
                     Adicionar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+
+          {/* ── PACOTES E RECURSOS AVULSOS ── */}
+          <div style={{ marginTop: 32, paddingTop: 24, borderTop: '2px solid var(--border-soft)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <h2 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>📦 Pacotes e Recursos Avulsos</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Venda pacotes extras e recursos premium além dos planos. Clientes podem comprar separadamente.</p>
+              </div>
+              <button onClick={() => { setAddonForm({ name: '', description: '', price: '', billing_type: 'one_time', category: 'conversas', quantity: '1' }); setAddonModal('new') }}
+                style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                ➕ Novo Pacote
+              </button>
+            </div>
+
+            {addons.length === 0 && (
+              <div className="ark-card" style={{ padding: '14px 18px', marginBottom: 12, border: '1px solid rgba(79,142,247,0.2)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20 }}>💡</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+                  Nenhum pacote criado ainda. Clique em <b>"Novo Pacote"</b> para adicionar recursos avulsos.
+                </span>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+              {addons.map((a) => (
+                <div key={a.id} className="ark-card" style={{ padding: 18, border: '1px solid var(--border-soft)', opacity: a.active === false ? 0.55 : 1, position: 'relative' }}>
+                  {/* Badge de categoria */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 6, fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                      background: a.category === 'conversas' ? 'rgba(79,142,247,0.1)' :
+                                  a.category === 'bots' ? 'rgba(168,85,247,0.1)' :
+                                  a.category === 'features' ? 'rgba(245,158,11,0.1)' :
+                                  'rgba(34,197,94,0.1)',
+                      color: a.category === 'conversas' ? '#4f8ef7' :
+                             a.category === 'bots' ? '#a855f7' :
+                             a.category === 'features' ? '#f59e0b' : '#22c55e',
+                    }}>
+                      {a.category === 'conversas' ? '💬 Conversas' :
+                       a.category === 'bots' ? '🤖 Bots' :
+                       a.category === 'features' ? '⚡ Recursos' :
+                       a.category === 'credits' ? '💳 Créditos' : a.category}
+                    </span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => toggleAddon(a.id)}
+                        title={a.active === false ? 'Ativar' : 'Pausar'}
+                        style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-soft)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>
+                        {a.active === false ? '▶️' : '⏸️'}
+                      </button>
+                      <button onClick={() => { setAddonForm({ name: a.name, description: a.description || '', price: String(a.price), billing_type: a.billing_type, category: a.category, quantity: String(a.quantity) }); setAddonModal(a) }}
+                        title="Editar"
+                        style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid var(--border-soft)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>✏️</button>
+                      <button onClick={() => deleteAddon(a.id)}
+                        title="Excluir"
+                        style={{ padding: '2px 6px', borderRadius: 4, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', cursor: 'pointer', fontSize: 10 }}>🗑️</button>
+                    </div>
+                  </div>
+
+                  <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>{a.name}</h3>
+                  {a.description && (
+                    <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 10, lineHeight: 1.4 }}>{a.description}</p>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 6 }}>
+                    <span style={{ fontSize: 22, fontWeight: 800, color: '#4f8ef7' }}>
+                      R$ {typeof a.price === 'number' ? a.price.toFixed(2).replace('.', ',') : a.price}
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {a.billing_type === 'monthly' ? '/mês' : 'único'}
+                    </span>
+                  </div>
+
+                  {a.quantity > 1 && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>
+                      Quantidade: {a.quantity.toLocaleString('pt-BR')}
+                    </span>
+                  )}
+
+                  <div style={{ marginTop: 10 }}>
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                      background: a.active === false ? 'var(--bg-secondary)' : 'rgba(34,197,94,0.1)',
+                      color: a.active === false ? 'var(--text-dim)' : '#22c55e',
+                    }}>
+                      {a.active === false ? 'INATIVO' : 'ATIVO'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Modal de criar/editar pacote */}
+          {addonModal && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+              <div className="ark-card" style={{ width: '100%', maxWidth: 460, maxHeight: '90vh', overflow: 'auto', padding: 24 }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700, marginBottom: 20 }}>
+                  {addonModal === 'new' ? '📦 Novo Pacote' : '✏️ Editar Pacote'}
+                </h3>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Nome do Pacote *</label>
+                  <input type="text" value={addonForm.name} onChange={e => setAddonForm({ ...addonForm, name: e.target.value })}
+                    placeholder="Ex: Pacote 1.000 Conversas, IA Premium..."
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                </div>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Descrição</label>
+                  <textarea value={addonForm.description} onChange={e => setAddonForm({ ...addonForm, description: e.target.value })}
+                    placeholder="O que o cliente recebe com este pacote..."
+                    rows={2}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none', resize: 'vertical' }} />
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Preço (R$) *</label>
+                    <input type="number" step="0.01" value={addonForm.price} onChange={e => setAddonForm({ ...addonForm, price: e.target.value })}
+                      placeholder="49.90"
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Cobrança</label>
+                    <select value={addonForm.billing_type} onChange={e => setAddonForm({ ...addonForm, billing_type: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
+                      <option value="one_time">Única (one-time)</option>
+                      <option value="monthly">Mensal (recorrente)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Categoria</label>
+                    <select value={addonForm.category} onChange={e => setAddonForm({ ...addonForm, category: e.target.value })}
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}>
+                      <option value="conversas">💬 Conversas</option>
+                      <option value="bots">🤖 Bots</option>
+                      <option value="features">⚡ Recursos</option>
+                      <option value="credits">💳 Créditos</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>Quantidade</label>
+                    <input type="number" value={addonForm.quantity} onChange={e => setAddonForm({ ...addonForm, quantity: e.target.value })}
+                      placeholder="1, 1000, 5000..."
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => setAddonModal(null)}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    Cancelar
+                  </button>
+                  <button onClick={() => saveAddon(addonModal !== 'new')} disabled={addonSaving || !addonForm.name}
+                    style={{ flex: 1, padding: '12px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', opacity: (addonSaving || !addonForm.name) ? 0.5 : 1 }}>
+                    {addonSaving ? 'Salvando...' : (addonModal === 'new' ? 'Criar Pacote' : 'Salvar')}
                   </button>
                 </div>
               </div>
