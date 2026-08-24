@@ -5,6 +5,66 @@ import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import { PLANS, GOOGLE_PLAY_PACKAGE } from '../../lib/plans'
 
+/**
+ * Gera features legíveis a partir dos limits do plano (tabela plans)
+ * Alinha com as linhas configuradas na aba Planos do painel
+ */
+function featuresFromLimits(limits = {}) {
+  const feats = []
+  const l = limits
+
+  // Bots
+  if (l.max_bots >= 999) feats.push('Bots ilimitados')
+  else if (l.max_bots) feats.push(`${l.max_bots} bot${l.max_bots > 1 ? 's' : ''}`)
+
+  // Conversas
+  if (l.max_conversations_month >= 999999) feats.push('Conversas ilimitadas')
+  else if (l.max_conversations_month) feats.push(`${l.max_conversations_month.toLocaleString('pt-BR')} conversas iniciadas/mês`)
+
+  // Flow Editor
+  if (l.has_flow_editor) feats.push('Editor de fluxos avançado')
+
+  // IA
+  if (l.has_ai) feats.push('Respostas com IA')
+
+  // Catálogo
+  if (l.has_catalog) feats.push('Catálogo de produtos no WhatsApp')
+
+  // PIX
+  if (l.has_pix) feats.push('Pagamentos via PIX')
+
+  // Mercado Pago
+  if (l.has_mercadopago) feats.push('Mercado Pago integrado')
+
+  // Multiusuário
+  if (l.has_multiuser) feats.push('Multiusuário')
+
+  // API
+  if (l.has_api) feats.push('Acesso à API + Webhooks')
+
+  // Relatórios
+  if (l.has_reports) feats.push('Relatórios avançados')
+
+  // Push
+  if (l.has_push) feats.push('Notificações push')
+
+  // Google Import
+  if (l.has_google_import) feats.push('Importação de contatos Google')
+
+  // Número dedicado
+  if (l.has_dedicated_number) feats.push('Número WhatsApp dedicado')
+
+  // Suporte
+  const supportLabels = { email: 'Suporte por e-mail', priority: 'Suporte prioritário', vip: 'Suporte VIP', dedicated: 'Gerente de conta dedicado' }
+  if (l.support_level && supportLabels[l.support_level]) feats.push(supportLabels[l.support_level])
+
+  // Storage
+  if (l.storage_gb && l.storage_gb >= 100) feats.push('Armazenamento ilimitado')
+  else if (l.storage_gb) feats.push(`${l.storage_gb} GB de armazenamento`)
+
+  return feats.length > 0 ? feats : ['Painel básico']
+}
+
 export default function Upgrade() {
   const router = useRouter()
   const { user, tenant, loading } = useTenant()
@@ -14,7 +74,6 @@ export default function Upgrade() {
   const [verifyMsg, setVerifyMsg] = useState('')
   const [token, setToken] = useState({ purchaseToken: '', productId: '', orderId: '' })
   const [showVerify, setShowVerify] = useState(false)
-  const [billingCycle, setBillingCycle] = useState('monthly')
 
   useEffect(() => {
     if (!loading && !user) router.replace('/assistente-ark/entrar')
@@ -57,18 +116,30 @@ export default function Upgrade() {
 
   if (loading || fetching) return <AdminLayout tenant={tenant} user={user}><div style={{padding:40,textAlign:'center',color:'var(--text-muted)'}}>Carregando planos…</div></AdminLayout>
 
-  const dynamicPlans = data?.plans || []
+  const dynamicPlans = (data?.plans || []).filter(p => p.active !== false)
   const resources = data?.resources || []
-  const currentPlan = data?.currentPlan || tenant?.plan || 'free'
+  const currentPlan = (data?.currentPlan || tenant?.plan || 'free').toLowerCase()
   const usage = data?.usage
 
   const cycleLabel = { monthly: '/mês', quarterly: '/trimestre', yearly: '/ano', lifetime: 'único', custom: '' }
 
-  // Hardcoded plans (fallback) 
+  // Determinar qual plano é "featured" (RECOMENDADO)
+  // Prioridade: Pro > plano com preço intermediário > segundo plano
+  const featuredIdx = dynamicPlans.findIndex(p => p.name?.toLowerCase() === 'pro')
+  const finalFeaturedIdx = featuredIdx >= 0 ? featuredIdx : (dynamicPlans.length > 1 ? 1 : 0)
+
+  // Preparar planos para exibição: dinâmicos com features geradas dos limits
+  const displayPlans = dynamicPlans.map(p => {
+    const feats = (p.features && p.features.length > 0) ? p.features : featuresFromLimits(p.limits)
+    return { ...p, _features: feats }
+  })
+
+  // Fallback hardcoded (só se não houver planos dinâmicos)
   const hardcodedPlans = [
-    { key: 'starter', ...PLANS.starter },
-    { key: 'pro', ...PLANS.pro },
-    { key: 'enterprise', ...PLANS.enterprise }
+    { key: 'free', name: 'Free', price: 0, billing_cycle: 'monthly', features: PLANS.free.features, _features: PLANS.free.features },
+    { key: 'starter', name: 'Starter', price: PLANS.starter.price / 100, billing_cycle: 'monthly', features: PLANS.starter.features, _features: PLANS.starter.features },
+    { key: 'pro', name: 'Pro', price: PLANS.pro.price / 100, billing_cycle: 'monthly', features: PLANS.pro.features, _features: PLANS.pro.features },
+    { key: 'enterprise', name: 'Enterprise', price: 0, billing_cycle: 'monthly', features: PLANS.enterprise.features, _features: PLANS.enterprise.features, _isContact: true }
   ]
 
   // Group resources by category
@@ -83,11 +154,11 @@ export default function Upgrade() {
   return (
     <AdminLayout tenant={tenant} user={user}>
       <style>{`
-        .upg-title { font-size: 22px; font-weight: 800, color: var(--text-primary); margin-bottom: 4px; }
+        .upg-title { font-size: 22px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
         .upg-sub { font-size: 13px; color: var(--text-muted); margin-bottom: 16px; }
         .upg-current-badge { display: inline-flex; align-items: center; gap: 8px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 100px; padding: 5px 14px; font-size: 12px; color: #22c55e; font-weight: 600; margin-bottom: 20px; }
         .upg-usage-bar { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; margin-bottom: 28px; }
-        .upg-usage-bar-title { font-size: 13px; font-weight: 600, color: var(--text-secondary); margin-bottom: 8px; }
+        .upg-usage-bar-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
         .upg-usage-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
         .upg-usage-bar-track { flex: 1; height: 8px; background: var(--bg-secondary); border-radius: 100px; overflow: hidden; }
         .upg-usage-bar-fill { height: 100%; border-radius: 100px; transition: width 0.3s; }
@@ -95,7 +166,7 @@ export default function Upgrade() {
         .upg-usage-val { font-size: 12px; font-weight: 600; color: var(--text-primary); }
         .upg-section { margin-bottom: 32px; }
         .upg-section-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-        .upg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+        .upg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
         .upg-card { border: 1px solid var(--border-soft); border-radius: 16px; padding: 24px 20px; position: relative; background: var(--bg-card); transition: border-color 0.2s; }
         .upg-card:hover { border-color: var(--border-medium); }
         .upg-card.featured { border-color: rgba(79,142,247,0.35); background: rgba(79,142,247,0.04); }
@@ -119,7 +190,7 @@ export default function Upgrade() {
         .upg-verify { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 16px; padding: 24px 20px; margin-top: 12px; }
         .upg-verify-toggle { font-size: 13px; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; gap: 6px; }
         .upg-verify-toggle:hover { color: var(--text-secondary); }
-        .upg-verify-title { font-size: 15px; font-weight: 700, color: var(--text-primary); margin-bottom: 6px; }
+        .upg-verify-title { font-size: 15px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
         .upg-verify-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.6; }
         .upg-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
         .upg-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 5px; }
@@ -134,7 +205,7 @@ export default function Upgrade() {
 
       <h1 className="upg-title">⬆️ Upgrades & Planos</h1>
       <p className="upg-sub">Escale seu negócio com mais recursos e conversas.</p>
-      <div className="upg-current-badge">● Plano atual: {currentPlan === 'free' ? 'Free' : currentPlan}</div>
+      <div className="upg-current-badge">● Plano atual: {currentPlan === 'free' ? 'Free' : currentPlan.charAt(0).toUpperCase() + currentPlan.slice(1)}</div>
 
       {/* Uso atual */}
       {usage && (
@@ -157,31 +228,41 @@ export default function Upgrade() {
         </div>
       )}
 
-      {/* Planos dinâmicos do painel */}
+      {/* Planos dinâmicos do painel — alinhados com a aba Planos */}
       <div className="upg-section">
         <div className="upg-section-title">📦 Planos disponíveis</div>
-        {dynamicPlans.length > 0 ? (
+        {displayPlans.length > 0 ? (
           <div className="upg-grid">
-            {dynamicPlans.map((p, i) => {
-              const isCurrent = p.name?.toLowerCase() === currentPlan?.toLowerCase()
-              const isFeatured = i === 1 || (dynamicPlans.length === 1 && i === 0)
+            {displayPlans.map((p, i) => {
+              const planName = (p.name || '').toLowerCase()
+              const isCurrent = planName === currentPlan
+              const isFeatured = i === finalFeaturedIdx
+              const isContact = p.price === 0 && planName === 'enterprise' // Enterprise = falar com vendas
+              const isFree = p.price === 0 && planName !== 'enterprise'
+
               return (
-                <div key={p.id} className={`upg-card ${isFeatured ? 'featured' : ''}`}>
-                  {isFeatured && <span className="upg-popular">Recomendado</span>}
+                <div key={p.id || i} className={`upg-card ${isFeatured ? 'featured' : ''}`}>
+                  {isFeatured && <span className="upg-popular">⭐ Recomendado</span>}
                   <div className="upg-plan-name">{p.name}</div>
-                  <div className="upg-price">{p.price > 0 ? `R$ ${p.price.toFixed(0)}` : 'Grátis'}</div>
-                  <div className="upg-price-sub">{p.price > 0 ? cycleLabel[p.billing_cycle] || '/mês' : ''}</div>
+                  <div className="upg-price">
+                    {isContact ? 'Consultar' : isFree ? 'Grátis' : `R$ ${p.price.toFixed(0).replace('.', ',')}`}
+                  </div>
+                  <div className="upg-price-sub">
+                    {isContact ? 'contato direto' : isFree ? '' : (cycleLabel[p.billing_cycle] || '/mês')}
+                  </div>
                   {p.description && <p style={{fontSize:12,color:'var(--text-muted)',marginBottom:12,lineHeight:1.5}}>{p.description}</p>}
                   <ul className="upg-feats">
-                    {(p.features || []).map((f, j) => (
+                    {p._features.map((f, j) => (
                       <li key={j} className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>{f}</li>
                     ))}
                   </ul>
                   {isCurrent
-                    ? <span className="upg-btn upg-btn-current">Plano atual</span>
-                    : p.price > 0
-                      ? <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${isFeatured ? 'upg-btn-solid' : 'upg-btn-ghost'}`}>Assinar →</a>
-                      : <span className="upg-btn upg-btn-current">Seu plano</span>
+                    ? <span className="upg-btn upg-btn-current">✓ Seu plano atual</span>
+                    : isContact
+                      ? <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="upg-btn upg-btn-ghost">💬 Falar com vendas</a>
+                      : isFree
+                        ? <span className="upg-btn upg-btn-ghost" style={{opacity:0.5,cursor:'default'}}>Plano básico</span>
+                        : <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${isFeatured ? 'upg-btn-solid' : 'upg-btn-ghost'}`}>Assinar →</a>
                   }
                 </div>
               )
@@ -192,18 +273,22 @@ export default function Upgrade() {
           <div className="upg-grid">
             {hardcodedPlans.map(p => {
               const isCurrent = p.key === currentPlan
+              const isFeatured = p.key === 'pro'
+              const isContact = p._isContact
               return (
-                <div key={p.key} className={`upg-card ${p.key === 'pro' ? 'featured' : ''}`}>
-                  {p.key === 'pro' && <span className="upg-popular">Mais popular</span>}
-                  <div className="upg-plan-name">{p.label}</div>
-                  <div className="upg-price">{p.price ? `R$ ${(p.price/100).toFixed(0)}` : 'Consultar'}</div>
-                  <div className="upg-price-sub">{p.price ? '/mês · Google Play' : 'contato direto'}</div>
-                  <ul className="upg-feats">{p.features.map(f => <li key={f} className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>{f}</li>)}</ul>
+                <div key={p.key} className={`upg-card ${isFeatured ? 'featured' : ''}`}>
+                  {isFeatured && <span className="upg-popular">⭐ Recomendado</span>}
+                  <div className="upg-plan-name">{p.name}</div>
+                  <div className="upg-price">{isContact ? 'Consultar' : p.price > 0 ? `R$ ${p.price.toFixed(0)}` : 'Grátis'}</div>
+                  <div className="upg-price-sub">{isContact ? 'contato direto' : p.price > 0 ? '/mês · Google Play' : ''}</div>
+                  <ul className="upg-feats">{p._features.map((f, j) => <li key={j} className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>{f}</li>)}</ul>
                   {isCurrent
-                    ? <span className="upg-btn upg-btn-current">Plano atual</span>
-                    : p.price
-                      ? <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${p.key==='pro'?'upg-btn-solid':'upg-btn-ghost'}`}>Assinar via Google Play →</a>
-                      : <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="upg-btn upg-btn-ghost">Falar com vendas</a>
+                    ? <span className="upg-btn upg-btn-current">✓ Seu plano atual</span>
+                    : isContact
+                      ? <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="upg-btn upg-btn-ghost">💬 Falar com vendas</a>
+                      : p.price > 0
+                        ? <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${isFeatured ? 'upg-btn-solid' : 'upg-btn-ghost'}`}>Assinar →</a>
+                        : <span className="upg-btn upg-btn-ghost" style={{opacity:0.5,cursor:'default'}}>Plano básico</span>
                   }
                 </div>
               )
