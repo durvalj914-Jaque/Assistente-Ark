@@ -511,6 +511,7 @@ export default function PainelAdminPage() {
       const json = await res.json()
       if (json.plans) setPlans(json.plans)
     } catch (e) { console.error('loadPlans', e) }
+  }
 
   async function loadAddons() {
     try {
@@ -574,8 +575,6 @@ export default function PainelAdminPage() {
       })
       setAddons(prev => prev.filter(a => a.id !== addonId))
     } catch (e) { console.error('deleteAddon', e) }
-  }
-
   }
 
   async function savePlan(isEdit) {
