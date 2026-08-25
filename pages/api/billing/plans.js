@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   try {
     const { data, error } = await db.from('plans')
       .select('*')
-      .eq('active', true)
+      .or('active.eq.true,active.is.null')
       .order('price', { ascending: true })
     if (!error && data) plans = data
   } catch {}

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
-import { PLANS, GOOGLE_PLAY_PACKAGE } from '../../lib/plans'
+import { GOOGLE_PLAY_PACKAGE } from '../../lib/plans'
 
 /**
  * Gera features legíveis a partir dos limits do plano (tabela plans)
@@ -135,12 +135,7 @@ export default function Upgrade() {
   })
 
   // Fallback hardcoded (só se não houver planos dinâmicos)
-  const hardcodedPlans = [
-    { key: 'free', name: 'Free', price: 0, billing_cycle: 'monthly', features: PLANS.free.features, _features: PLANS.free.features },
-    { key: 'starter', name: 'Starter', price: PLANS.starter.price / 100, billing_cycle: 'monthly', features: PLANS.starter.features, _features: PLANS.starter.features },
-    { key: 'pro', name: 'Pro', price: PLANS.pro.price / 100, billing_cycle: 'monthly', features: PLANS.pro.features, _features: PLANS.pro.features },
-    { key: 'enterprise', name: 'Enterprise', price: 0, billing_cycle: 'monthly', features: PLANS.enterprise.features, _features: PLANS.enterprise.features, _isContact: true }
-  ]
+
 
   // Group resources by category
   const resByCat = resources.reduce((acc, r) => {
@@ -269,30 +264,8 @@ export default function Upgrade() {
             })}
           </div>
         ) : (
-          /* Fallback: planos hardcoded do lib/plans.js */
-          <div className="upg-grid">
-            {hardcodedPlans.map(p => {
-              const isCurrent = p.key === currentPlan
-              const isFeatured = p.key === 'pro'
-              const isContact = p._isContact
-              return (
-                <div key={p.key} className={`upg-card ${isFeatured ? 'featured' : ''}`}>
-                  {isFeatured && <span className="upg-popular">⭐ Recomendado</span>}
-                  <div className="upg-plan-name">{p.name}</div>
-                  <div className="upg-price">{isContact ? 'Consultar' : p.price > 0 ? `R$ ${p.price.toFixed(0)}` : 'Grátis'}</div>
-                  <div className="upg-price-sub">{isContact ? 'contato direto' : p.price > 0 ? '/mês · Google Play' : ''}</div>
-                  <ul className="upg-feats">{p._features.map((f, j) => <li key={j} className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>{f}</li>)}</ul>
-                  {isCurrent
-                    ? <span className="upg-btn upg-btn-current">✓ Seu plano atual</span>
-                    : isContact
-                      ? <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="upg-btn upg-btn-ghost">💬 Falar com vendas</a>
-                      : p.price > 0
-                        ? <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${isFeatured ? 'upg-btn-solid' : 'upg-btn-ghost'}`}>Assinar →</a>
-                        : <span className="upg-btn upg-btn-ghost" style={{opacity:0.5,cursor:'default'}}>Plano básico</span>
-                  }
-                </div>
-              )
-            })}
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
+            Nenhum plano disponível no momento. Configure planos na aba Planos do painel.
           </div>
         )}
       </div>
