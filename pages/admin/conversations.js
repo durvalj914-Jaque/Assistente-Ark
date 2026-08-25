@@ -426,7 +426,7 @@ export default function ConversationsPage() {
       const cfg = await cfgRes.json()
       if (json.connected && json.methods) setMpChargeMethods(json.methods)
       if (json.account) setMpChargeAccount(json.account)
-      if (cfg.config?.fee_config) setFeeConfig(cfg.config.fee_config)
+      if (cfg.config?.fee_config) { const fc = cfg.config.fee_config; const flat = {}; for (const k of Object.keys(fc)) { flat[k] = typeof fc[k] === "number" ? fc[k] : (fc[k]?.fee_percent ?? 0) } setFeeConfig(flat) }
     } catch (e) { console.error('fetchChargeMethods:', e.message) }
     finally { setLoadingChargeMethods(false) }
   }

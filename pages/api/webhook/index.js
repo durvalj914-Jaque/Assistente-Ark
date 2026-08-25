@@ -348,7 +348,7 @@ async function processWebhook(body) {
         if (conv0) {
           // Buscar mensagem __pending_charge__ mais recente
           const { data: pending } = await db.from('messages')
-            .select('content,created_at')
+            .select('id, content, created_at')
             .eq('conversation_id', conv0.id)
             .like('content', '__pending_charge__:%')
             .order('created_at', { ascending: false })
@@ -358,8 +358,8 @@ async function processWebhook(body) {
           if (pending?.content) {
             // Extrair dados do pending
             const amountMatch = pending.content.match(/amount=([\d.]+)/)
-            const descMatch = pending.content.match(/desc=([^:]+):/)
-            const pixMatch = pending.content.match(/pix=([^:]+):/)
+            const descMatch = pending.content.match(/desc=(.+?):pix=/)
+            const pixMatch = pending.content.match(/pix=(.+?):method=/)
             const methodMatch = pending.content.match(/method=(.+)$/)
             const pAmount = amountMatch ? amountMatch[1] : ''
             const pDesc = descMatch ? decodeURIComponent(descMatch[1]) : ''
@@ -371,6 +371,8 @@ async function processWebhook(body) {
             const pixMsg = `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
 
             try {
+              // Marcar como enviado PRIMEIRO
+              await db.from('messages').update({ content: pending.content.replace('__pending_charge__:', '__charge_sent__:') }).eq('id', pending.id)
               await sendText(phoneNumberId, waToken0, from, pixMsg)
               await safeInsert(db, 'messages', {
                 tenant_id: bot0.tenant_id, conversation_id: conv0.id, bot_id: bot0.id,
@@ -578,7 +580,7 @@ async function processWebhook(body) {
 
   // ── CHECK PIX PENDENTE: se há cobrança pendente, enviar PIX agora (janela 24h aberta) ──
   const { data: pendingCharge } = await db.from('messages')
-    .select('content,created_at')
+    .select('id, content, created_at')
     .eq('conversation_id', conv.id)
     .like('content', '__pending_charge__:%')
     .order('created_at', { ascending: false })
@@ -586,9 +588,20 @@ async function processWebhook(body) {
     .maybeSingle()
 
   if (pendingCharge?.content) {
+    // Marcar como enviado PRIMEIRO (antes do envio) para evitar reenvio em mensagens futuras
+    try {
+      const { error: markErr } = await db.from('messages')
+        .update({ content: pendingCharge.content.replace('__pending_charge__:', '__charge_sent__:') })
+        .eq('id', pendingCharge.id)
+      if (markErr) console.error('[webhook] Erro ao marcar charge_sent:', markErr.message)
+      else console.log('[webhook] Charge marcada como enviada:', pendingCharge.id)
+    } catch (markErr) {
+      console.error('[webhook] Excecao ao marcar charge_sent:', markErr.message)
+    }
+
     const amountMatch = pendingCharge.content.match(/amount=([\d.]+)/)
-    const descMatch = pendingCharge.content.match(/desc=([^:]+):pix=/)
-    const pixMatch = pendingCharge.content.match(/pix=([^:]+):method=/)
+    const descMatch = pendingCharge.content.match(/desc=(.+?):pix=/)
+    const pixMatch = pendingCharge.content.match(/pix=(.+?):method=/)
     const methodMatch = pendingCharge.content.match(/method=(.+)$/)
     const pAmount = amountMatch ? amountMatch[1] : ''
     const pDesc = descMatch ? decodeURIComponent(descMatch[1]) : ''
@@ -607,8 +620,6 @@ async function processWebhook(body) {
       } catch (pixSendErr) {
         console.error('[webhook] Erro ao enviar PIX pendente:', pixSendErr.message)
       }
-      // Marcar como enviado (remover prefixo __pending_charge__)
-      await db.from('messages').update({ content: pendingCharge.content.replace('__pending_charge__:', '__charge_sent__:') }).eq('id', pendingCharge.id)
     }
   }
 
