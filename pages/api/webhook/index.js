@@ -955,9 +955,9 @@ Obrigado! 🎉`)
 
         const txid = `ARK${Date.now().toString(36).toUpperCase()}`
         const { data: payment } = await db.from('payments').insert({
-          tenant_id: tenantId, bot_id: bot.id, conversation_id: conv.id, contact_id: contact.id,
-          amount: payAmount, description: reply?.substring(0, 100) || 'Pagamento via bot',
-          status: 'pending', method: payMethod, payment_ref: txid, metadata: { txid, from_flow: true },
+          tenant_id: tenantId, bot_id: bot.id,
+          amount: payAmount, status: 'pending', pix_code: txid,
+          pix_qr_url: JSON.stringify({ txid, from_flow: true, contact_id: contact.id, conversation_id: conv.id, method: payMethod, description: reply?.substring(0, 100) || 'Pagamento via bot' }),
         }).select().single()
 
         if (payMethod === 'pix' && tenant?.pix_key) {
@@ -1015,7 +1015,7 @@ Obrigado! 🎉`)
           const mpData = await mpRes.json()
           if (mpData.init_point) {
             await sendText(phoneNumberId, tkn, from, `💳 *Pagamento* - R$ ${payAmount.toFixed(2)}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`)
-            await db.from('payments').update({ mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point }).eq('id', payment.id)
+            await db.from('payments').update({ pix_qr_url: JSON.stringify({ ...JSON.parse(payment.pix_qr_url || '{}'), mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point, method: 'mercadopago' }) }).eq('id', payment.id)
             reply = `[Link MP enviado - R$ ${payAmount.toFixed(2)}]`
           } else {
             await sendText(phoneNumberId, tkn, from, '❌ Erro ao gerar pagamento. Tente novamente ou digite *0* para voltar ao menu.')

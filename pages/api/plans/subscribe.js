@@ -120,12 +120,9 @@ export default async function handler(req, res) {
   const { data: payment, error: payError } = await db.from('payments').insert({
     tenant_id: clientTenantId,
     amount,
-    description,
-    method,
     status: 'pending',
     pix_code: txid,
-    pix_qr_url: JSON.stringify(paymentMeta),
-    category: 'plan_subscription',
+    pix_qr_url: JSON.stringify({ ...paymentMeta, description, method, category: 'plan_subscription' }),
   }).select().single()
 
   if (payError) {

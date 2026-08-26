@@ -92,13 +92,10 @@ export default async function handler(req, res) {
     await db.from('payments').insert({
       tenant_id: tenantId,
       bot_id: bot?.id || null,
-      contact_id: contactId,
       amount,
-      description: `Catálogo: ${product.name}`,
       status: 'pending',
-      method: 'pix',
       pix_code: pixCode,
-      metadata: { order_id: order.id, order_ref: orderRef, from_catalog: true, product_id: productId },
+      pix_qr_url: JSON.stringify({ contact_id: contactId, method: 'pix', description: `Catálogo: ${product.name}`, order_id: order.id, order_ref: orderRef, from_catalog: true, product_id: productId }),
     })
 
     return res.status(200).json({
@@ -151,14 +148,10 @@ export default async function handler(req, res) {
     await db.from('payments').insert({
       tenant_id: tenantId,
       bot_id: bot?.id || null,
-      contact_id: contactId,
       amount,
-      description: `Catálogo: ${product.name}`,
       status: 'pending',
-      method: 'mercadopago',
-      mp_preference_id: mpData.id,
-      mp_checkout_url: mpData.init_point,
-      metadata: { order_id: order.id, order_ref: orderRef, from_catalog: true, product_id: productId },
+      pix_code: orderRef,
+      pix_qr_url: JSON.stringify({ contact_id: contactId, method: 'mercadopago', description: `Catálogo: ${product.name}`, mp_preference_id: mpData.id, mp_checkout_url: mpData.init_point, order_id: order.id, order_ref: orderRef, from_catalog: true, product_id: productId }),
     })
 
     return res.status(200).json({

@@ -37,9 +37,13 @@ export default async function handler(req, res) {
     if (error) return res.status(500).json({ error: error.message })
 
     if (payment_id) {
+      // Atualizar status e guardar receipt_id no pix_qr_url JSON
+      const { data: pay } = await db.from('payments').select('pix_qr_url').eq('id', payment_id).maybeSingle()
+      let existingMeta = {}
+      try { existingMeta = JSON.parse(pay?.pix_qr_url || '{}') } catch {}
       await db.from('payments').update({
         status: 'paid', paid_at: new Date().toISOString(),
-        metadata: { receipt_id: data.id, manual_confirmation: true }
+        pix_qr_url: JSON.stringify({ ...existingMeta, receipt_id: data.id, manual_confirmation: true })
       }).eq('id', payment_id)
     }
 

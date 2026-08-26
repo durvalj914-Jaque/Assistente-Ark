@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
   // ── 1. Buscar TODOS os pagamentos do tenant ──
   const { data: allPayments } = await db.from('payments')
-    .select('id, amount, description, method, status, pix_code, pix_qr_url, paid_at, created_at, category')
+    .select('id, amount, status, pix_code, pix_qr_url, paid_at, created_at')
     .eq('tenant_id', tenantId)
     .order('created_at', { ascending: false }).limit(500)
 
@@ -49,8 +49,19 @@ export default async function handler(req, res) {
     return false
   }
 
-  let pending = (allPayments || []).filter(p => p.status === 'pending' && matchPayment(p))
-  let paid = (allPayments || []).filter(p => (p.status === 'paid' || p.status === 'confirmed') && matchPayment(p))
+  // Enriquecer payments com method/description do JSON pix_qr_url
+  const enrichPayment = (p) => {
+    try {
+      const meta = JSON.parse(p.pix_qr_url || '{}')
+      p.description = meta.description || 'Pagamento'
+      p.method = meta.method || (meta.mp_preference_id ? 'mercadopago' : 'pix')
+      p.category = meta.category || 'b2c_charge'
+    } catch { p.description = p.description || 'Pagamento'; p.method = p.method || 'pix'; p.category = p.category || 'b2c_charge' }
+    return p
+  }
+
+  let pending = (allPayments || []).filter(p => p.status === 'pending' && matchPayment(p)).map(enrichPayment)
+  let paid = (allPayments || []).filter(p => (p.status === 'paid' || p.status === 'confirmed') && matchPayment(p)).map(enrichPayment)
 
   // ── 2. Buscar receipts desta conversa E contato (tem colunas diretas) ──
   let { data: receipts } = await db.from('payment_receipts')
@@ -84,13 +95,14 @@ export default async function handler(req, res) {
 
       // Buscar o pagamento completo
       const { data: pay } = await db.from('payments')
-        .select('id, amount, description, method, status, pix_code, pix_qr_url, paid_at, created_at, category')
+        .select('id, amount, status, pix_code, pix_qr_url, paid_at, created_at')
         .eq('id', r.payment_id).maybeSingle()
 
       if (pay && pay.status !== 'cancelled' && pay.status !== 'expired') {
         // Mesmo que o status não seja 'paid', se tem receipt, foi pago
         if (!seenIds.has(pay.id)) {
           seenIds.add(pay.id)
+          enrichPayment(pay)
           paid.unshift({
             ...pay,
             status: 'paid',

@@ -138,8 +138,6 @@ export default async function handler(req, res) {
         tenant_id: conv.tenant_id,
         bot_id: conv.bot_id || null,
         amount: parseFloat(amount),
-        description: description || 'Pagamento Arkiel',
-        method: useDirectPix ? 'pix_direct' : (mpPixId ? 'pix_mp' : 'pix'),
         status: 'pending',
         pix_code: txid,
         pix_qr_url: JSON.stringify({
@@ -147,10 +145,11 @@ export default async function handler(req, res) {
           contact_id: conv.contact_id,
           conversation_id: conversation_id,
           description: description || '',
+          method: useDirectPix ? 'pix_direct' : (mpPixId ? 'pix_mp' : 'pix'),
+          category: 'b2c_charge',
           from_panel: true,
           pix_code: pixCode,
         }),
-        category: 'b2c_charge',
       })
       console.log('[payments/create] Registro salvo na tabela payments, txid:', txid, 'method:', useDirectPix ? 'pix_direct' : (mpPixId ? 'pix_mp' : 'pix'))
     } catch (payErr) {
@@ -306,8 +305,6 @@ export default async function handler(req, res) {
         tenant_id: conv.tenant_id,
         bot_id: conv.bot_id || null,
         amount: parseFloat(amount),
-        description: description || 'Pagamento Arkiel',
-        method: 'mercadopago',
         status: 'pending',
         pix_code: txid,
         pix_qr_url: JSON.stringify({
@@ -316,9 +313,10 @@ export default async function handler(req, res) {
           contact_id: conv.contact_id,
           conversation_id: conversation_id,
           description: description || '',
+          method: 'mercadopago',
+          category: 'b2c_charge',
           from_panel: true,
         }),
-        category: 'b2c_charge',
       })
       console.log('[payments/create] Registro Mercado Pago salvo na tabela payments, txid:', txid)
     } catch (payErr) {
