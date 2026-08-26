@@ -221,7 +221,7 @@ export default function ConversationsPage() {
   const [showPayModal, setShowPayModal] = useState(false)
   const [payAmount, setPayAmount] = useState('')
   const [payDesc, setPayDesc] = useState('')
-  const [payMethod, setPayMethod] = useState('pix')
+  const [payMethod, setPayMethod] = useState('pix_mp')
   const [chargeTab, setChargeTab] = useState('cobrar')
   const [convCharges, setConvCharges] = useState({ pending: [], paid: [], receipts: [] })
   const [showMediaModal, setShowMediaModal] = useState(false)
@@ -1221,43 +1221,6 @@ export default function ConversationsPage() {
                 <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '16px 0', textAlign: 'center' }}>Buscando formas conectadas…</div>
               ) : (
                 <>
-                  {/* ── SEÇÃO 1: PIX DIRETO (sem taxa) ── */}
-                  <div style={{
-                    borderRadius: 12, padding: 12, marginBottom: 10,
-                    background: 'rgba(34,197,94,0.04)', border: '1px solid rgba(34,197,94,0.15)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#22c55e', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏦 PIX Direto</span>
-                      <span style={{ fontSize: 9, color: '#22c55e', background: 'rgba(34,197,94,0.12)', padding: '1px 6px', borderRadius: 6, fontWeight: 600 }}>Sem taxa Arkiel</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      <button onClick={() => setPayMethod('pix_direct')}
-                        style={{
-                          padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
-                          border: payMethod === 'pix_direct' ? '2px solid #22c55e' : '1px solid var(--border-soft)',
-                          background: payMethod === 'pix_direct' ? 'rgba(34,197,94,0.12)' : 'var(--bg-secondary)',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                          transition: 'all .15s',
-                        }}>
-                        <span style={{ fontSize: 18 }}>🏦</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix_direct' ? '#22c55e' : 'var(--text-primary)' }}>PIX Direto</span>
-                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>Chave própria · QR + Copia e cola</span>
-                      </button>
-                      <button onClick={() => setPayMethod('pix')}
-                        style={{
-                          padding: '10px 8px', borderRadius: 10, cursor: 'pointer',
-                          border: payMethod === 'pix' ? '2px solid #22c55e' : '1px solid var(--border-soft)',
-                          background: payMethod === 'pix' ? 'rgba(34,197,94,0.12)' : 'var(--bg-secondary)',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                          transition: 'all .15s',
-                        }}>
-                        <span style={{ fontSize: 18 }}>💸</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: payMethod === 'pix' ? '#22c55e' : 'var(--text-primary)' }}>PIX Simples</span>
-                        <span style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center' }}>QR + Copia e cola</span>
-                      </button>
-                    </div>
-                  </div>
-
                   {/* ── SEÇÃO 2: MERCADO PAGO (com taxa) ── */}
                   {mpChargeAccount ? (
                     <div style={{
