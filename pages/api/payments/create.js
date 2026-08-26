@@ -300,6 +300,36 @@ export default async function handler(req, res) {
 
     const linkText = `💳 *Pagamento* - R$ ${parseFloat(amount).toFixed(2)}\n\n${description || ''}\n\n*Pague via link seguro:*\n${mpData.init_point}\n\nAceita PIX, cartão e boleto.`
 
+    // SALVAR REGISTRO NA TABELA payments (para contabilizar como pendente)
+    try {
+      await db.from('payments').insert({
+        tenant_id: conv.tenant_id,
+        bot_id: conv.bot_id || null,
+        amount: parseFloat(amount),
+        description: description || 'Pagamento Arkiel',
+        method: 'mercadopago',
+        status: 'pending',
+        pix_code: txid,
+        pix_qr_url: JSON.stringify({
+          mp_preference_id: mpData.id,
+          checkout_url: mpData.init_point,
+          contact_id: conv.contact_id,
+          conversation_id: conversation_id,
+          description: description || '',
+          from_panel: true,
+        }),
+        category: 'b2c_charge',
+      })
+      console.log('[payments/create] Registro Mercado Pago salvo na tabela payments, txid:', txid)
+    } catch (payErr) {
+      console.error('[payments/create] Erro ao salvar payments MP:', payErr.message)
+    }
+
+    // SALVAR MENSAGEM PENDENTE (para o webhook detectar quando cliente responde)
+    const mpPendingContent = `__pending_charge__:amount=${parseFloat(amount)}:desc=${encodeURIComponent(description || '')}:pix=${encodeURIComponent(mpData.init_point)}:method=Mercado Pago`
+    await saveMessage(mpPendingContent, 'payment_pending')
+    console.log('[payments/create] Cobrança Mercado Pago salva como pendente')
+
     try {
       await sendWaMessage({ messaging_product: 'whatsapp', to: cleanPhone, type: 'text', text: { body: linkText } })
     } catch (sendErr) {

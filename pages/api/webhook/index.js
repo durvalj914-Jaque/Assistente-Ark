@@ -368,7 +368,10 @@ async function processWebhook(body) {
 
             const waToken0 = bot0.access_token || process.env.META_SYSTEM_USER_TOKEN || process.env.FACEBOOK_BUSINESS_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
 
-            const pixMsg = `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
+            const isMPLink0 = pPix.startsWith('http')
+            const pixMsg = isMPLink0
+              ? `💳 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*Pague via link seguro:*\n${pPix}\n\nAceita PIX, cartão e boleto.`
+              : `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
 
             try {
               // Marcar como enviado PRIMEIRO
@@ -378,7 +381,7 @@ async function processWebhook(body) {
                 tenant_id: bot0.tenant_id, conversation_id: conv0.id, bot_id: bot0.id,
                 contact_id: contact0.id, direction: 'outbound', content: pixMsg, sent_by: 'bot'
               })
-              console.log('[webhook] PIX enviado apos "Ver detalhes"')
+              console.log('[webhook] Cobrança enviada apos "Ver detalhes" (method:', pMethod, ')')
             } catch (sendErr) {
               console.error('[webhook] Erro ao enviar PIX:', sendErr.message)
             }
@@ -609,16 +612,20 @@ async function processWebhook(body) {
     const pMethod = methodMatch ? methodMatch[1] : 'PIX'
 
     if (pPix) {
-      const pixMsg = `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
+      // Detectar se é link do Mercado Pago (http) ou código PIX
+      const isMPLink = pPix.startsWith('http')
+      const chargeMsg = isMPLink
+        ? `💳 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*Pague via link seguro:*\n${pPix}\n\nAceita PIX, cartão e boleto.`
+        : `💰 *Pagamento ${pMethod}* - R$ ${parseFloat(pAmount).toFixed(2)}\n\n${pDesc}\n\n*PIX Copia e Cola:*\n${pPix}\n\nAbra o app do seu banco e cole o codigo acima para pagar.`
       try {
-        await sendText(phoneNumberId, tkn, from, pixMsg)
+        await sendText(phoneNumberId, tkn, from, chargeMsg)
         await safeInsert(db, 'messages', {
           tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id,
-          contact_id: contact.id, direction: 'outbound', content: pixMsg, sent_by: 'bot'
+          contact_id: contact.id, direction: 'outbound', content: chargeMsg, sent_by: 'bot'
         })
-        console.log('[webhook] PIX pendente enviado apos msg do cliente')
+        console.log('[webhook] Cobrança pendente enviada apos msg do cliente (method:', pMethod, ')')
       } catch (pixSendErr) {
-        console.error('[webhook] Erro ao enviar PIX pendente:', pixSendErr.message)
+        console.error('[webhook] Erro ao enviar cobrança pendente:', pixSendErr.message)
       }
     }
   }

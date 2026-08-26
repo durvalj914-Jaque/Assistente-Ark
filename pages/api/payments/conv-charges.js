@@ -110,7 +110,7 @@ export default async function handler(req, res) {
 
   if (pendingMsgs && pendingMsgs.length > 0) {
     for (const msg of pendingMsgs) {
-      const match = msg.content?.match(/amount=([^:]+):desc=([^:]*):pix=([^:]*):method=(.*)/)
+      const match = msg.content?.match(/amount=([\d.]+):desc=(.*?):pix=(.*?):method=(.*)/)
       if (!match) continue
       const [, amount, desc, pix, method] = match
       const pixCode = decodeURIComponent(pix)
