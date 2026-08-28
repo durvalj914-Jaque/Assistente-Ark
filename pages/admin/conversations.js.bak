@@ -877,7 +877,7 @@ export default function ConversationsPage() {
                   </div>
                   <div>
                     <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{selected.contacts?.name || selected.contacts?.phone}</div>
-                    <div className="ark-hide-mobile" style={{ color: 'var(--text-dim)', fontSize: 11 }}>{selected.contacts?.phone}</div>
+                    <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>{selected.contacts?.phone}</div>
                   </div>
                 </div>
                 </div>
@@ -885,7 +885,6 @@ export default function ConversationsPage() {
                   {!isClosed && (
                     <button onClick={handleToggleMode} disabled={toggling}
                       title={isHuman ? 'Devolver para o bot' : 'Assumir atendimento'}
-                      className="ark-toggle-btn"
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '5px 6px 5px 14px', borderRadius: 20,
@@ -893,14 +892,14 @@ export default function ConversationsPage() {
                         background: isHuman ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
                         cursor: toggling ? 'wait' : 'pointer', opacity: toggling ? 0.6 : 1,
                       }}>
-                      <span className="ark-hide-mobile" style={{ fontSize: 11, fontWeight: 700, color: isHuman ? '#f59e0b' : '#8b5cf6' }}>{isHuman ? '👤 Humano' : '🤖 Bot'}</span>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: isHuman ? '#f59e0b' : '#8b5cf6' }}>{isHuman ? '👤 Humano' : '🤖 Bot'}</span>
                       <span style={{ width: 32, height: 18, borderRadius: 10, background: isHuman ? '#f59e0b' : 'rgba(255,255,255,0.15)', position: 'relative', transition: 'background .15s' }}>
                         <span style={{ position: 'absolute', top: 2, left: isHuman ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
                       </span>
                     </button>
                   )}
-                  {/* Botão de pagamento — escondido no mobile, vai pro menu ⋮ */}
-                  <button className="ark-hide-mobile" onClick={() => { setShowPayModal(o => !o); if (!showPayModal) { fetchChargeMethods(); setChargeTab('cobrar'); fetchConvCharges() } }} title="Enviar cobrança"
+                  {/* Botão de pagamento */}
+                  <button onClick={() => { setShowPayModal(o => !o); if (!showPayModal) { fetchChargeMethods(); setChargeTab('cobrar'); fetchConvCharges() } }} title="Enviar cobrança"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
@@ -911,8 +910,8 @@ export default function ConversationsPage() {
                     }}>
                     💰 Cobrar
                   </button>
-                  {/* Botão de mídia — escondido no mobile, vai pro menu ⋮ */}
-                  <button className="ark-hide-mobile" onClick={() => { setShowMediaModal(o => !o); if (!showMediaModal) fetchMedia() }} title="Mídias e documentos"
+                  {/* Botão de mídia */}
+                  <button onClick={() => { setShowMediaModal(o => !o); if (!showMediaModal) fetchMedia() }} title="Mídias e documentos"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '8px 16px', borderRadius: 10, cursor: 'pointer',
@@ -924,9 +923,8 @@ export default function ConversationsPage() {
                     📎 Mídia
                   </button>
 
-                  {/* Checkbox "Sem bot" — escondido no mobile, vai pro menu ⋮ */}
+                  {/* Checkbox "Sem bot" */}
                   <label
-                    className="ark-hide-mobile"
                     title="Quando marcado, o bot não responde automaticamente a este contato"
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
@@ -969,21 +967,6 @@ export default function ConversationsPage() {
                           borderRadius: 12, padding: 6, minWidth: 200,
                           boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                         }}>
-                          {/* Opções que estavam no header — só aparecem no mobile */}
-                          <button className="ark-show-mobile-only" onClick={() => { setChatMenuOpen(false); setShowPayModal(o => !o); if (!showPayModal) { fetchChargeMethods(); setChargeTab('cobrar'); fetchConvCharges() } }}
-                            style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: showPayModal ? '#4f8ef7' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-                            <span style={{ fontSize: 15 }}>💰</span> Cobrar
-                          </button>
-                          <button className="ark-show-mobile-only" onClick={() => { setChatMenuOpen(false); setShowMediaModal(o => !o); if (!showMediaModal) fetchMedia() }}
-                            style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: showMediaModal ? '#4f8ef7' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-                            <span style={{ fontSize: 15 }}>📎</span> Mídia
-                          </button>
-                          <button className="ark-show-mobile-only" onClick={() => { setChatMenuOpen(false); toggleNoBot() }}
-                            style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: selected.status === 'no_bot' ? '#6b7280' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2, opacity: togglingNoBot ? 0.5 : 1 }}>
-                            <span style={{ fontSize: 15 }}>{selected.status === 'no_bot' ? '🔇' : '🔊'}</span> {selected.status === 'no_bot' ? 'Remover Sem bot' : 'Sem bot'}
-                          </button>
-                          {/* Separador */}
-                          <div className="ark-show-mobile-only" style={{ height: 1, background: 'var(--border-soft)', margin: '4px 0' }} />
                           <button onClick={() => { setChatMenuOpen(false); setDeleteConfirm(true) }}
                             style={{ width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 13, background: 'transparent', color: '#ef4444', display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
                             <span style={{ fontSize: 15 }}>🗑️</span> Deletar conversa

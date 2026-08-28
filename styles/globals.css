@@ -340,3 +340,22 @@ select.ark-input {
   .ark-hide-mobile { display: none !important; }
   .ark-grid-1-mobile { grid-template-columns: 1fr !important; }
 }
+
+/* ── Mobile-only: elementos que só aparecem no smartphone ── */
+.ark-show-mobile-only { display: none; }
+
+@media (max-width: 768px) {
+  .ark-show-mobile-only { display: flex !important; }
+  /* Toggle Bot/Humano: compactar no mobile (só o switch, sem texto) */
+  .ark-toggle-btn { padding: 5px 6px !important; gap: 0 !important; }
+  /* Header do chat: gap menor entre elementos no mobile */
+  .ark-wa-chat > div:first-child > div:last-child { gap: 4px !important; }
+  /* Avatar e nome: reduzir no mobile para caber melhor */
+  .ark-wa-chat > div:first-child > div:first-child > div:last-child > div:last-child > div:last-child { display: none; }
+}
+
+/* ── Mobile: esconder phone number duplicado no header do chat ── */
+@media (max-width: 480px) {
+  /* Em telas muito pequenas, esconder também o phone se o nome já mostrar */
+  .ark-wa-chat > div:first-child { height: auto !important; min-height: 56px !important; }
+}
