@@ -350,12 +350,16 @@ select.ark-input {
   .ark-toggle-btn { padding: 5px 6px !important; gap: 0 !important; }
   /* Header do chat: gap menor entre elementos no mobile */
   .ark-wa-chat > div:first-child > div:last-child { gap: 4px !important; }
-  /* Avatar e nome: reduzir no mobile para caber melhor */
-  .ark-wa-chat > div:first-child > div:first-child > div:last-child > div:last-child > div:last-child { display: none; }
+  /* Phone + status: fonte menor no mobile para caber */
+  .ark-chat-phone { font-size: 10px !important; gap: 4px !important; }
+  .ark-chat-phone span { white-space: nowrap; }
 }
 
-/* ── Mobile: esconder phone number duplicado no header do chat ── */
+/* ── Mobile: telas muito pequenas — ajustar header ── */
 @media (max-width: 480px) {
-  /* Em telas muito pequenas, esconder também o phone se o nome já mostrar */
   .ark-wa-chat > div:first-child { height: auto !important; min-height: 56px !important; }
+  .ark-chat-phone { font-size: 9px !important; }
+  /* Em telas muito pequenas, esconder o número se o nome já mostrar */
+  .ark-chat-phone > span:first-child { display: none; }
+  .ark-chat-phone > span:nth-child(2) { display: none; }
 }

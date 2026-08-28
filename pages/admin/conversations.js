@@ -882,7 +882,15 @@ export default function ConversationsPage() {
                   </div>
                   <div>
                     <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>{selected.contacts?.name || selected.contacts?.phone}</div>
-                    <div className="ark-hide-mobile" style={{ color: 'var(--text-dim)', fontSize: 11 }}>{selected.contacts?.phone}</div>
+                    <div className="ark-chat-phone" style={{ color: 'var(--text-dim)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {selected.contacts?.name && selected.contacts?.phone && <span>{selected.contacts?.phone}</span>}
+                      {selected.contacts?.name && selected.contacts?.phone && <span style={{ opacity: 0.4 }}>·</span>}
+                      <span style={{ color: isHuman ? '#f59e0b' : selected.status === 'no_bot' ? '#6b7280' : '#8b5cf6', fontWeight: 600 }}>
+                        {isHuman ? '👤 Humano' : selected.status === 'no_bot' ? '🔇 Sem bot' : '🤖 Bot'}
+                      </span>
+                      {hasInbound && windowInfo.open && <span style={{ color: '#22c55e', fontWeight: 600 }}>· 🟢 {windowInfo.hoursLeft}h</span>}
+                      {!hasInbound && !isClosed && <span style={{ color: '#f59e0b', fontWeight: 600 }}>· 🔒 Bloqueado</span>}
+                    </div>
                   </div>
                 </div>
                 </div>
@@ -898,7 +906,7 @@ export default function ConversationsPage() {
                         background: isHuman ? 'rgba(245,158,11,0.1)' : 'rgba(139,92,246,0.1)',
                         cursor: toggling ? 'wait' : 'pointer', opacity: toggling ? 0.6 : 1,
                       }}>
-                      <span className="ark-hide-mobile" style={{ fontSize: 11, fontWeight: 700, color: isHuman ? '#f59e0b' : '#8b5cf6' }}>{isHuman ? '👤 Humano' : '🤖 Bot'}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: isHuman ? '#f59e0b' : '#8b5cf6', display: 'inline-flex', alignItems: 'center', gap: 3 }}>{isHuman ? '👤' : '🤖'}<span className="ark-hide-mobile" style={{ fontSize: 11 }}>{isHuman ? 'Humano' : 'Bot'}</span></span>
                       <span style={{ width: 32, height: 18, borderRadius: 10, background: isHuman ? '#f59e0b' : 'rgba(255,255,255,0.15)', position: 'relative', transition: 'background .15s' }}>
                         <span style={{ position: 'absolute', top: 2, left: isHuman ? 16 : 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'left .15s' }} />
                       </span>
