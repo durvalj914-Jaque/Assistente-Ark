@@ -523,6 +523,11 @@ export default function ConversationsPage() {
   }
 
   async function selectConversation(conv) {
+    // Resetar IMMEDIATAMENTE — evita race condition onde hasInbound do chat anterior
+    // faz o lock piscar/desaparecer antes do fetch async completar
+    setHasInbound(false)
+    setWindowInfo({ open: false, hoursLeft: 0 })
+    setMessages([])
     setSelected(conv)
     setDraft('')
     const { data } = await supabase
@@ -599,7 +604,7 @@ export default function ConversationsPage() {
     (hasInbound && !windowInfo.open && isFreePlan)  // Janela expirou e plano free
   )
   const chatLockedReason = !hasInbound
-    ? 'Aguarde o cliente iniciar a conversa para responder gratuitamente'
+    ? 'Aguarde o cliente iniciar a conversa'
     : (hasInbound && !windowInfo.open && isFreePlan)
     ? 'Janela gratuita de 24h expirou. Aguarde o cliente enviar uma nova mensagem'
     : ''
@@ -630,7 +635,7 @@ export default function ConversationsPage() {
       const res = await fetch('/api/send-message', { method: 'POST', headers, body: JSON.stringify({ conversation_id: selected.id, text }) })
       const json = await res.json()
       if (!res.ok) {
-        if (json.code === 'NO_INBOUND_FREE_PLAN') {
+        if (json.code === 'NO_INBOUND' || json.code === 'NO_INBOUND_FREE_PLAN') {
           alert('🔒 Cliente não iniciou a conversa\n\n' + json.error + '\n\nAguarde o cliente enviar a primeira mensagem no WhatsApp.')
           throw new Error('blocked')
         }
@@ -1047,7 +1052,7 @@ export default function ConversationsPage() {
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
                       {!hasInbound
-                        ? 'No plano gratuito, o cliente deve enviar a primeira mensagem para abrir o chat. Você poderá responder livremente por 24h após o primeiro contato.'
+                        ? 'O cliente deve enviar a primeira mensagem no WhatsApp para abrir o chat. Você poderá responder livremente por 24h após o primeiro contato.'
                         : 'Na janela gratuita de 24h você pode responder livremente. Aguarde o cliente reenviar uma mensagem para abrir uma nova janela.'
                       }
                     </div>

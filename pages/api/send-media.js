@@ -76,6 +76,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Esta conversa está encerrada' })
   }
 
+  // ── VERIFICAR INBOUND: bloquear envio se cliente nunca mandou mensagem ──
+  const { data: inboundCheck } = await db.from('messages')
+    .select('id')
+    .eq('conversation_id', conv.id)
+    .eq('direction', 'inbound')
+    .limit(1)
+    .maybeSingle()
+
+  if (!inboundCheck) {
+    return res.status(402).json({
+      error: 'O cliente ainda não iniciou esta conversa. Aguarde o cliente enviar a primeira mensagem no WhatsApp.',
+      code: 'NO_INBOUND',
+      window_open: false,
+      needs_inbound: true,
+    })
+  }
+
   const bot = conv.bots
   const contact = conv.contacts
   const token = bot?.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2 || process.env.WHATSAPP_ACCESS_TOKEN

@@ -69,33 +69,15 @@ export default async function handler(req, res) {
     .maybeSingle()
 
   if (!inboundMessages) {
-    // Cliente nunca mandou mensagem — bloquear no plano free
-    // Verificar se é plano free
-    let isFreePlan = true
-    try {
-      const sub = JSON.parse(conv.tenant?.subscription || '{}') || JSON.parse((await db.from('tenants').select('subscription, plan').eq('id', conv.tenant_id).maybeSingle()).data?.subscription || '{}')
-      if (sub?.status === 'active' && (!sub.expires_at || new Date(sub.expires_at) >= new Date())) {
-        isFreePlan = false
-      }
-    } catch {}
-    try {
-      const { data: tenantData } = await db.from('tenants').select('plan, subscription').eq('id', conv.tenant_id).maybeSingle()
-      const sub = JSON.parse(tenantData?.subscription || '{}')
-      if (sub?.status === 'active' && (!sub.expires_at || new Date(sub.expires_at) >= new Date())) {
-        isFreePlan = false
-      } else if (tenantData?.plan && tenantData.plan !== 'free') {
-        isFreePlan = false
-      }
-    } catch {}
-
-    if (isFreePlan) {
-      return res.status(402).json({
-        error: 'O cliente ainda não iniciou esta conversa. No plano gratuito, você só pode responder após o cliente enviar a primeira mensagem.',
-        code: 'NO_INBOUND_FREE_PLAN',
-        window_open: false,
-        needs_inbound: true,
-      })
-    }
+    // Cliente nunca mandou mensagem — BLOQUEAR para todos os planos
+    // O WhatsApp API exige que o cliente inicie a conversa antes de enviar msgs free-form
+    // Planos pagos podem enviar via template (Marketing/Utility) mas não chat livre
+    return res.status(402).json({
+      error: 'O cliente ainda não iniciou esta conversa. Aguarde o cliente enviar a primeira mensagem no WhatsApp para responder livremente. Para enviar mensagens proativas, use a aba Marketing com templates aprovados.',
+      code: 'NO_INBOUND',
+      window_open: false,
+      needs_inbound: true,
+    })
   }
 
   // 2. Verificar janela 24h e créditos
