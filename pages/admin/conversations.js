@@ -235,6 +235,7 @@ export default function ConversationsPage() {
   const [loadingChargeMethods, setLoadingChargeMethods] = useState(false)
   const [hasInbound, setHasInbound] = useState(false)
   const [windowInfo, setWindowInfo] = useState({ open: false, hoursLeft: 0 })
+  const [loadingMsgs, setLoadingMsgs] = useState(false)
   const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   // Taxas reais do provedor (Mercado Pago) — atualizado conforme plano da conta
   const MP_PROVIDER_FEES = { pix: 0, credit_card: 4.99, debit_card: 2.39, boleto: 3.99 }
@@ -404,6 +405,9 @@ export default function ConversationsPage() {
         setDeleteConfirm(false)
         setSelected(null)
         setMessages([])
+        setLoadingMsgs(false)
+        setHasInbound(false)
+        setWindowInfo({ open: false, hoursLeft: 0 })
         loadConversations()
       } else {
         alert('Erro ao deletar: ' + (data.error || 'desconhecido'))
@@ -525,6 +529,7 @@ export default function ConversationsPage() {
   async function selectConversation(conv) {
     // Resetar IMMEDIATAMENTE — evita race condition onde hasInbound do chat anterior
     // faz o lock piscar/desaparecer antes do fetch async completar
+    setLoadingMsgs(true)
     setHasInbound(false)
     setWindowInfo({ open: false, hoursLeft: 0 })
     setMessages([])
@@ -540,6 +545,7 @@ export default function ConversationsPage() {
     setMessages(data || [])
 
     // ── VERIFICAR JANELA 24h E INBOUND ──
+    setLoadingMsgs(false)
     const inboundMsgs = (data || []).filter(m => m.direction === 'inbound')
     const hasIn = inboundMsgs.length > 0
     setHasInbound(hasIn)
@@ -596,17 +602,14 @@ export default function ConversationsPage() {
   } catch {}
   if (tenant?.plan && tenant.plan !== 'free') isFreePlan = false
 
-  // Chat bloqueado se:
-  // 1. Cliente nunca mandou mensagem (não há inbound) → precisa do cliente iniciar
-  // 2. Janela 24h expirou → precisa de créditos ou cliente responder de novo
-  const chatLocked = !isClosed && (
-    !hasInbound ||  // Cliente nunca iniciou conversa
-    (hasInbound && !windowInfo.open && isFreePlan)  // Janela expirou e plano free
-  )
+  // Chat bloqueado se a janela 24h não está aberta (regra do WhatsApp API)
+  // Aplica a TODOS os planos — fora da janela 24h, não pode enviar free-form
+  // Planos pagos podem enviar templates via aba Marketing
+  const chatLocked = !isClosed && !loadingMsgs && !windowInfo.open
   const chatLockedReason = !hasInbound
     ? 'Aguarde o cliente iniciar a conversa'
-    : (hasInbound && !windowInfo.open && isFreePlan)
-    ? 'Janela gratuita de 24h expirou. Aguarde o cliente enviar uma nova mensagem'
+    : !windowInfo.open
+    ? 'Janela de 24h expirou. Aguarde o cliente enviar uma nova mensagem'
     : ''
   const selectedBotId = selected?.bots?.id || selected?.bot_id
 
@@ -863,7 +866,7 @@ export default function ConversationsPage() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   {/* Botão voltar — só aparece no mobile */}
-                  <button onClick={() => setSelected(null)}
+                  <button onClick={() => { setSelected(null); setLoadingMsgs(false); setHasInbound(false); setWindowInfo({ open: false, hoursLeft: 0 }) }}
                     className="ark-wa-back"
                     style={{
                       width: 36, height: 36, borderRadius: '50%',
@@ -1061,7 +1064,7 @@ export default function ConversationsPage() {
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>
                       {!hasInbound
                         ? 'O cliente deve enviar a primeira mensagem no WhatsApp para abrir o chat. Você poderá responder livremente por 24h após o primeiro contato.'
-                        : 'Na janela gratuita de 24h você pode responder livremente. Aguarde o cliente reenviar uma mensagem para abrir uma nova janela.'
+                        : 'Fora da janela de 24h não é possível enviar mensagens livres. Aguarde o cliente reenviar uma mensagem, ou use templates na aba Marketing.'
                       }
                     </div>
                   </div>
