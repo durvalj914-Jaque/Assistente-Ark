@@ -336,22 +336,39 @@ export default function MarketingPage() {
             {/* Resultado: PIX gerado */}
             {buyResult?.ok && buyResult.pix_code && (
               <div>
-                <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>💠</div>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>R$ {buyResult.amount.toFixed(2)}</div>
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 28, marginBottom: 4 }}>💠</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>R$ {buyResult.amount.toFixed(2)}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{buyResult.quantity} créditos de {buyResult.credit_label}</div>
                 </div>
-                <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 12 }}>
+                {buyResult.pix_qr && (
+                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <img src={buyResult.pix_qr} alt="QR Code PIX" style={{ width: 200, height: 200, borderRadius: 12, border: '1px solid var(--border-soft)' }} />
+                  </div>
+                )}
+                <div style={{ padding: 10, background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 10 }}>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>PIX Copia e Cola:</div>
-                  <div style={{ fontSize: 11, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)', maxHeight: 60, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)', maxHeight: 50, overflow: 'hidden' }}>
                     {buyResult.pix_code.substring(0, 80)}...
                   </div>
                 </div>
-                <button onClick={copyPix} style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: copied ? '#10b981' : 'var(--bg-secondary)', color: copied ? '#fff' : 'var(--text-primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 12 }}>
+                <button onClick={copyPix} style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: copied ? '#10b981' : 'var(--bg-secondary)', color: copied ? '#fff' : 'var(--text-primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 10 }}>
                   {copied ? '✅ Copiado!' : '📋 Copiar código PIX'}
                 </button>
-                <div style={{ padding: 12, background: '#f0fdf4', borderRadius: 10, fontSize: 12, color: '#15803d' }}>
-                  ✅ Após o pagamento, os créditos serão liberados automaticamente em segundos.
+                <div style={{ padding: 10, background: '#f0fdf4', borderRadius: 10, fontSize: 11, color: '#15803d', textAlign: 'center' }}>
+                  ✅ Após o pagamento, os créditos serão liberados automaticamente.
+                </div>
+              </div>
+            )}
+
+            {/* Resultado sem PIX (fallback) */}
+            {buyResult?.ok && !buyResult.pix_code && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>💳</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>R$ {buyResult.amount?.toFixed(2)}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{buyResult.quantity} créditos de {buyResult.credit_label}</div>
+                <div style={{ padding: 12, background: '#fef3c7', borderRadius: 10, fontSize: 12, color: '#92400e' }}>
+                  ⚠️ {buyResult.message || 'Entre em contato para efetuar o pagamento.'}
                 </div>
               </div>
             )}

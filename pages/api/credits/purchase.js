@@ -13,6 +13,12 @@ const CREDIT_PRICES = {
   marketing: { unit: 0.36, meta_cost: 0.3438, arkiel_margin: 0.02, label: 'Mensagens de Marketing' },
 }
 
+// Chave PIX da Arkiel — sempre usada para receber pagamentos de créditos
+// (o cliente compra DA Arkiel, não de si mesmo)
+const ARKIEL_PIX_KEY = process.env.ARKIEL_PIX_KEY || 'arkieltech@gmail.com'
+const ARKIEL_MERCHANT_NAME = process.env.ARKIEL_MERCHANT_NAME || 'ARKIEL TECNOLOGIA'
+const ARKIEL_MERCHANT_CITY = process.env.ARKIEL_MERCHANT_CITY || 'SAO PAULO'
+
 export default async function handler(req, res) {
   const db = getDB()
   
@@ -34,78 +40,71 @@ export default async function handler(req, res) {
     const price = CREDIT_PRICES[credit_type]
     const total = (price.unit * qty).toFixed(2)
     
-    // Buscar tenant para PIX
+    // Verificar se o tenant existe
     const { data: tenant } = await db.from('tenants')
-      .select('pix_key, merchant_name, merchant_city, name, mp_access_token')
+      .select('id, name')
       .eq('id', tenant_id).maybeSingle()
     
     if (!tenant) return res.status(404).json({ error: 'Tenant não encontrado' })
     
-    // Gerar PIX
-    if (tenant.pix_key) {
-      try {
-        const { generatePixCode } = await import('../../../lib/pix')
-        const QRCodeModule = await import('qrcode')
-        const txid = `ARK${Date.now().toString(36).toUpperCase()}`
-        
-        const pixCode = generatePixCode({
-          pixKey: tenant.pix_key,
-          merchantName: (tenant.merchant_name || tenant.name || 'Arkiel').substring(0, 25),
-          merchantCity: (tenant.merchant_city || 'SAO PAULO').substring(0, 15),
-          amount: parseFloat(total), txid,
-        })
-        
-        const qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
-        
-        // Criar registro de pagamento
-        const meta = JSON.stringify({
-          type: 'credit_purchase', credit_type, quantity: qty,
-          unit_price: price.unit, total_price: parseFloat(total),
-          arkiel_margin: price.arkiel_margin, meta_cost: price.meta_cost,
-        })
-        const { data: payment } = await db.from('payments').insert({
-          tenant_id, amount: parseFloat(total),
-          status: 'pending', pix_code: pixCode, pix_qr_url: meta,
-        }).select().single()
-        
-        return res.status(200).json({
-          ok: true,
-          payment_id: payment?.id,
-          pix_code: pixCode,
-          amount: parseFloat(total),
-          credit_type,
-          credit_label: price.label,
-          quantity: qty,
-          unit_price: price.unit,
-          meta_cost_per_unit: price.meta_cost,
-          arkiel_margin_per_unit: price.arkiel_margin,
-          breakdown: {
-            meta_cost: (price.meta_cost * qty).toFixed(2),
-            arkiel_margin: (price.arkiel_margin * qty).toFixed(2),
-            total: total,
-          },
-        })
-      } catch (e) {
-        return res.status(500).json({ error: 'Erro ao gerar PIX: ' + e.message })
-      }
+    // Gerar PIX usando a chave da Arkiel (sempre)
+    try {
+      const { generatePixCode } = await import('../../../lib/pix')
+      const QRCodeModule = await import('qrcode')
+      const txid = `ARK${Date.now().toString(36).toUpperCase()}`
+      
+      const pixCode = generatePixCode({
+        pixKey: ARKIEL_PIX_KEY,
+        merchantName: ARKIEL_MERCHANT_NAME.substring(0, 25),
+        merchantCity: ARKIEL_MERCHANT_CITY.substring(0, 15),
+        amount: parseFloat(total),
+        txid,
+        description: `Creditos ${credit_type} x${qty}`,
+      })
+      
+      // Gerar QR Code como base64 data URL
+      const qrDataUrl = await QRCodeModule.default.toDataURL(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+      
+      // Criar registro de pagamento
+      const meta = JSON.stringify({
+        type: 'credit_purchase',
+        credit_type,
+        quantity: qty,
+        unit_price: price.unit,
+        total_price: parseFloat(total),
+        arkiel_margin: price.arkiel_margin,
+        meta_cost: price.meta_cost,
+      })
+      const { data: payment } = await db.from('payments').insert({
+        tenant_id,
+        amount: parseFloat(total),
+        status: 'pending',
+        pix_code: pixCode,
+        pix_qr_url: meta,
+      }).select().single()
+      
+      return res.status(200).json({
+        ok: true,
+        payment_id: payment?.id,
+        pix_code: pixCode,
+        pix_qr: qrDataUrl,
+        amount: parseFloat(total),
+        credit_type,
+        credit_label: price.label,
+        quantity: qty,
+        unit_price: price.unit,
+        meta_cost_per_unit: price.meta_cost,
+        arkiel_margin_per_unit: price.arkiel_margin,
+        breakdown: {
+          meta_cost: (price.meta_cost * qty).toFixed(2),
+          arkiel_margin: (price.arkiel_margin * qty).toFixed(2),
+          total: total,
+        },
+      })
+    } catch (e) {
+      console.error('Erro ao gerar PIX:', e)
+      return res.status(500).json({ error: 'Erro ao gerar PIX: ' + e.message })
     }
-    
-    // Sem PIX: retornar dados para pagamento manual
-    return res.status(200).json({
-      ok: true,
-      amount: parseFloat(total),
-      credit_type,
-      credit_label: price.label,
-      quantity: qty,
-      unit_price: price.unit,
-      breakdown: {
-        meta_cost: (price.meta_cost * qty).toFixed(2),
-        arkiel_margin: (price.arkiel_margin * qty).toFixed(2),
-        total: total,
-      },
-      pix_required: true,
-      message: 'Configure uma chave PIX no painel para gerar cobranças automáticas',
-    })
   }
   
   // GET: listar histórico de compras
