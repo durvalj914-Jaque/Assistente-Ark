@@ -4,14 +4,15 @@
  * Body: { conversation_id, text }
  * Header: Authorization: Bearer <supabase_session_token>
  *
- * - Confirma que o usuário autenticado pertence ao tenant da conversa.
- * - Verifica janela 24h: se aberta, envia grátis. Se fechada, bloqueia sem créditos.
- * - Envia via WhatsApp usando o token do bot.
- * - Salva a mensagem (sent_by: 'human') e muda a conversa para status 'human'
+ * Regras de envio:
+ * 1. Janela 24h aberta → envia texto livre (grátis)
+ * 2. Janela fechada + tem créditos utility → envia via template (custa 1 crédito)
+ * 3. Janela fechada + sem créditos → BLOQUEIA
+ * 4. Conversa encerrada → BLOQUEIA
  */
 import { supabaseAdmin } from '../../lib/supabase'
-import { sendText } from '../../lib/meta'
-import { canSendToB2C } from '../../lib/messageGuard'
+import { sendText, sendUtilityTemplate } from '../../lib/meta'
+import { checkCredits, checkConversationWindow } from '../../lib/messageGuard'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -58,67 +59,78 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Configuração do bot incompleta para envio' })
   }
 
-  // ── VERIFICAR JANELA 24h, INBOUND E CRÉDITOS ──
-  // 1. Verificar se o cliente já enviou alguma mensagem (inbound)
-  const { data: inboundMessages } = await db.from('messages')
-    .select('id, created_at')
-    .eq('conversation_id', conv.id)
-    .eq('direction', 'inbound')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // ── VERIFICAR JANELA 24h ──
+  const window = await checkConversationWindow(db, bot.id, contact.id)
+  const messageText = text.trim()
 
-  if (!inboundMessages) {
-    // Cliente nunca mandou mensagem — BLOQUEAR para todos os planos
-    // O WhatsApp API exige que o cliente inicie a conversa antes de enviar msgs free-form
-    // Planos pagos podem enviar via template (Marketing/Utility) mas não chat livre
-    return res.status(402).json({
-      error: 'O cliente ainda não iniciou esta conversa. Aguarde o cliente enviar a primeira mensagem no WhatsApp para responder livremente. Para enviar mensagens proativas, use a aba Marketing com templates aprovados.',
-      code: 'NO_INBOUND',
-      window_open: false,
-      needs_inbound: true,
-    })
+  if (window.window_open) {
+    // ── JANELA ABERTA: enviar texto livre (grátis) ──
+    try {
+      await sendText(bot.phone_number_id, token, contact.phone, messageText)
+    } catch (err) {
+      console.error('[send-message] erro ao enviar WhatsApp (janela aberta):', err?.response?.data || err.message)
+      return res.status(502).json({ error: 'Falha ao enviar mensagem via WhatsApp', detail: err?.response?.data || err.message })
+    }
+
+    await saveMessage(db, conv, bot, contact, messageText)
+    return res.status(200).json({ ok: true, window_open: true, method: 'free_text' })
   }
 
-  // 2. Verificar janela 24h e créditos
-  const sendCheck = await canSendToB2C(conv.tenant_id, bot.id, contact.id, 'utility')
-  if (!sendCheck.canSend) {
+  // ── JANELA FECHADA: verificar créditos utility ──
+  const credits = await checkCredits(db, conv.tenant_id, 'utility')
+
+  if (!credits.has_credit) {
+    // Sem créditos — BLOQUEAR
     return res.status(402).json({
-      error: 'A janela de 24h expirou e você não tem créditos de mensagens iniciais. O cliente precisa enviar uma mensagem primeiro (abre a janela grátis) ou compre créditos no painel de Marketing.',
-      code: 'WINDOW_CLOSED_NO_CREDITS',
+      error: 'A janela de 24h expirou e você não tem créditos de mensagens iniciais. O cliente precisa enviar uma mensagem primeiro (abre a janela grátis) ou compre créditos no painel.',
+      code: 'NO_CREDITS',
       window_open: false,
       needs_credits: true,
       credit_type: 'utility',
-      balance: sendCheck.balance,
+      balance: 0,
       purchase_url: '/admin/marketing',
     })
   }
 
-  // Se a janela está fechada mas tem créditos, avisa que vai usar template
-  if (!sendCheck.window_open && sendCheck.needs_template) {
-    // Para mensagens manuais, tentar enviar texto mesmo (pode falhar se janela fechada)
-    // Mas o cliente tem créditos, então se falhar, tentar template
-    console.log('[send-message] Janela fechada, tenant tem', sendCheck.balance, 'créditos')
-  }
-
+  // ── TEM CRÉDITOS: tentar enviar texto livre primeiro ──
+  // Se a Meta permitir (caso raro onde nossa checagem está desatualizada), ótimo
+  // Se falhar, enviar via template hello_world (debita 1 crédito no webhook)
   try {
-    await sendText(bot.phone_number_id, token, contact.phone, text.trim())
-  } catch (err) {
-    console.error('[send-message] erro ao enviar WhatsApp:', err?.response?.data || err.message)
-    
-    // Se erro for por janela 24h e tem créditos, tentar template
-    if (!sendCheck.window_open && sendCheck.has_credit) {
-      return res.status(402).json({
-        error: 'A janela de 24h expirou. Mensagens manuais fora da janela precisam de template aprovado. Use a aba Marketing para enviar broadcasts ou aguarde o cliente enviar uma mensagem.',
-        code: 'WINDOW_CLOSED_NEED_TEMPLATE',
-        has_credits: true,
-        balance: sendCheck.balance,
-      })
-    }
-    
-    return res.status(502).json({ error: 'Falha ao enviar mensagem via WhatsApp', detail: err?.response?.data || err.message })
+    await sendText(bot.phone_number_id, token, contact.phone, messageText)
+    await saveMessage(db, conv, bot, contact, messageText)
+    return res.status(200).json({ ok: true, window_open: false, method: 'free_text', credits_balance: credits.balance })
+  } catch (freeFormErr) {
+    console.log('[send-message] Texto livre falhou (janela fechada), tentando template. Erro:', freeFormErr?.response?.data?.error?.message || freeFormErr?.message)
   }
 
+  // ── FALLBACK: enviar via template hello_world ──
+  try {
+    await sendUtilityTemplate(bot.phone_number_id, token, contact.phone, 'hello_world', 'en_US')
+
+    // Salvar a mensagem original no banco (o B2B verá o que enviou)
+    await saveMessage(db, conv, bot, contact, messageText)
+
+    return res.status(200).json({
+      ok: true,
+      window_open: false,
+      method: 'template',
+      template: 'hello_world',
+      credits_balance: credits.balance - 1,
+      notice: 'Mensagem enviada via template. O cliente receberá uma notificação e poderá responder para abrir o chat.',
+    })
+  } catch (tmplErr) {
+    console.error('[send-message] erro ao enviar template:', tmplErr?.response?.data || tmplErr?.message)
+    return res.status(502).json({
+      error: 'Falha ao enviar mensagem. A janela 24h está fechada e o envio via template também falhou.',
+      code: 'SEND_FAILED',
+      detail: tmplErr?.response?.data || tmplErr?.message,
+      credits_balance: credits.balance,
+    })
+  }
+}
+
+// Helper: salvar mensagem no banco
+async function saveMessage(db, conv, bot, contact, text) {
   await db.from('messages').insert({
     tenant_id: conv.tenant_id,
     conversation_id: conv.id,
@@ -126,18 +138,14 @@ export default async function handler(req, res) {
     contact_id: contact.id,
     direction: 'outbound',
     type: 'text',
-    content: text.trim(),
-    sent_by: 'human'
+    content: text,
+    sent_by: 'human',
   })
 
-  // Responder manualmente assume o atendimento — muda para modo humano se ainda não estiver.
   const convUpdate = {
-    last_message: text.trim(),
-    last_message_at: new Date().toISOString()
+    last_message: text,
+    last_message_at: new Date().toISOString(),
   }
   if (conv.status !== 'human') convUpdate.status = 'human'
-
   await db.from('conversations').update(convUpdate).eq('id', conv.id)
-
-  return res.status(200).json({ ok: true, window_open: sendCheck.window_open })
 }

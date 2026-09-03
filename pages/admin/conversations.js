@@ -204,6 +204,25 @@ export default function ConversationsPage() {
 
   // Maném a ref sincronizada com o estado
   useEffect(() => { selectedRef.current = selected }, [selected])
+
+  // Buscar saldo de créditos utility do tenant
+  async function fetchUtilityBalance() {
+    if (!tenant?.id) return
+    try {
+      const h = await authHeaders()
+      const res = await fetch(`/api/credits/balance?tenant_id=${tenant.id}`, { headers: h })
+      if (res.ok) {
+        const data = await res.json()
+        // data pode ser { utility: N, marketing: N } ou objeto similar
+        const balance = typeof data === 'object' && data !== null ? (data.utility ?? data.utility_balance ?? 0) : 0
+        setUtilityBalance(balance)
+      } else {
+        setUtilityBalance(0)
+      }
+    } catch { setUtilityBalance(0) }
+  }
+
+  useEffect(() => { if (tenant?.id) fetchUtilityBalance() }, [tenant?.id])
   const [messages, setMessages] = useState([])
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
@@ -236,6 +255,7 @@ export default function ConversationsPage() {
   const [hasInbound, setHasInbound] = useState(false)
   const [windowInfo, setWindowInfo] = useState({ open: false, hoursLeft: 0 })
   const [loadingMsgs, setLoadingMsgs] = useState(false)
+  const [utilityBalance, setUtilityBalance] = useState(null) // null = carregando, 0 = sem créditos, >0 = tem saldo
   const [feeConfig, setFeeConfig] = useState({ pix: 2.0, credit_card: 3.0, debit_card: 2.5, boleto: 2.0 })
   // Taxas reais do provedor (Mercado Pago) — atualizado conforme plano da conta
   const MP_PROVIDER_FEES = { pix: 0, credit_card: 4.99, debit_card: 2.39, boleto: 3.99 }
@@ -602,15 +622,17 @@ export default function ConversationsPage() {
   } catch {}
   if (tenant?.plan && tenant.plan !== 'free') isFreePlan = false
 
-  // Chat bloqueado se a janela 24h não está aberta (regra do WhatsApp API)
-  // Aplica a TODOS os planos — fora da janela 24h, não pode enviar free-form
-  // Planos pagos podem enviar templates via aba Marketing
-  const chatLocked = !isClosed && !loadingMsgs && !windowInfo.open
+  // Chat bloqueado se a janela 24h não está aberta E não tem créditos utility
+  // Se tem créditos, o B2B pode enviar (via template no backend)
+  const hasUtilityCredits = utilityBalance !== null && utilityBalance > 0
+  const chatLocked = !isClosed && !loadingMsgs && !windowInfo.open && !hasUtilityCredits
   const chatLockedReason = !hasInbound
     ? 'Aguarde o cliente iniciar a conversa'
     : !windowInfo.open
     ? 'Janela de 24h expirou. Aguarde o cliente enviar uma nova mensagem'
     : ''
+  // Aviso de uso de créditos (quando pode enviar mas vai gastar 1 crédito)
+  const willUseCredit = !isClosed && !loadingMsgs && !windowInfo.open && hasUtilityCredits
   const selectedBotId = selected?.bots?.id || selected?.bot_id
 
   async function handleToggleMode() {
@@ -638,23 +660,27 @@ export default function ConversationsPage() {
       const res = await fetch('/api/send-message', { method: 'POST', headers, body: JSON.stringify({ conversation_id: selected.id, text }) })
       const json = await res.json()
       if (!res.ok) {
-        if (json.code === 'NO_INBOUND' || json.code === 'NO_INBOUND_FREE_PLAN') {
-          alert('🔒 Cliente não iniciou a conversa\n\n' + json.error + '\n\nAguarde o cliente enviar a primeira mensagem no WhatsApp.')
-          throw new Error('blocked')
+        // Se a API bloqueou, mostrar erro e atualizar saldo
+        fetchUtilityBalance()
+        if (json.code === 'NO_CREDITS') {
+          alert(json.error)
+          return
         }
-        if (json.code === 'WINDOW_CLOSED_NO_CREDITS') {
-          alert('⏰ Janela de 24h expirada\n\n' + json.error + '\n\nCompre créditos em: Marketing → Comprar créditos')
-          throw new Error('blocked')
+        throw new Error(json.error || 'Erro ao enviar')
+      }
+      // Se enviou via template, avisar e atualizar saldo
+      if (json.method === 'template') {
+        setUtilityBalance(json.credits_balance ?? utilityBalance - 1)
+        if (json.notice) {
+          // Aviso discreto sem bloquear
+          console.log('[chat] Template enviado:', json.notice)
         }
-        if (json.code === 'WINDOW_CLOSED_NEED_TEMPLATE') {
-          alert('⏰ Janela de 24h expirada\n\nPara enviar mensagens fora da janela, use a aba Marketing para broadcasts com template.')
-          throw new Error('blocked')
-        }
-        throw new Error(json.error || 'Falha ao enviar')
+      } else if (json.credits_balance !== undefined) {
+        setUtilityBalance(json.credits_balance)
       }
       if (selected.status === 'bot') { setSelected(p => ({ ...p, status: 'human' })); loadConversations() }
+      fetchUtilityBalance()
     } catch (e) {
-      if (e.message !== 'blocked') { alert(e.message) }
       setMessages(m => m.filter(msg => msg.id !== optimistic.id)); setDraft(text)
     } finally { setSending(false) }
   }
@@ -1066,6 +1092,23 @@ export default function ConversationsPage() {
                         ? 'O cliente deve enviar a primeira mensagem no WhatsApp para abrir o chat. Você poderá responder livremente por 24h após o primeiro contato.'
                         : 'Fora da janela de 24h não é possível enviar mensagens livres. Aguarde o cliente reenviar uma mensagem, ou use templates na aba Marketing.'
                       }
+                    </div>
+                    {utilityBalance !== null && (
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(245,158,11,0.15)', fontSize: 11, color: 'var(--text-muted)' }}>
+                        💬 Mensagens iniciais: <strong style={{ color: utilityBalance > 0 ? '#22c55e' : '#ef4444' }}>{utilityBalance}</strong>
+                        {utilityBalance === 0 && (
+                          <a href="/admin/marketing" style={{ color: '#3b82f6', marginLeft: 6, textDecoration: 'underline' }}>Comprar créditos</a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : willUseCredit ? (
+                  <div style={{ marginBottom: 6, padding: '8px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 600 }}>
+                      💬 Janela 24h fechada — envio custa 1 crédito
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                      Saldo: <strong style={{ color: '#22c55e' }}>{utilityBalance}</strong>
                     </div>
                   </div>
                 ) : selected.status === 'no_bot' ? (

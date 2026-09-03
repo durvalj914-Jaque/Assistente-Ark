@@ -76,20 +76,49 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Esta conversa está encerrada' })
   }
 
-  // ── VERIFICAR INBOUND: bloquear envio se cliente nunca mandou mensagem ──
-  const { data: inboundCheck } = await db.from('messages')
-    .select('id')
-    .eq('conversation_id', conv.id)
+  // ── VERIFICAR JANELA 24h E CRÉDITOS ──
+  const { data: lastInbound } = await db.from('messages')
+    .select('created_at')
+    .eq('bot_id', bot.id)
+    .eq('contact_id', contact.id)
     .eq('direction', 'inbound')
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (!inboundCheck) {
+  let windowOpen = false
+  if (lastInbound) {
+    const expiresAt = new Date(new Date(lastInbound.created_at).getTime() + 24 * 60 * 60 * 1000)
+    windowOpen = new Date() < expiresAt
+  }
+
+  if (!windowOpen) {
+    // Janela fechada — verificar créditos utility
+    const { data: creditRow } = await db.from('conversation_credits')
+      .select('balance')
+      .eq('tenant_id', conv.tenant_id)
+      .eq('credit_type', 'utility')
+      .maybeSingle()
+    const creditBalance = creditRow?.balance || 0
+
+    if (creditBalance === 0) {
+      return res.status(402).json({
+        error: 'A janela de 24h expirou e você não tem créditos de mensagens iniciais. O cliente precisa enviar uma mensagem primeiro ou compre créditos no painel.',
+        code: 'NO_CREDITS',
+        window_open: false,
+        needs_credits: true,
+        credit_type: 'utility',
+        balance: 0,
+        purchase_url: '/admin/marketing',
+      })
+    }
+    // Tem créditos — mas mídia via template não é suportada, bloquear
     return res.status(402).json({
-      error: 'O cliente ainda não iniciou esta conversa. Aguarde o cliente enviar a primeira mensagem no WhatsApp.',
-      code: 'NO_INBOUND',
+      error: 'Não é possível enviar mídia fora da janela de 24h. Aguarde o cliente enviar uma mensagem para reabrir o chat, ou envie um texto primeiro.',
+      code: 'MEDIA_WINDOW_CLOSED',
       window_open: false,
-      needs_inbound: true,
+      has_credits: true,
+      balance: creditBalance,
     })
   }
 
