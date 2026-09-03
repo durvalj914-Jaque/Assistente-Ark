@@ -214,7 +214,7 @@ export default function MarketingPage() {
         <div style={{ flex: 1, minWidth: 280, padding: 20, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-soft)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>💬 MENSSAGENS INICIAIS</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>💬 MENSAGENS INICIAIS</div>
               <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{credits.utility}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>créditos disponíveis</div>
             </div>
