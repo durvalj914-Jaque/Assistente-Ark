@@ -55,6 +55,7 @@ export default async function handler(req, res) {
     let mpPaymentId = null
     let usedProvider = 'static'
 
+    let mpError = null
     if (mpToken) {
       try {
         const pixRes = await fetch('https://api.mercadopago.com/v1/payments', {
@@ -86,7 +87,8 @@ export default async function handler(req, res) {
           mpPaymentId = String(pixData.id)
           usedProvider = 'mercadopago'
         } else {
-          console.error('[credits/purchase] MP falhou, usando BR Code estático:', JSON.stringify(pixData).substring(0, 300))
+          mpError = JSON.stringify(pixData).substring(0, 400)
+          console.error('[credits/purchase] MP falhou, usando BR Code estático:', mpError)
         }
       } catch (e) {
         console.error('[credits/purchase] Erro MP:', e.message)
@@ -94,6 +96,7 @@ export default async function handler(req, res) {
     }
 
     // ── 2) Fallback: BR Code estático (chave PIX da Arkiel) ──
+    if (!pixCode && !mpToken) mpError = 'sem token MP configurado'
     if (!pixCode) {
       try {
         const { generatePixCode } = await import('../../../lib/pix')
@@ -122,6 +125,7 @@ export default async function handler(req, res) {
       arkiel_margin: price.arkiel_margin,
       meta_cost: price.meta_cost,
       provider: usedProvider,
+      mp_error: mpError,
     })
 
     let paymentId = null
