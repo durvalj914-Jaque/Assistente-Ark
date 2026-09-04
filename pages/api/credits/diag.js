@@ -6,31 +6,24 @@ const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 export default async function handler(req, res) {
   const db = createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
 
-  // Buscar OpenAPI do PostgREST — descreve todas as colunas das tabelas
   const specRes = await fetch(SUPA_URL + '/rest/v1/', {
     headers: { apikey: SUPA_KEY, Authorization: 'Bearer ' + SUPA_KEY }
   })
   const spec = await specRes.json()
 
-  const defs = spec.definitions || {}
-  const out = {}
-  for (const name of ['conversation_credits', 'credit_purchases', 'credit_usage_log']) {
-    if (defs[name]) {
-      out[name] = Object.keys(defs[name].properties).map(col => {
-        const p = defs[name].properties[col]
-        return col + ':' + (p.format || p.type || '?')
-      })
-    } else {
-      out[name] = 'NOT FOUND IN SPEC'
+  // RPCs aparecem em paths: /rpc/<nome>
+  const out = { rpcs: {} }
+  for (const [path, def] of Object.entries(spec.paths || {})) {
+    if (path.startsWith('/rpc/')) {
+      const name = path.replace('/rpc/', '')
+      const post = def.post || {}
+      const params = (post.parameters || []).map(p => ({
+        name: p.name,
+        type: p.schema?.type || (p.schema?.$ref ? p.schema.$ref : '?'),
+      }))
+      out.rpcs[name] = params
     }
   }
 
-  // Tentar descobrir assinatura de purchase_credits chamando com params inválidos
-  let rpcTest = null
-  try {
-    const { error } = await db.rpc('purchase_credits', { __invalid_param: 'x' })
-    rpcTest = error?.message || 'no error'
-  } catch (e) { rpcTest = String(e) }
-
-  return res.status(200).json({ tables: out, rpc_purchase_credits_error: rpcTest })
+  return res.status(200).json(out)
 }
