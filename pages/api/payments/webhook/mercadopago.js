@@ -46,6 +46,64 @@ export default async function handler(req, res) {
             .eq('pix_code', txid).maybeSingle()
 
           if (payment) {
+            // ── COMPRA DE CRÉDITOS: creditar e sair (não é transação de tenant) ──
+            const payMeta = JSON.parse(payment.pix_qr_url || '{}')
+            if (payMeta.type === 'credit_purchase') {
+              try {
+                // Registrar a compra como paga
+                await db.from('credit_purchases').insert({
+                  tenant_id: payment.tenant_id,
+                  credit_type: payMeta.credit_type,
+                  quantity: payMeta.quantity,
+                  unit_price_brl: payMeta.unit_price,
+                  total_price_brl: payMeta.total_price,
+                  arkiel_margin_brl: payMeta.arkiel_margin,
+                  meta_cost_brl: payMeta.meta_cost,
+                  payment_id: payment.id,
+                  status: 'paid',
+                })
+
+                // Creditar o saldo (ler-modificar-escrever em conversation_credits)
+                const { data: cc } = await db.from('conversation_credits')
+                  .select('id, balance, total_purchased')
+                  .eq('tenant_id', payment.tenant_id)
+                  .eq('credit_type', payMeta.credit_type)
+                  .maybeSingle()
+
+                if (cc) {
+                  await db.from('conversation_credits').update({
+                    balance: (cc.balance || 0) + payMeta.quantity,
+                    total_purchased: (cc.total_purchased || 0) + payMeta.quantity,
+                    updated_at: new Date().toISOString(),
+                  }).eq('id', cc.id)
+                } else {
+                  await db.from('conversation_credits').insert({
+                    tenant_id: payment.tenant_id,
+                    credit_type: payMeta.credit_type,
+                    balance: payMeta.quantity,
+                    total_purchased: payMeta.quantity,
+                    total_used: 0,
+                  })
+                }
+
+                console.log('[webhook-mp] Créditos creditados:', payMeta.quantity, payMeta.credit_type, 'tenant:', payment.tenant_id)
+
+                // Push pro admin
+                try {
+                  const { sendPushToTenant } = await import('../../../../lib/webpush')
+                  await sendPushToTenant(payment.tenant_id, {
+                    title: '✅ Créditos adicionados!',
+                    body: `${payMeta.quantity} créditos de ${payMeta.credit_type === 'marketing' ? 'marketing' : 'mensagens iniciais'} foram adicionados ao seu saldo.`,
+                    url: '/admin/marketing',
+                    tag: `ark-credits-${payment.id}`,
+                  })
+                } catch (_) {}
+              } catch (e) {
+                console.error('[webhook-mp] Erro ao creditar compra de créditos:', e.message)
+              }
+              return res.status(200).json({ ok: true, credited: true })
+            }
+
             // Comprovante automático
             await db.from('payment_receipts').insert({
               payment_id: payment.id,
