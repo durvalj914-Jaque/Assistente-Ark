@@ -122,6 +122,9 @@ export default function PainelAdminPage() {
   const [receiptCategory, setReceiptCategory] = useState('all')
   const [editingReceipt, setEditingReceipt] = useState(null)
   const [receiptModal, setReceiptModal] = useState(false)
+  const [viewReceipt, setViewReceipt] = useState(null)
+  const [viewReceiptData, setViewReceiptData] = useState(null)
+  const [cancelingPaymentId, setCancelingPaymentId] = useState(null)
   const [receiptNotes, setReceiptNotes] = useState('')
   const [receiptAmount, setReceiptAmount] = useState('')
   const [wabaNumbers, setWabaNumbers] = useState([])
@@ -335,6 +338,40 @@ export default function PainelAdminPage() {
       if (json.payments) setPayments(json.payments)
     } catch (e) {}
     finally { setLoadingPayments(false) }
+  }
+
+  // ── Visualizar comprovante de um pagamento pago ──
+  async function openPaymentReceipt(p) {
+    setViewReceipt(p)
+    setViewReceiptData(null)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/payments/receipts', { headers: h })
+      const json = await res.json()
+      const found = (json.receipts || []).find(r => r.payment_id === p.id) || null
+      setViewReceiptData(found)
+    } catch (e) { setViewReceiptData(null) }
+  }
+
+  // ── Cancelar pagamento pendente ──
+  async function cancelPendingPayment(paymentId) {
+    if (!confirm('⚠️ Cancelar este pagamento pendente?\n\nO cliente não poderá mais pagar por este link/QR Code.')) return
+    setCancelingPaymentId(paymentId)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/payments/cancel', {
+        method: 'POST',
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_id: paymentId })
+      })
+      const json = await res.json()
+      if (json.ok) {
+        loadPayments()
+      } else {
+        alert('Erro: ' + (json.error || 'Falha ao cancelar'))
+      }
+    } catch (e) { alert('Erro: ' + e.message) }
+    finally { setCancelingPaymentId(null) }
   }
 
   async function loadFeeConfig() {
@@ -2312,18 +2349,32 @@ export default function PainelAdminPage() {
                       {p.paid_at && ' • Pago em ' + new Date(p.paid_at).toLocaleString('pt-BR')}
                     </div>
                   </div>
-                  {p.pix_code && (
-                    <button onClick={() => navigator.clipboard.writeText(p.pix_code)} title="Copiar código PIX"
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, cursor: 'pointer' }}>
-                      📋 Copiar PIX
-                    </button>
-                  )}
-                  {p.mp_checkout_url && (
-                    <a href={p.mp_checkout_url} target="_blank" rel="noopener"
-                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, textDecoration: 'none' }}>
-                      🔗 Ver link
-                    </a>
-                  )}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    {p.status === 'paid' && (
+                      <button onClick={() => openPaymentReceipt(p)}
+                        style={{ padding: '5px 12px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                        👁 Ver comprovante
+                      </button>
+                    )}
+                    {p.status === 'pending' && (
+                      <button onClick={() => cancelPendingPayment(p.id)} disabled={cancelingPaymentId === p.id}
+                        style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid rgba(239,68,68,0.4)', background: 'transparent', color: '#ef4444', fontSize: 11, fontWeight: 700, cursor: 'pointer', opacity: cancelingPaymentId === p.id ? 0.5 : 1 }}>
+                        {cancelingPaymentId === p.id ? 'Cancelando...' : '✖ Cancelar'}
+                      </button>
+                    )}
+                    {p.pix_code && (
+                      <button onClick={() => navigator.clipboard.writeText(p.pix_code)} title="Copiar código PIX"
+                        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, cursor: 'pointer' }}>
+                        📋 Copiar PIX
+                      </button>
+                    )}
+                    {p.mp_checkout_url && (
+                      <a href={p.mp_checkout_url} target="_blank" rel="noopener"
+                        style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, textDecoration: 'none' }}>
+                        🔗 Ver link
+                      </a>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -2483,6 +2534,61 @@ export default function PainelAdminPage() {
           )}
 
           {/* Modal de upload de comprovante manual (B2B) */}
+          {viewReceipt && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
+                 onClick={() => setViewReceipt(null)}>
+              <div onClick={e => e.stopPropagation()} style={{ background: '#0d0d1e', borderRadius: 16, padding: 24, maxWidth: 420, width: '90%', border: '1px solid rgba(34,197,94,0.25)', maxHeight: '85vh', overflowY: 'auto' }}>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, marginBottom: 4 }}>📄 Comprovante de Pagamento</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 16 }}>Criado em {new Date(viewReceipt.created_at).toLocaleString('pt-BR')}</p>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                  <span style={{ fontSize: 24 }}>✅</span>
+                  <div>
+                    <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 18 }}>R$ {parseFloat(viewReceipt.amount).toFixed(2)}</div>
+                    <div style={{ color: '#22c55e', fontSize: 11, fontWeight: 700 }}>Pago{viewReceipt.paid_at ? ' em ' + new Date(viewReceipt.paid_at).toLocaleString('pt-BR') : ''}</div>
+                  </div>
+                </div>
+
+                {viewReceiptData ? (
+                  <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', marginBottom: 12 }}>
+                    <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{viewReceiptData.file_name || 'Comprovante'}</div>
+                    {viewReceiptData.notes && <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 6 }}>{viewReceiptData.notes}</div>}
+                    <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>Registrado por {viewReceiptData.uploaded_by || 'sistema'} • {new Date(viewReceiptData.created_at).toLocaleString('pt-BR')}</div>
+                    {viewReceiptData.file_url && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(viewReceiptData.file_url) && (
+                      <img src={viewReceiptData.file_url} alt="Comprovante" style={{ width: '100%', borderRadius: 8, marginTop: 8, border: '1px solid var(--border-soft)' }} />
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginBottom: 12, padding: 12, borderRadius: 10, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)' }}>📌 Registro oficial do pagamento na plataforma.</div>
+                )}
+
+                {viewReceipt.pix_code && (
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600, display: 'block', marginBottom: 6 }}>PIX Copia e Cola</label>
+                    <div style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--bg-secondary)', border: '1px solid var(--border-soft)', color: 'var(--text-muted)', fontSize: 10, wordBreak: 'break-all', marginBottom: 6 }}>
+                      {viewReceipt.pix_code}
+                    </div>
+                    <button onClick={() => navigator.clipboard.writeText(viewReceipt.pix_code)}
+                      style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                      📋 Copiar código PIX
+                    </button>
+                  </div>
+                )}
+
+                {(viewReceipt.pix_qr_url || '').startsWith('data:image') && (
+                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <img src={viewReceipt.pix_qr_url} alt="QR Code PIX" style={{ width: 180, height: 180, borderRadius: 8, border: '1px solid var(--border-soft)' }} />
+                  </div>
+                )}
+
+                <button onClick={() => setViewReceipt(null)}
+                  style={{ width: '100%', padding: '10px', borderRadius: 8, border: 'none', background: '#22c55e', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
+
           {receiptModal && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}
                  onClick={() => setReceiptModal(null)}>
