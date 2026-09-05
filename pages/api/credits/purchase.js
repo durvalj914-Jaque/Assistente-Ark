@@ -70,6 +70,7 @@ export default async function handler(req, res) {
             description: `Créditos ${price.label} — ${tenant.name} (x${qty})`,
             payment_method_id: 'pix',
             external_reference: txid,
+            payer: { email: `tenant-${tenant_id.substring(0, 8)}@arkiel.com.br` },
             metadata: {
               type: 'credit_purchase',
               tenant_id,
