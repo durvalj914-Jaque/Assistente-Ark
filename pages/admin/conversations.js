@@ -1103,14 +1103,37 @@ export default function ConversationsPage() {
                     )}
                   </div>
                 ) : willUseCredit ? (
-                  <div style={{ marginBottom: 6, padding: '8px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                    <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 600 }}>
-                      💬 Janela 24h fechada — envio custa 1 crédito
+                  <>
+                    <div style={{ marginBottom: 6, padding: '8px 12px', background: 'rgba(59,130,246,0.08)', borderRadius: 8, border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <div style={{ fontSize: 11, color: '#3b82f6', fontWeight: 600 }}>
+                        💬 Janela 24h fechada — envio custa 1 crédito
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Saldo: <strong style={{ color: '#22c55e' }}>{utilityBalance}</strong>
+                      </div>
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                      Saldo: <strong style={{ color: '#22c55e' }}>{utilityBalance}</strong>
+                    {mediaPreview && (
+                      <div style={{ marginBottom: 8, padding: '8px 12px', background: 'var(--blue-tint)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        {mediaPreview.url ? <img src={mediaPreview.url} alt="preview" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} /> : <span style={{ fontSize: 20 }}>{mediaPreview.type?.startsWith('video/') ? '🎬' : mediaPreview.type?.startsWith('audio/') ? '🎵' : '📎'}</span>}
+                        <div style={{ flex: 1, overflow: 'hidden' }}>
+                          <div style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{mediaPreview.name}</div>
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{mediaUploading ? 'Enviando…' : `${(mediaPreview.size / 1024 / 1024).toFixed(1)}MB`}</div>
+                        </div>
+                        <span style={{ fontSize: 11, color: '#4f8ef7' }}>⏳</span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                      <input ref={fileInputRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip" onChange={handleSendMedia} style={{ display: 'none' }} />
+                      <button onClick={() => fileInputRef.current?.click()} disabled={mediaUploading} title="Enviar arquivo"
+                        style={{ padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-dim)', cursor: mediaUploading ? 'wait' : 'pointer', fontSize: 18, minWidth: 42, minHeight: 42 }}>📎</button>
+                      <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={handleKeyDown} placeholder="Digite uma mensagem..." rows={1}
+                        style={{ flex: 1, resize: 'none', background: 'var(--bg-input)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: '10px 12px', color: 'var(--text-primary)', fontSize: 13, fontFamily: 'inherit', maxHeight: 120, outline: 'none' }} />
+                      <button onClick={handleSend} disabled={sending || !draft.trim()}
+                        style={{ padding: '10px 18px', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: 13, background: '#4f8ef7', color: '#fff', cursor: (sending || !draft.trim()) ? 'not-allowed' : 'pointer', opacity: (sending || !draft.trim()) ? 0.5 : 1 }}>
+                        {sending ? '...' : 'Enviar'}
+                      </button>
                     </div>
-                  </div>
+                  </>
                 ) : selected.status === 'no_bot' ? (
                   <>
                     <div style={{ textAlign: 'center', color: '#6b7280', fontSize: 11, marginBottom: 6, padding: '4px 0' }}>
