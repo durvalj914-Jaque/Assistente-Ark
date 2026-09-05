@@ -15,6 +15,35 @@ export default async function handler(req, res) {
   const db = supabaseAdmin()
 
   if (req.method === 'GET') {
+    // ── Auto-heal: comprovantes faltantes de compras de créditos pagas ──
+    try {
+      const { data: paidPurchases } = await db.from('credit_purchases')
+        .select('id, tenant_id, credit_type, quantity, total_price_brl, payment_id')
+        .eq('status', 'paid').not('payment_id', 'is', null)
+      if (paidPurchases?.length) {
+        const paymentIds = paidPurchases.map(p => p.payment_id)
+        const { data: existing } = await db.from('payment_receipts')
+          .select('payment_id').in('payment_id', paymentIds)
+        const have = new Set((existing || []).map(r => r.payment_id))
+        const missing = paidPurchases.filter(p => !have.has(p.payment_id))
+        if (missing.length) {
+          await db.from('payment_receipts').insert(missing.map(p => ({
+            payment_id: p.payment_id,
+            tenant_id: p.tenant_id,
+            file_url: null,
+            file_type: 'mp_confirmation',
+            file_name: `MP · ${p.quantity} créditos`,
+            uploaded_by: 'mercadopago',
+            notes: `Compra de créditos confirmada via Mercado Pago — R$ ${parseFloat(p.total_price_brl).toFixed(2)} (pix) · ${p.quantity}x ${p.credit_type === 'marketing' ? 'marketing' : 'mensagens iniciais'}`,
+            category: 'credit_purchase',
+          })))
+          console.log('[receipts] Auto-heal:', missing.length, 'comprovante(s) de créditos criado(s)')
+        }
+      }
+    } catch (e) {
+      console.error('[receipts] Erro no auto-heal de comprovantes:', e.message)
+    }
+
     const { data, error } = await db.from('payment_receipts')
       .select('*, payments(amount, description, status, method)')
       .order('created_at', { ascending: false }).limit(200)
