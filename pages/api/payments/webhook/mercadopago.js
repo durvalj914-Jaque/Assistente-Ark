@@ -88,6 +88,22 @@ export default async function handler(req, res) {
 
                 console.log('[webhook-mp] Créditos creditados:', payMeta.quantity, payMeta.credit_type, 'tenant:', payment.tenant_id)
 
+                // Comprovante automático da compra de créditos (aba Comprovantes)
+                try {
+                  await db.from('payment_receipts').insert({
+                    payment_id: payment.id,
+                    tenant_id: payment.tenant_id,
+                    file_url: null,
+                    file_type: 'mp_confirmation',
+                    file_name: `MP-${data.id} · ${payMeta.quantity} créditos`,
+                    uploaded_by: 'mercadopago',
+                    notes: `Compra de créditos confirmada via Mercado Pago — R$ ${parseFloat(payment.amount).toFixed(2)} (${payData.payment_method_id || 'pix'}) · ${payMeta.quantity}x ${payMeta.credit_type === 'marketing' ? 'marketing' : 'mensagens iniciais'}`,
+                    category: 'credit_purchase',
+                  })
+                } catch (e) {
+                  console.error('[webhook-mp] Erro ao registrar comprovante de créditos:', e.message)
+                }
+
                 // Push pro admin
                 try {
                   const { sendPushToTenant } = await import('../../../../lib/webpush')
