@@ -9,7 +9,7 @@ function getDB() {
 
 /**
  * POST /api/marketing/send
- * Body: { tenant_id, message, contacts: ['5511...', ...] }
+ * Body: { tenant_id, message, contacts: ['5511...', ...], image_url (opcional) }
  * 
  * Envia uma mensagem de marketing via template do WhatsApp.
  * Cada contato consome 1 crédito de marketing (R$0,36).
@@ -18,7 +18,7 @@ function getDB() {
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { tenant_id, message, contacts } = req.body
+  const { tenant_id, message, contacts, image_url } = req.body
 
   if (!tenant_id || !message || !Array.isArray(contacts) || contacts.length === 0) {
     return res.status(400).json({ error: 'tenant_id, message e contacts são obrigatórios' })
@@ -110,6 +110,17 @@ export default async function handler(req, res) {
             language: { code: templateLanguage },
           }
         }
+      } else if (image_url) {
+        // Com imagem: o template só abre a janela 24h; o conteúdo real (imagem+caption) vai depois
+        body = {
+          messaging_product: 'whatsapp',
+          to: phone,
+          type: 'template',
+          template: {
+            name: templateName,
+            language: { code: templateLanguage },
+          },
+        }
       } else {
         // Template de marketing customizado com variável
         body = {
@@ -136,11 +147,20 @@ export default async function handler(req, res) {
 
       if (sendData.id || sendData.message_status === 'accepted') {
         sent++
-        // Se template customizado com a mensagem, a mensagem já foi enviada no template
-        // Se hello_world, enviar a mensagem real como follow-up
-        if (templateName === 'hello_world' && message !== 'hello_world') {
-          // Enviar a mensagem de marketing como texto (após abrir a janela)
-          try {
+        // Follow-up com o conteúdo real de marketing (após abrir a janela 24h)
+        try {
+          if (image_url) {
+            // 🖼️ Enviar imagem com a mensagem como legenda
+            await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
+              body: JSON.stringify({
+                messaging_product: 'whatsapp', to: phone, type: 'image',
+                image: { link: image_url, caption: message.substring(0, 1024) },
+              }),
+            })
+          } else if (templateName === 'hello_world' && message !== 'hello_world') {
+            // Enviar a mensagem de marketing como texto (após abrir a janela)
             await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
@@ -149,8 +169,8 @@ export default async function handler(req, res) {
                 text: { body: message.substring(0, 4096) },
               }),
             })
-          } catch (_) {}
-        }
+          }
+        } catch (_) {}
       } else {
         failed++
         errors.push({ phone, error: sendData.error?.message || 'unknown' })
@@ -170,7 +190,7 @@ export default async function handler(req, res) {
       tenant_id,
       event_type: 'marketing_broadcast',
       description: `Broadcast de marketing enviado para ${sent} contatos (${failed} falhas)`,
-      metadata: JSON.stringify({ sent, failed, template: templateName, message_preview: message.substring(0, 100) }),
+      metadata: JSON.stringify({ sent, failed, template: templateName, has_image: Boolean(image_url), message_preview: message.substring(0, 100) }),
     })
   } catch (_) {}
 

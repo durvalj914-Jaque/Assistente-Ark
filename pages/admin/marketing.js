@@ -24,6 +24,8 @@ export default function MarketingPage() {
   const [tplText, setTplText] = useState('')
   const [savingTpl, setSavingTpl] = useState(false)
   const [tplError, setTplError] = useState('')
+  const [tplImageUrl, setTplImageUrl] = useState('')
+  const [uploadingImg, setUploadingImg] = useState(false)
 
   // Envio
   const [showSendModal, setShowSendModal] = useState(false)
@@ -32,6 +34,7 @@ export default function MarketingPage() {
   const [selectedContacts, setSelectedContacts] = useState([])
   const [contacts, setContacts] = useState([])
   const [msgText, setMsgText] = useState('')
+  const [sendImageUrl, setSendImageUrl] = useState('')
   const [sending, setSending] = useState(false)
   const [sendResult, setSendResult] = useState(null)
 
@@ -109,6 +112,7 @@ export default function MarketingPage() {
     setEditingTplId(null)
     setTplName('')
     setTplText('')
+    setTplImageUrl('')
     setTplError('')
     setShowTplModal(true)
   }
@@ -117,8 +121,33 @@ export default function MarketingPage() {
     setEditingTplId(t.id)
     setTplName(t.name)
     setTplText(t.message)
+    setTplImageUrl(t.image_url || '')
     setTplError('')
     setShowTplModal(true)
+  }
+
+  async function handleUploadImage(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImg(true)
+    setTplError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/marketing/upload-image', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.imageUrl) setTplImageUrl(data.imageUrl)
+      else setTplError(data.error || 'Erro no upload da imagem')
+    } catch (err) {
+      setTplError('Erro no upload: ' + err.message)
+    }
+    setUploadingImg(false)
+    e.target.value = ''
   }
 
   async function saveTemplate() {
@@ -132,7 +161,7 @@ export default function MarketingPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (editingTplId) {
         const { error } = await supabase.from('marketing_messages')
-          .update({ name: tplName.trim(), message: tplText.trim(), updated_at: new Date().toISOString() })
+          .update({ name: tplName.trim(), message: tplText.trim(), image_url: tplImageUrl || null, updated_at: new Date().toISOString() })
           .eq('id', editingTplId)
         if (error) throw error
       } else {
@@ -140,6 +169,7 @@ export default function MarketingPage() {
           tenant_id: tenant.id,
           name: tplName.trim(),
           message: tplText.trim(),
+          image_url: tplImageUrl || null,
           status: 'draft',
           created_by: session?.user?.id,
         })
@@ -165,6 +195,7 @@ export default function MarketingPage() {
   function openSend(t) {
     setSendTplName(t?.name || '')
     setMsgText(t?.message || '')
+    setSendImageUrl(t?.image_url || '')
     setRecipients('all')
     setSelectedContacts([])
     setSendResult(null)
@@ -183,6 +214,7 @@ export default function MarketingPage() {
         body: JSON.stringify({
           tenant_id: tenant.id,
           message: msgText,
+          image_url: sendImageUrl || null,
           contacts: targetContacts.map(c => c.phone),
         }),
       })
@@ -253,8 +285,11 @@ export default function MarketingPage() {
               <div key={t.id} style={{ padding: '14px 16px', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 15 }}>✉️</span>
+                    {t.image_url
+                      ? <img src={t.image_url} alt="" style={{ width: 34, height: 34, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-soft)' }} />
+                      : <span style={{ fontSize: 15 }}>✉️</span>}
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</span>
+                    {t.image_url && <span title="Com imagem" style={{ fontSize: 11 }}>🖼️</span>}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, maxHeight: 34, overflow: 'hidden', lineHeight: '17px' }}>
                     {t.message}
@@ -325,6 +360,22 @@ export default function MarketingPage() {
             <textarea value={tplText} onChange={e => setTplText(e.target.value)} placeholder="Ex: Olá! Aproveite nossa promoção desta semana..." rows={6}
               style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, resize: 'vertical', marginTop: 6, marginBottom: 16 }} />
 
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Imagem (opcional, mas recomendada 😎)</label>
+            {tplImageUrl ? (
+              <div style={{ position: 'relative', marginTop: 6, marginBottom: 16 }}>
+                <img src={tplImageUrl} alt="Preview" style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border-soft)' }} />
+                <button onClick={() => setTplImageUrl('')}
+                  style={{ position: 'absolute', top: 8, right: 8, padding: '4px 10px', borderRadius: 8, border: 'none', background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+                  ✕ Remover
+                </button>
+              </div>
+            ) : (
+              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 6, marginBottom: 16, padding: 18, borderRadius: 10, border: '2px dashed var(--border-medium)', background: 'var(--bg-secondary)', color: uploadingImg ? 'var(--text-dim)' : 'var(--text-secondary)', fontSize: 13, cursor: 'pointer' }}>
+                {uploadingImg ? '⏳ Enviando imagem...' : '🖼️ Clique para adicionar uma imagem (PNG, JPG ou WebP)'}
+                <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleUploadImage} style={{ display: 'none' }} disabled={uploadingImg} />
+              </label>
+            )}
+
             {tplError && (
               <div style={{ padding: 12, background: '#fef2f2', borderRadius: 10, fontSize: 13, color: '#dc2626', marginBottom: 12 }}>❌ {tplError}</div>
             )}
@@ -348,6 +399,10 @@ export default function MarketingPage() {
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
               {sendTplName ? `Enviando: "${sendTplName}". ` : ''}Cada contato que receber consumirá 1 crédito de marketing (R$0,36). Você tem {credits.marketing} créditos.
             </p>
+
+            {sendImageUrl && (
+              <img src={sendImageUrl} alt="Preview" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border-soft)', marginBottom: 16 }} />
+            )}
 
             {/* Destinatários */}
             <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Destinatários</label>
