@@ -3,6 +3,10 @@ import Head from 'next/head'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { supabase } from '../../lib/supabase'
 
+/**
+ * Aba Marketing — B2B cria suas mensagens de marketing e deixa prontas
+ * para envio quando tiverem créditos. Compra de créditos fica na aba Upgrades.
+ */
 export default function MarketingPage() {
   const [tenant, setTenant] = useState(null)
   const [user, setUser] = useState(null)
@@ -10,17 +14,21 @@ export default function MarketingPage() {
   const [role, setRole] = useState('viewer')
   const [credits, setCredits] = useState({ utility: 0, marketing: 0, utility_total_purchased: 0, marketing_total_purchased: 0, utility_total_used: 0, marketing_total_used: 0 })
   const [history, setHistory] = useState([])
-  const [purchases, setPurchases] = useState([])
   const [loading, setLoading] = useState(true)
-  const [buying, setBuying] = useState(null)
-  const [showBuyModal, setShowBuyModal] = useState(null) // 'utility' | 'marketing'
-  const [buyQty, setBuyQty] = useState(100)
-  const [buyResult, setBuyResult] = useState(null)
-  const [copied, setCopied] = useState(false)
 
-  // Compose marketing message
+  // Templates de marketing
+  const [templates, setTemplates] = useState([])
+  const [showTplModal, setShowTplModal] = useState(false)
+  const [editingTplId, setEditingTplId] = useState(null)
+  const [tplName, setTplName] = useState('')
+  const [tplText, setTplText] = useState('')
+  const [savingTpl, setSavingTpl] = useState(false)
+  const [tplError, setTplError] = useState('')
+
+  // Envio
   const [showSendModal, setShowSendModal] = useState(false)
-  const [recipients, setRecipients] = useState('') // 'all' | 'selected'
+  const [sendTplName, setSendTplName] = useState('')
+  const [recipients, setRecipients] = useState('all') // 'all' | 'selected'
   const [selectedContacts, setSelectedContacts] = useState([])
   const [contacts, setContacts] = useState([])
   const [msgText, setMsgText] = useState('')
@@ -49,7 +57,7 @@ export default function MarketingPage() {
       setProfile(prof)
       await loadCredits(tm.tenants.id)
       await loadHistory(tm.tenants.id)
-      await loadPurchases(tm.tenants.id)
+      await loadTemplates(tm.tenants.id)
       await loadContacts(tm.tenants.id)
     }
     setLoading(false)
@@ -77,15 +85,16 @@ export default function MarketingPage() {
     } catch (e) { console.error('loadHistory:', e) }
   }
 
-  async function loadPurchases(tid) {
+  async function loadTemplates(tid) {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/credits/purchase?tenant_id=${tid}`, {
-        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
-      })
-      const data = await res.json()
-      if (!data.error) setPurchases(data.purchases || [])
-    } catch (e) { console.error('loadPurchases:', e) }
+      const { data, error } = await supabase
+        .from('marketing_messages')
+        .select('*')
+        .eq('tenant_id', tid)
+        .order('updated_at', { ascending: false })
+      if (!error) setTemplates(data || [])
+      else console.error('loadTemplates:', error.message)
+    } catch (e) { console.error('loadTemplates:', e) }
   }
 
   async function loadContacts(tid) {
@@ -95,29 +104,71 @@ export default function MarketingPage() {
     } catch (e) {}
   }
 
-  async function handleBuy() {
-    if (!tenant || !showBuyModal) return
-    setBuying(true)
-    setBuyResult(null)
-    try {
-      const res = await fetch('/api/credits/purchase', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tenant_id: tenant.id,
-          credit_type: showBuyModal,
-          quantity: parseInt(buyQty),
-        }),
-      })
-      const data = await res.json()
-      setBuyResult(data)
-      if (data.ok) {
-        // Não recarregar saldo ainda — só após pagamento confirmado
-      }
-    } catch (e) {
-      setBuyResult({ error: e.message })
+  // ── Templates ──
+  function openNewTemplate() {
+    setEditingTplId(null)
+    setTplName('')
+    setTplText('')
+    setTplError('')
+    setShowTplModal(true)
+  }
+
+  function openEditTemplate(t) {
+    setEditingTplId(t.id)
+    setTplName(t.name)
+    setTplText(t.message)
+    setTplError('')
+    setShowTplModal(true)
+  }
+
+  async function saveTemplate() {
+    if (!tenant || !tplName.trim() || !tplText.trim()) {
+      setTplError('Preencha o nome e a mensagem.')
+      return
     }
-    setBuying(false)
+    setSavingTpl(true)
+    setTplError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (editingTplId) {
+        const { error } = await supabase.from('marketing_messages')
+          .update({ name: tplName.trim(), message: tplText.trim(), updated_at: new Date().toISOString() })
+          .eq('id', editingTplId)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('marketing_messages').insert({
+          tenant_id: tenant.id,
+          name: tplName.trim(),
+          message: tplText.trim(),
+          status: 'draft',
+          created_by: session?.user?.id,
+        })
+        if (error) throw error
+      }
+      setShowTplModal(false)
+      await loadTemplates(tenant.id)
+    } catch (e) {
+      setTplError('Erro ao salvar: ' + e.message)
+    }
+    setSavingTpl(false)
+  }
+
+  async function deleteTemplate(id) {
+    if (!confirm('Excluir esta mensagem de marketing?')) return
+    try {
+      await supabase.from('marketing_messages').delete().eq('id', id)
+      if (tenant) await loadTemplates(tenant.id)
+    } catch (e) { console.error('deleteTemplate:', e) }
+  }
+
+  // ── Envio ──
+  function openSend(t) {
+    setSendTplName(t?.name || '')
+    setMsgText(t?.message || '')
+    setRecipients('all')
+    setSelectedContacts([])
+    setSendResult(null)
+    setShowSendModal(true)
   }
 
   async function handleSendMarketing() {
@@ -125,7 +176,6 @@ export default function MarketingPage() {
     setSending(true)
     setSendResult(null)
     try {
-      // Enviar via API de broadcast de marketing
       const targetContacts = recipients === 'all' ? contacts : contacts.filter(c => selectedContacts.includes(c.id))
       const res = await fetch('/api/marketing/send', {
         method: 'POST',
@@ -149,17 +199,11 @@ export default function MarketingPage() {
     setSending(false)
   }
 
-  function copyPix() {
-    if (buyResult?.pix_code) {
-      navigator.clipboard.writeText(buyResult.pix_code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
   if (loading) {
     return <AdminLayout><div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>Carregando...</div></AdminLayout>
   }
+
+  const targetCount = recipients === 'all' ? contacts.length : selectedContacts.length
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
@@ -167,98 +211,76 @@ export default function MarketingPage() {
 
       {/* HEADER */}
       <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-soft)' }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>📣 Marketing & Créditos</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-primary)' }}>📣 Mensagens de Marketing</h1>
         <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
-          Envie mensagens proativas e gerencie seus créditos pré-pagos para conversas no WhatsApp.
+          Crie suas mensagens promocionais e deixe-as prontas para enviar aos seus contatos quando tiver créditos.
         </p>
       </div>
 
-      {/* EXPLICAÇÃO DE COBRANÇA */}
-      <div style={{ margin: '16px 20px', padding: 20, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-soft)' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>ℹ️ Como funciona a cobrança</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, color: 'var(--text-secondary)' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 18 }}>💬</span>
-            <div>
-              <strong>Mensagens Iniciais (Utility)</strong> — R$0,05 por conversa<br />
-              <span style={{ color: 'var(--text-muted)' }}>Quando você inicia uma conversa com um cliente (confirmação de pedido, lembrete, etc.). Inclui R$0,04 (custo Meta) + R$0,01 (taxa Arkiel).</span>
-            </div>
+      {/* SALDO + DICA DE COMPRA */}
+      <div style={{ margin: '16px 20px', padding: 16, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 26 }}>📣</span>
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Saldo de marketing</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)' }}>{credits.marketing} <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--text-dim)' }}>créditos</span></div>
           </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 18 }}>📣</span>
-            <div>
-              <strong>Mensagens de Marketing</strong> — R$0,36 por conversa<br />
-              <span style={{ color: 'var(--text-muted)' }}>Quando você envia uma promoção, oferta ou novidade. Inclui R$0,34 (custo Meta) + R$0,02 (taxa Arkiel).</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 18 }}>✅</span>
-            <div>
-              <strong>Respostas de clientes</strong> — Gratuito<br />
-              <span style={{ color: 'var(--text-muted)' }}>Quando um cliente inicia a conversa ou responde dentro de 24h, não há cobrança. Apenas conversas iniciadas por você consomem créditos.</span>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 18 }}>🔄</span>
-            <div>
-              <strong>Recarga automática</strong><br />
-              <span style={{ color: 'var(--text-muted)' }}>Cada conversa iniciada debita 1 crédito do saldo. Compre mais créditos antes que o saldo acabe para não interromper o atendimento.</span>
-            </div>
-          </div>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
+          Cada envio consome 1 crédito de marketing (R$0,36) por contato.<br />
+          Precisa de créditos? Faça a adesão na aba <strong style={{ color: 'var(--text-primary)' }}>⬆️ Upgrades</strong>.
         </div>
       </div>
 
-      {/* CARDS DE CRÉDITOS */}
-      <div style={{ display: 'flex', gap: 16, padding: '0 20px 20px', flexWrap: 'wrap' }}>
-        {/* Utility Credits */}
-        <div style={{ flex: 1, minWidth: 280, padding: 20, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-soft)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>💬 MENSAGENS INICIAIS</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{credits.utility}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>créditos disponíveis</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>R$0,05/cada</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>usadas: {credits.utility_total_used}</div>
-            </div>
-          </div>
-          <div style={{ height: 6, background: 'var(--bg-secondary)', borderRadius: 3, overflow: 'hidden', marginBottom: 12 }}>
-            <div style={{ height: '100%', width: credits.utility_total_purchased > 0 ? `${(credits.utility / credits.utility_total_purchased) * 100}%` : '0%', background: 'linear-gradient(90deg,#4f8ef7,#06b6d4)', borderRadius: 3, transition: 'width 0.3s' }} />
-          </div>
-          <button onClick={() => { setShowBuyModal('utility'); setBuyQty(100); setBuyResult(null); setCopied(false) }}
-            style={{ width: '100%', padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-            Comprar créditos
+      {/* LISTA DE MENSAGENS */}
+      <div style={{ padding: '0 20px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>✉️ Suas mensagens prontas</h3>
+          <button onClick={openNewTemplate}
+            style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            + Nova mensagem
           </button>
         </div>
 
-        {/* Marketing Credits */}
-        <div style={{ flex: 1, minWidth: 280, padding: 20, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-soft)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 500 }}>📣 MARKETING</div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>{credits.marketing}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>créditos disponíveis</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>R$0,36/cada</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>usadas: {credits.marketing_total_used}</div>
-            </div>
+        {templates.length === 0 ? (
+          <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>✉️</div>
+            Nenhuma mensagem criada ainda. Clique em <strong>+ Nova mensagem</strong> para montar sua promoção e deixá-la pronta para envio.
           </div>
-          <div style={{ height: 6, background: 'var(--bg-secondary)', borderRadius: 3, overflow: 'hidden', marginBottom: 12 }}>
-            <div style={{ height: '100%', width: credits.marketing_total_purchased > 0 ? `${(credits.marketing / credits.marketing_total_purchased) * 100}%` : '0%', background: 'linear-gradient(90deg,#f59e0b,#ef4444)', borderRadius: 3, transition: 'width 0.3s' }} />
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {templates.map(t => (
+              <div key={t.id} style={{ padding: '14px 16px', background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border-soft)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 15 }}>✉️</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{t.name}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, maxHeight: 34, overflow: 'hidden', lineHeight: '17px' }}>
+                    {t.message}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+                    Atualizada em {new Date(t.updated_at || t.created_at).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => openEditTemplate(t)} title="Editar"
+                    style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    ✏️ Editar
+                  </button>
+                  <button onClick={() => openSend(t)} title="Enviar agora"
+                    style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                    🚀 Enviar
+                  </button>
+                  <button onClick={() => deleteTemplate(t.id)} title="Excluir"
+                    style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { setShowBuyModal('marketing'); setBuyQty(100); setBuyResult(null); setCopied(false) }}
-              style={{ flex: 1, padding: '10px', borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-              Comprar
-            </button>
-            <button onClick={() => setShowSendModal(true)}
-              style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-              Enviar
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* HISTÓRICO DE USO */}
@@ -286,102 +308,34 @@ export default function MarketingPage() {
         )}
       </div>
 
-      {/* MODAL: COMPRAR CRÉDITOS */}
-      {showBuyModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={() => setShowBuyModal(null)}>
-          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
-              Comprar {showBuyModal === 'marketing' ? '📣 Marketing' : '💬 Mensagens Iniciais'}
-            </h3>
+      {/* MODAL: NOVA/EDITAR MENSAGEM */}
+      {showTplModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={() => setShowTplModal(false)}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>{editingTplId ? '✏️ Editar mensagem' : '✉️ Nova mensagem de marketing'}</h3>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              {showBuyModal === 'marketing' ? 'R$0,36 por crédito (inclui custo Meta + taxa Arkiel)' : 'R$0,05 por crédito (inclui custo Meta + taxa Arkiel)'}
+              A mensagem fica salva e pronta. Você envia quando quiser — cada contato que receber consumirá 1 crédito de marketing.
             </p>
 
-            {!buyResult && (
-              <>
-                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Quantidade de créditos</label>
-                <input type="number" value={buyQty} onChange={e => setBuyQty(e.target.value)} min="1" max="100000"
-                  style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 16, marginTop: 6, marginBottom: 16 }} />
-                
-                {/* Botões rápidos */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-                  {[50, 100, 500, 1000].map(q => (
-                    <button key={q} onClick={() => setBuyQty(q)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>{q}</button>
-                  ))}
-                </div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Nome interno</label>
+            <input value={tplName} onChange={e => setTplName(e.target.value)} placeholder="Ex: Promoção de inverno"
+              style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, marginTop: 6, marginBottom: 16 }} />
 
-                {/* Resumo */}
-                <div style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 12, marginBottom: 16 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Custo Meta (WhatsApp)</span>
-                    <span>R$ {((showBuyModal === 'marketing' ? 0.0374 : 0.0374) * buyQty).toFixed(2)}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Taxa Arkiel</span>
-                    <span>R$ {((showBuyModal === 'marketing' ? 0.02 : 0.01) * buyQty).toFixed(2)}</span>
-                  </div>
-                  <div style={{ borderTop: '1px solid var(--border-soft)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700 }}>
-                    <span>Total a pagar</span>
-                    <span>R$ {((showBuyModal === 'marketing' ? 0.36 : 0.05) * parseInt(buyQty || 0)).toFixed(2)}</span>
-                  </div>
-                </div>
+            <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Mensagem</label>
+            <textarea value={tplText} onChange={e => setTplText(e.target.value)} placeholder="Ex: Olá! Aproveite nossa promoção desta semana..." rows={6}
+              style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, resize: 'vertical', marginTop: 6, marginBottom: 16 }} />
 
-                <button onClick={handleBuy} disabled={buying}
-                  style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: buying ? 'not-allowed' : 'pointer', opacity: buying ? 0.6 : 1 }}>
-                  {buying ? 'Gerando PIX...' : 'Gerar PIX para pagamento'}
-                </button>
-              </>
+            {tplError && (
+              <div style={{ padding: 12, background: '#fef2f2', borderRadius: 10, fontSize: 13, color: '#dc2626', marginBottom: 12 }}>❌ {tplError}</div>
             )}
 
-            {/* Resultado: PIX gerado */}
-            {buyResult?.ok && buyResult.pix_code && (
-              <div>
-                <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                  <div style={{ fontSize: 28, marginBottom: 4 }}>💠</div>
-                  <div style={{ fontSize: 18, fontWeight: 800 }}>R$ {buyResult.amount.toFixed(2)}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{buyResult.quantity} créditos de {buyResult.credit_label}</div>
-                </div>
-                {buyResult.pix_qr && (
-                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
-                    <img src={buyResult.pix_qr} alt="QR Code PIX" style={{ width: 200, height: 200, borderRadius: 12, border: '1px solid var(--border-soft)' }} />
-                  </div>
-                )}
-                <div style={{ padding: 10, background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 10 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>PIX Copia e Cola:</div>
-                  <div style={{ fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)', maxHeight: 50, overflow: 'hidden' }}>
-                    {buyResult.pix_code.substring(0, 80)}...
-                  </div>
-                </div>
-                <button onClick={copyPix} style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: copied ? '#10b981' : 'var(--bg-secondary)', color: copied ? '#fff' : 'var(--text-primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 10 }}>
-                  {copied ? '✅ Copiado!' : '📋 Copiar código PIX'}
-                </button>
-                <div style={{ padding: 10, background: '#f0fdf4', borderRadius: 10, fontSize: 11, color: '#15803d', textAlign: 'center' }}>
-                  ✅ Após o pagamento, os créditos serão liberados automaticamente.
-                </div>
-              </div>
-            )}
-
-            {/* Resultado sem PIX (fallback) */}
-            {buyResult?.ok && !buyResult.pix_code && (
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>💳</div>
-                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>R$ {buyResult.amount?.toFixed(2)}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{buyResult.quantity} créditos de {buyResult.credit_label}</div>
-                <div style={{ padding: 12, background: '#fef3c7', borderRadius: 10, fontSize: 12, color: '#92400e' }}>
-                  ⚠️ {buyResult.message || 'Entre em contato para efetuar o pagamento.'}
-                </div>
-              </div>
-            )}
-
-            {buyResult?.error && (
-              <div style={{ padding: 12, background: '#fef2f2', borderRadius: 10, fontSize: 13, color: '#dc2626' }}>
-                ❌ {buyResult.error}
-              </div>
-            )}
-
-            <button onClick={() => setShowBuyModal(null)} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', marginTop: 12 }}>
-              Fechar
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => setShowTplModal(false)} style={{ flex: 1, padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: 'transparent', color: 'var(--text-muted)', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={saveTemplate} disabled={savingTpl}
+                style={{ flex: 1, padding: 12, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: savingTpl ? 'not-allowed' : 'pointer', opacity: savingTpl ? 0.6 : 1 }}>
+                {savingTpl ? 'Salvando...' : '💾 Salvar mensagem'}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -390,9 +344,9 @@ export default function MarketingPage() {
       {showSendModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={() => setShowSendModal(false)}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>📣 Enviar mensagem de marketing</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🚀 Enviar mensagem de marketing</h3>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Cada contato que receber esta mensagem consumirá 1 crédito de marketing (R$0,36). Você tem {credits.marketing} créditos.
+              {sendTplName ? `Enviando: "${sendTplName}". ` : ''}Cada contato que receber consumirá 1 crédito de marketing (R$0,36). Você tem {credits.marketing} créditos.
             </p>
 
             {/* Destinatários */}
@@ -420,29 +374,29 @@ export default function MarketingPage() {
               </div>
             )}
 
-            {/* Mensagem */}
+            {/* Mensagem (editável na hora do envio) */}
             <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Mensagem</label>
-            <textarea value={msgText} onChange={e => setMsgText(e.target.value)} placeholder="Digite sua mensagem de marketing..." rows={5}
+            <textarea value={msgText} onChange={e => setMsgText(e.target.value)} rows={5}
               style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 14, resize: 'vertical', marginBottom: 12 }} />
 
             {/* Resumo de custos */}
             <div style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 12, marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Destinatários</span>
-                <span>{recipients === 'all' ? contacts.length : selectedContacts.length} contatos</span>
+                <span>{targetCount} contatos</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Créditos necessários</span>
-                <span style={{ fontWeight: 600 }}>{recipients === 'all' ? contacts.length : selectedContacts.length}</span>
+                <span style={{ fontWeight: 600 }}>{targetCount}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Custo total</span>
-                <span>R$ {((recipients === 'all' ? contacts.length : selectedContacts.length) * 0.36).toFixed(2)}</span>
+                <span>R$ {(targetCount * 0.36).toFixed(2)}</span>
               </div>
               <div style={{ borderTop: '1px solid var(--border-soft)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                 <span style={{ color: 'var(--text-muted)' }}>Seu saldo</span>
-                <span style={{ color: credits.marketing >= (recipients === 'all' ? contacts.length : selectedContacts.length) ? '#10b981' : '#ef4444', fontWeight: 600 }}>
-                  {credits.marketing} créditos {credits.marketing >= (recipients === 'all' ? contacts.length : selectedContacts.length) ? '✅' : '⚠️ insuficiente'}
+                <span style={{ color: credits.marketing >= targetCount ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                  {credits.marketing} créditos {credits.marketing >= targetCount ? '✅' : '⚠️ insuficiente — compre na aba Upgrades'}
                 </span>
               </div>
             </div>
@@ -456,13 +410,13 @@ export default function MarketingPage() {
               </div>
             )}
 
-            <button onClick={handleSendMarketing} disabled={sending || !msgText.trim() || credits.marketing < (recipients === 'all' ? contacts.length : selectedContacts.length)}
-              style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: (sending || !msgText.trim() || credits.marketing < (recipients === 'all' ? contacts.length : selectedContacts.length)) ? 'not-allowed' : 'pointer', opacity: (sending || !msgText.trim() || credits.marketing < (recipients === 'all' ? contacts.length : selectedContacts.length)) ? 0.6 : 1 }}>
-              {sending ? 'Enviando...' : 'Enviar agora'}
+            <button onClick={handleSendMarketing} disabled={sending || !msgText.trim() || credits.marketing < targetCount}
+              style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: (sending || !msgText.trim() || credits.marketing < targetCount) ? 'not-allowed' : 'pointer', opacity: (sending || !msgText.trim() || credits.marketing < targetCount) ? 0.5 : 1 }}>
+              {sending ? 'Enviando...' : `🚀 Enviar para ${targetCount} contato(s)`}
             </button>
 
-            <button onClick={() => setShowSendModal(false)} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', marginTop: 8 }}>
-              Cancelar
+            <button onClick={() => setShowSendModal(false)} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', marginTop: 12 }}>
+              Fechar
             </button>
           </div>
         </div>

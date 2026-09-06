@@ -74,6 +74,13 @@ export default function Upgrade() {
   const [verifyMsg, setVerifyMsg] = useState('')
   const [token, setToken] = useState({ purchaseToken: '', productId: '', orderId: '' })
   const [showVerify, setShowVerify] = useState(false)
+  // Créditos de conversas (compra de Mensagens Iniciais / Marketing)
+  const [credits, setCredits] = useState({ utility: 0, marketing: 0, utility_total_purchased: 0, marketing_total_purchased: 0, utility_total_used: 0, marketing_total_used: 0 })
+  const [showBuyModal, setShowBuyModal] = useState(null) // 'utility' | 'marketing'
+  const [buyQty, setBuyQty] = useState(100)
+  const [buyResult, setBuyResult] = useState(null)
+  const [buying, setBuying] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.replace('/assistente-ark/entrar')
@@ -83,6 +90,52 @@ export default function Upgrade() {
     if (!user) return
     loadPlans()
   }, [user])
+
+  useEffect(() => {
+    if (tenant?.id) loadCredits(tenant.id)
+  }, [tenant?.id])
+
+  async function loadCredits(tid) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch(`/api/credits/balance?tenant_id=${tid}`, {
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      const data = await res.json()
+      if (!data.error) setCredits(data)
+    } catch (e) { console.error('loadCredits:', e) }
+  }
+
+  async function handleBuy() {
+    if (!tenant || !showBuyModal) return
+    setBuying(true)
+    setBuyResult(null)
+    try {
+      const res = await fetch('/api/credits/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tenant_id: tenant.id,
+          credit_type: showBuyModal,
+          quantity: parseInt(buyQty),
+        }),
+      })
+      const data = await res.json()
+      setBuyResult(data)
+      if (data.ok && tenant?.id) loadCredits(tenant.id)
+    } catch (e) {
+      setBuyResult({ error: e.message })
+    }
+    setBuying(false)
+  }
+
+  function copyPix() {
+    if (buyResult?.pix_code) {
+      navigator.clipboard.writeText(buyResult.pix_code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   async function loadPlans() {
     try {
@@ -290,6 +343,44 @@ export default function Upgrade() {
         </div>
       )}
 
+      {/* 💠 Créditos de Conversas — adesão pré-paga */}
+      <div className="upg-section">
+        <div className="upg-section-title">💠 Créditos de Conversas</div>
+        <p style={{fontSize:12,color:'var(--text-muted)',marginBottom:16}}>
+          Cada conversa iniciada por você no WhatsApp consome 1 crédito. Respostas de clientes dentro de 24h são sempre gratuitas.
+        </p>
+        <div className="upg-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+          {/* Utility */}
+          <div className="upg-card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="upg-plan-name">💬 Mensagens Iniciais</div>
+            <div className="upg-price">{credits.utility}</div>
+            <div className="upg-price-sub">créditos disponíveis</div>
+            <ul className="upg-feats">
+              <li className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>R$0,05 por conversa iniciada</li>
+              <li className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>Confirmações, lembretes, cobranças</li>
+              <li className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>Inclui custo Meta + taxa Arkiel</li>
+            </ul>
+            <button className="upg-btn upg-btn-solid" style={{ marginTop: 'auto' }} onClick={() => { setShowBuyModal('utility'); setBuyQty(100); setBuyResult(null); setCopied(false) }}>
+              Comprar créditos
+            </button>
+          </div>
+          {/* Marketing */}
+          <div className="upg-card" style={{ display: 'flex', flexDirection: 'column' }}>
+            <div className="upg-plan-name">📣 Marketing</div>
+            <div className="upg-price">{credits.marketing}</div>
+            <div className="upg-price-sub">créditos disponíveis</div>
+            <ul className="upg-feats">
+              <li className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>R$0,36 por conversa iniciada</li>
+              <li className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>Promoções, ofertas e novidades</li>
+              <li className="upg-feat"><span style={{color:'#22c55e'}}>✓</span>Inclui custo Meta + taxa Arkiel</li>
+            </ul>
+            <button className="upg-btn upg-btn-solid" style={{ marginTop: 'auto', background: 'linear-gradient(135deg,#f59e0b,#ef4444)' }} onClick={() => { setShowBuyModal('marketing'); setBuyQty(100); setBuyResult(null); setCopied(false) }}>
+              Comprar créditos
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Verificação de compra */}
       <div className="upg-section">
         <div className="upg-verify-toggle" onClick={() => setShowVerify(s => !s)}>
@@ -311,6 +402,102 @@ export default function Upgrade() {
           </div>
         )}
       </div>
+
+      {/* MODAL: COMPRAR CRÉDITOS */}
+      {showBuyModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={() => setShowBuyModal(null)}>
+          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, maxWidth: 420, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>
+              Comprar {showBuyModal === 'marketing' ? '📣 Marketing' : '💬 Mensagens Iniciais'}
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+              {showBuyModal === 'marketing' ? 'R$0,36 por crédito (inclui custo Meta + taxa Arkiel)' : 'R$0,05 por crédito (inclui custo Meta + taxa Arkiel)'}
+            </p>
+
+            {!buyResult && (
+              <>
+                <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>Quantidade de créditos</label>
+                <input type="number" value={buyQty} onChange={e => setBuyQty(e.target.value)} min="1" max="100000"
+                  style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-secondary)', color: 'var(--text-primary)', fontSize: 16, marginTop: 6, marginBottom: 16 }} />
+
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                  {[50, 100, 500, 1000].map(q => (
+                    <button key={q} onClick={() => setBuyQty(q)} style={{ flex: 1, padding: 8, borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary)', color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>{q}</button>
+                  ))}
+                </div>
+
+                <div style={{ padding: 16, background: 'var(--bg-secondary)', borderRadius: 12, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Custo Meta (WhatsApp)</span>
+                    <span>R$ {(0.0374 * buyQty).toFixed(2)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-muted)' }}>Taxa Arkiel</span>
+                    <span>R$ {((showBuyModal === 'marketing' ? 0.02 : 0.01) * buyQty).toFixed(2)}</span>
+                  </div>
+                  <div style={{ borderTop: '1px solid var(--border-soft)', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700 }}>
+                    <span>Total a pagar</span>
+                    <span>R$ {((showBuyModal === 'marketing' ? 0.36 : 0.05) * parseInt(buyQty || 0)).toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <button onClick={handleBuy} disabled={buying}
+                  style={{ width: '100%', padding: 14, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: buying ? 'not-allowed' : 'pointer', opacity: buying ? 0.6 : 1 }}>
+                  {buying ? 'Gerando PIX...' : 'Gerar PIX para pagamento'}
+                </button>
+              </>
+            )}
+
+            {buyResult?.ok && buyResult.pix_code && (
+              <div>
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <div style={{ fontSize: 28, marginBottom: 4 }}>💠</div>
+                  <div style={{ fontSize: 18, fontWeight: 800 }}>R$ {buyResult.amount.toFixed(2)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{buyResult.quantity} créditos de {buyResult.credit_label}</div>
+                </div>
+                {buyResult.pix_qr && (
+                  <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                    <img src={buyResult.pix_qr} alt="QR Code PIX" style={{ width: 200, height: 200, borderRadius: 12, border: '1px solid var(--border-soft)' }} />
+                  </div>
+                )}
+                <div style={{ padding: 10, background: 'var(--bg-secondary)', borderRadius: 10, marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>PIX Copia e Cola:</div>
+                  <div style={{ fontSize: 10, fontFamily: 'monospace', wordBreak: 'break-all', color: 'var(--text-primary)', maxHeight: 50, overflow: 'hidden' }}>
+                    {buyResult.pix_code.substring(0, 80)}...
+                  </div>
+                </div>
+                <button onClick={copyPix} style={{ width: '100%', padding: 12, borderRadius: 10, border: '1px solid var(--border-medium)', background: copied ? '#10b981' : 'var(--bg-secondary)', color: copied ? '#fff' : 'var(--text-primary)', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 10 }}>
+                  {copied ? '✅ Copiado!' : '📋 Copiar código PIX'}
+                </button>
+                <div style={{ padding: 10, background: '#f0fdf4', borderRadius: 10, fontSize: 11, color: '#15803d', textAlign: 'center' }}>
+                  ✅ Após o pagamento, os créditos serão liberados automaticamente.
+                </div>
+              </div>
+            )}
+
+            {buyResult?.ok && !buyResult.pix_code && (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>💳</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>R$ {buyResult.amount?.toFixed(2)}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12 }}>{buyResult.quantity} créditos de {buyResult.credit_label}</div>
+                <div style={{ padding: 12, background: '#fef3c7', borderRadius: 10, fontSize: 12, color: '#92400e' }}>
+                  ⚠️ {buyResult.message || 'Entre em contato para efetuar o pagamento.'}
+                </div>
+              </div>
+            )}
+
+            {buyResult?.error && (
+              <div style={{ padding: 12, background: '#fef2f2', borderRadius: 10, fontSize: 13, color: '#dc2626' }}>
+                ❌ {buyResult.error}
+              </div>
+            )}
+
+            <button onClick={() => setShowBuyModal(null)} style={{ width: '100%', padding: 10, borderRadius: 10, border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', marginTop: 12 }}>
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   )
 }
