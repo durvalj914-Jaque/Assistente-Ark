@@ -875,7 +875,73 @@ Obrigado! 🎉`)
   }
 
   // ── 📅 Agendamento de serviços: sched_service → sched_day → sched_slot → PIX ──
-  async function schedSendServiceMenu() {
+  // ── Motor de horários inteligente (agendamento) ──
+function normHM(t) {
+  if (!t) return null
+  const m = /^(\d{1,2}):(\d{1,2})/.exec(String(t).trim())
+  if (!m) return null
+  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
+}
+function hm(mins) {
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+}
+
+// Gera horários livres de forma inteligente:
+// - respeita a duração do serviço (horários "quebrados" tipo 09:45 são permitidos)
+// - respeita o horário de atendimento (booking_settings)
+// - respeita agendamentos existentes (por sobreposição de intervalos, não por string)
+// - respeita a agenda Google conectada do tenant (freeBusy)
+// - preenche lacunas após períodos ocupados (ex.: evento até 09:30 → oferece 09:30)
+async function buildFreeSlots(db, tenantId, date, serviceId) {
+  const { data: cfg } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
+  const openM = normHM(cfg?.open_time || '09:00')
+  const closeM = normHM(cfg?.close_time || '18:00')
+  if (openM == null || closeM == null || closeM <= openM) return []
+
+  const { data: svc } = await db.from('services').select('duration_min').eq('id', serviceId).maybeSingle()
+  const dur = Math.max(5, svc?.duration_min || 60)
+  const step = Math.max(10, dur)      // opções alinhadas à duração do serviço
+  const probe = Math.max(5, Math.min(15, step)) // resolução de busca de lacunas
+
+  // Períodos ocupados: agendamentos do banco (com qualquer formatação de hora)
+  const { data: taken } = await db.from('appointments')
+    .select('start_time, end_time').eq('tenant_id', tenantId).eq('date', date)
+    .in('status', ['pending_payment', 'confirmed'])
+  const busy = []
+  for (const t of (taken || [])) {
+    const s = normHM(t.start_time)
+    if (s == null) continue
+    const e = normHM(t.end_time) ?? s + dur
+    busy.push([s, Math.max(e, s + 5)])
+  }
+  // Períodos ocupados: Google Agenda do tenant
+  try {
+    const gBusy = await getGoogleBusy(db, tenantId, date)
+    for (const b of (gBusy || [])) {
+      const s = normHM(b.start)
+      if (s == null) continue
+      const e = normHM(b.end) ?? s + 60
+      busy.push([s, Math.max(e, s + 5)])
+    }
+  } catch (_) {}
+
+  const overlaps = (s) => busy.some(([bs, be]) => s < be && s + dur > bs)
+  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  const isToday = date === new Date().toISOString().slice(0, 10)
+  const minStart = isToday ? nowMin + 30 : openM
+
+  const slots = []
+  let cursor = openM
+  while (slots.length < 12) {
+    while (cursor + dur <= closeM && (overlaps(cursor) || cursor < minStart)) cursor += probe
+    if (cursor + dur > closeM) break
+    slots.push(hm(cursor))
+    cursor += Math.max(step, probe)
+  }
+  return slots
+}
+
+async function schedSendServiceMenu() {
     const { data: services } = await db.from('services')
       .select('id, name, description, price, duration_min')
       .eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
@@ -964,38 +1030,9 @@ Obrigado! 🎉`)
         return
       }
 
-      const { data: cfg2 } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
-      const open = cfg2?.open_time || '09:00'
-      const close = cfg2?.close_time || '18:00'
-      const slot = cfg2?.slot_min || 60
-      const { data: taken } = await db.from('appointments')
-        .select('start_time').eq('tenant_id', tenantId).eq('date', chosen)
-        .in('status', ['pending_payment', 'confirmed'])
-      const takenSet = new Set((taken || []).map(t => t.start_time))
-      // Google Agenda: períodos ocupados na agenda conectada do tenant
-      try {
-        const gBusy = await getGoogleBusy(db, tenantId, chosen)
-        for (const b of gBusy) {
-          const [bh, bm] = b.start.split(':').map(Number)
-          const [eh, em] = b.end.split(':').map(Number)
-          const bs = bh * 60 + bm, be = eh * 60 + em
-          for (let t = Math.floor(bs / slot) * slot; t < be; t += slot) {
-            takenSet.add(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`)
-          }
-        }
-      } catch (_) {}
-      const [oh, om] = open.split(':').map(Number)
-      const [ch, cm] = close.split(':').map(Number)
-      let cur = oh * 60 + om
-      const end = ch * 60 + cm
-      const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
-      const isToday = chosen === new Date().toISOString().slice(0, 10)
-      const slots = []
-      while (cur + slot <= end) {
-        const st = `${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`
-        if (!takenSet.has(st) && !(isToday && cur <= nowMin + 30)) slots.push(st)
-        cur += slot
-      }
+      // Motor inteligente: duração do serviço + horário de atendimento
+      // + agendamentos existentes + agenda Google (por sobreposição, não por string)
+      const slots = await buildFreeSlots(db, tenantId, chosen, draft.service_id)
       if (!slots.length) {
         await sendText(phoneNumberId, tkn, from, '😕 Não há horários livres nesse dia. Escolha outro dia acima ou *0* para voltar.')
         return
@@ -1015,6 +1052,19 @@ Obrigado! 🎉`)
       const st = slotMap[(num || 0) - 1]
       if (!st) {
         await sendText(phoneNumberId, tkn, from, '❌ Opção inválida. Digite o número do horário ou *0* para voltar ao menu.')
+        return
+      }
+      // Revalidação dinâmica: agenda pode ter mudado desde o menu (Google, outro cliente)
+      const freeNow = await buildFreeSlots(db, tenantId, draft.date, draft.service_id)
+      if (!freeNow.includes(st)) {
+        if (!freeNow.length) {
+          await sendText(phoneNumberId, tkn, from, '😕 O horário escolhido acabou de ser ocupado e não há outros horários livres nesse dia. Tente outro dia ou digite *0* para voltar ao menu.')
+          await db.from('conversations').update({ status: 'sched_day' }).eq('id', conv.id)
+          return
+        }
+        await db.from('appointments').update({ notes: 'SLOTS:' + freeNow.join(','), updated_at: new Date().toISOString() }).eq('id', draft.id)
+        const slotMenu2 = freeNow.map((s, i) => `${i + 1}️⃣ ${s}`).join('\n')
+        await sendText(phoneNumberId, tkn, from, `⚠️ O horário *${st}* acabou de ser ocupado (agenda atualizada).\n\nHorários livres agora:\n\n${slotMenu2}\n\n0️⃣ Voltar ao menu`)
         return
       }
       const { data: svc } = await db.from('services').select('id, name, price, duration_min').eq('id', draft.service_id).maybeSingle()
