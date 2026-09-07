@@ -1027,45 +1027,113 @@ Obrigado! 🎉`)
       const taxa = parseFloat(svc?.price || 0)
 
       if (taxa > 0) {
-        const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, name').eq('id', tenantId).maybeSingle()
-        const txid = `ARK${Date.now().toString(36).toUpperCase()}`
+        const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, name, mp_access_token').eq('id', tenantId).maybeSingle()
+        const txid = `ARK${Date.now().toString(36).toUpperCase()}${Math.floor(Math.random() * 90 + 10)}`
         const { data: payment } = await db.from('payments').insert({
           tenant_id: tenantId, bot_id: bot.id,
           amount: taxa, status: 'pending', pix_code: txid,
-          pix_qr_url: JSON.stringify({ txid, contact_id: contact.id, conversation_id: conv.id, method: 'pix', appointment_id: draft.id, description: `Agendamento ${svc?.name || ''} — taxa` }),
+          pix_qr_url: JSON.stringify({ txid, contact_id: contact.id, conversation_id: conv.id, method: 'pix_mp', appointment_id: draft.id, description: `Agendamento ${svc?.name || ''} — taxa` }),
         }).select().single()
         await db.from('appointments').update({ payment_id: payment?.id }).eq('id', draft.id)
 
-        if (tenant?.pix_key) {
+        // ── PIX via Mercado Pago: confirmação automática via webhook ──
+        let mpToken = null
+        try { mpToken = JSON.parse(tenant?.mp_access_token || 'null')?.access_token } catch (_) {}
+        if (!mpToken) mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN_3 || process.env.MERCADO_PAGO_ACCESS_TOKEN_2
+
+        let qrBuffer = null
+        let pixCode = null
+        let usedMP = false
+
+        if (mpToken) {
+          try {
+            const cleanPhone = (contact.phone || '').replace(/\D/g, '')
+            const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${mpToken}`, 'X-Idempotency-Key': txid },
+              body: JSON.stringify({
+                transaction_amount: Number(taxa.toFixed(2)),
+                description: `Taxa de agendamento — ${svc?.name || 'Atendimento'}`,
+                payment_method_id: 'pix',
+                external_reference: txid,
+                notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+                date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+                payer: { email: cleanPhone ? cleanPhone + '@arkiel.com.br' : 'cliente@arkiel.com.br' },
+              }),
+            })
+            const mpData = await mpRes.json()
+            const tdata = mpData?.point_of_interaction?.transaction_data
+            if (tdata?.qr_code && tdata?.qr_code_base64) {
+              pixCode = tdata.qr_code
+              qrBuffer = Buffer.from(tdata.qr_code_base64, 'base64')
+              usedMP = true
+              await db.from('payments').update({
+                pix_qr_url: JSON.stringify({ ...JSON.parse(payment.pix_qr_url || '{}'), mp_payment_id: mpData.id }),
+              }).eq('id', payment.id)
+            } else {
+              await savelog(db, 'pix_mp_fail', null, { txid, mp: JSON.stringify(mpData).substring(0, 300) })
+            }
+          } catch (e) {
+            await savelog(db, 'pix_mp_err', e?.message)
+          }
+        }
+
+        // Fallback: PIX estático da chave do tenant (confirmação manual via comprovante)
+        if (!pixCode && tenant?.pix_key) {
           const { generatePixCode } = await import('../../../lib/pix')
           const QRCodeModule = await import('qrcode')
-          const pixCode = generatePixCode({
+          pixCode = generatePixCode({
             pixKey: tenant.pix_key,
             merchantName: (tenant.merchant_name || tenant.name || 'Arkiel').substring(0, 25),
             merchantCity: (tenant.merchant_city || 'SAO PAULO').substring(0, 15),
             amount: taxa, txid,
           })
-          const qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
-          const blob = new Blob([qrBuffer], { type: 'image/png' })
-          const formData = new FormData()
-          formData.append('messaging_product', 'whatsapp')
-          formData.append('type', 'image/png')
-          formData.append('file', blob, 'pix_booking.png')
-          const upRes = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${tkn}` }, body: formData })
-          const upJson = await upRes.json()
-          if (upJson.id) {
-            await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
-              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
-              body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'image',
-                image: { id: upJson.id, caption: `📅 *Reserva de horário*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nTaxa de agendamento: *R$ ${taxa.toFixed(2)}*\n\n*Escaneie o QR Code ou copie: *\n\n${pixCode}\n\nApós o pagamento, sua reserva é confirmada automaticamente. ✅` } }),
-            })
-            await db.from('payments').update({ pix_code: pixCode, pix_qr_url: JSON.stringify({ ...JSON.parse(payment.pix_qr_url || '{}'), qr_media_id: upJson.id }) }).eq('id', payment.id)
-          } else {
-            await sendText(phoneNumberId, tkn, from, `📅 *Reserva de horário*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nTaxa de agendamento: *R$ ${taxa.toFixed(2)}*\n\n💠 *PIX Copia e Cola:*\n\n${pixCode}\n\nApós o pagamento, sua reserva é confirmada automaticamente. ✅`)
-            await db.from('payments').update({ pix_code: pixCode }).eq('id', payment.id)
+          qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+        }
+
+        const pixMsg = `📅 *Reserva de horário*
+
+${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}
+
+Taxa de agendamento: *R$ ${taxa.toFixed(2)}*
+
+*Escaneie o QR Code ou copie o código:*
+
+${pixCode}
+
+${usedMP ? 'Após o pagamento, sua reserva é confirmada automaticamente. ✅' : 'Após o pagamento, sua reserva é confirmada automaticamente. ✅'}`
+
+        if (pixCode && qrBuffer) {
+          try {
+            const blob = new Blob([qrBuffer], { type: 'image/png' })
+            const formData = new FormData()
+            formData.append('messaging_product', 'whatsapp')
+            formData.append('type', 'image/png')
+            formData.append('file', blob, 'pix_booking.png')
+            const upRes = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${tkn}` }, body: formData })
+            const upJson = await upRes.json()
+            if (upJson.id) {
+              await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+                body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'image',
+                  image: { id: upJson.id, caption: pixMsg.substring(0, 1024) } }),
+              })
+            } else {
+              await sendText(phoneNumberId, tkn, from, pixMsg)
+            }
+          } catch (_) {
+            await sendText(phoneNumberId, tkn, from, pixMsg)
           }
+        } else if (pixCode) {
+          await sendText(phoneNumberId, tkn, from, pixMsg)
         } else {
-          await sendText(phoneNumberId, tkn, from, `📅 *Reserva de horário*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nTaxa de agendamento: R$ ${taxa.toFixed(2)}.\n\n⚠️ Não conseguimos gerar o PIX agora — nossa equipe confirmará sua reserva manualmente.`)
+          await sendText(phoneNumberId, tkn, from, `📅 *Reserva de horário*
+
+${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}
+
+Taxa de agendamento: R$ ${taxa.toFixed(2)}.
+
+⚠️ Não conseguimos gerar o PIX agora — nossa equipe confirmará sua reserva manualmente.`)
         }
       } else {
         await db.from('appointments').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', draft.id)

@@ -180,6 +180,21 @@ export default async function handler(req, res) {
               console.error('[webhook-mp] Erro ao registrar taxa:', e.message)
             }
 
+            // ── Confirmar agendamento vinculado (taxa de agendamento) ──
+            const apptPayMeta = JSON.parse(payment.pix_qr_url || '{}')
+            if (apptPayMeta.appointment_id) {
+              const { data: apptRow } = await db.from('appointments')
+                .select('id, date, start_time, end_time, service_id, customer_name, status')
+                .eq('id', apptPayMeta.appointment_id).maybeSingle()
+              if (apptRow && apptRow.status !== 'confirmed') {
+                await db.from('appointments').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', apptPayMeta.appointment_id)
+                try {
+                  const { pushAppointmentToGoogle } = await import('../../../../lib/googleCalendar')
+                  await pushAppointmentToGoogle(db, payment.tenant_id, apptRow)
+                } catch (e) { console.error('[webhook-mp] Erro ao criar evento Google:', e.message) }
+              }
+            }
+
             // ── Atualizar pedido do catalogo se aplicavel ──
             const orderId = JSON.parse(payment.pix_qr_url || '{}')?.order_id
             if (orderId) {
@@ -196,6 +211,49 @@ export default async function handler(req, res) {
             if (bot?.phone_number_id && contact?.phone) {
               const waToken = bot.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
               const isCatalog = !!meta.from_catalog
+              if (meta.appointment_id) {
+                const { data: apptRow } = await db.from('appointments')
+                  .select('date, start_time, service_id').eq('id', meta.appointment_id).maybeSingle()
+                const { data: apptSvc } = apptRow?.service_id
+                  ? await db.from('services').select('name').eq('id', apptRow.service_id).maybeSingle()
+                  : { data: null }
+                const apptDate = apptRow ? new Date(apptRow.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' }) : ''
+                const apptText = `📅 *Agendamento confirmado!*
+
+${apptSvc?.name || 'Atendimento'} — ${apptDate} às ${apptRow?.start_time || ''}
+
+Seu pagamento foi confirmado automaticamente. Até lá! 🎉`
+                try {
+                  await fetch(`https://graph.facebook.com/v25.0/${bot.phone_number_id}/messages`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
+                    body: JSON.stringify({ messaging_product: 'whatsapp', to: contact.phone, type: 'text', text: { body: apptText } }),
+                  })
+                  await db.from('messages').insert({
+                    tenant_id: payment.tenant_id, bot_id: payment.bot_id,
+                    conversation_id: meta.conversation_id || null,
+                    contact_id: meta.contact_id || null, direction: 'outbound', type: 'text', content: apptText, sent_by: 'bot'
+                  })
+                } catch (_) {}
+                // Push pro admin
+                try {
+                  const { sendPushToTenant } = await import('../../../../lib/webpush')
+                  const { sendFcmToTenant } = await import('../../../../lib/fcm')
+                  await Promise.all([
+                    sendPushToTenant(payment.tenant_id, {
+                      title: '📅 Agendamento confirmado!',
+                      body: `Pagamento da taxa confirmado via PIX — ${contact.phone}`,
+                      url: '/admin/agendamentos',
+                      tag: `ark-appt-paid-${payment.id}`,
+                    }),
+                    sendFcmToTenant(payment.tenant_id, {
+                      title: '📅 Agendamento confirmado!',
+                      body: `Pagamento da taxa confirmado via PIX — ${contact.phone}`,
+                      url: '/admin/agendamentos',
+                    }),
+                  ])
+                } catch (_) {}
+                return res.status(200).json({ ok: true, appointment_confirmed: true })
+              }
               const confirmText = isCatalog
                 ? `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\nSeu pedido do catalogo foi confirmado e esta sendo processado. 🎉\n\nObrigado pela compra!`
                 : `✅ *Pagamento confirmado!*\n\nValor: R$ ${parseFloat(payment.amount).toFixed(2)}\n${meta.description || ''}\n\nObrigado pelo pagamento! 🎉`
