@@ -885,6 +885,11 @@ function normHM(t) {
 function hm(mins) {
   return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
 }
+function durLabel(mins) {
+  if (!mins || mins < 60) return `${mins || 60} min`
+  const h = Math.floor(mins / 60), m = mins % 60
+  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+}
 
 // Gera horários livres de forma inteligente:
 // - respeita a duração do serviço (horários "quebrados" tipo 09:45 são permitidos)
@@ -952,7 +957,7 @@ async function schedSendServiceMenu() {
     }
     const menu = services.map((sv, i) => {
       const taxa = parseFloat(sv.price) > 0 ? ` — taxa R$ ${parseFloat(sv.price).toFixed(2)}` : ''
-      return `${i + 1}️⃣ ${sv.name}${taxa}`
+      return `${i + 1}️⃣ ${sv.name} (${durLabel(sv.duration_min)})${taxa}`
     }).join('\n')
     await sendText(phoneNumberId, tkn, from, `📅 *Agendamento*\n\nEscolha um serviço:\n\n${menu}\n\n0️⃣ Voltar ao menu`)
     await db.from('conversations').update({ status: 'sched_service' }).eq('id', conv.id)
@@ -1040,7 +1045,9 @@ async function schedSendServiceMenu() {
       await db.from('appointments').update({ date: chosen, notes: 'SLOTS:' + slots.join(','), updated_at: new Date().toISOString() }).eq('id', draft.id)
       const slotMenu = slots.map((st, i) => `${i + 1}️⃣ ${st}`).join('\n')
       const chosenLabel = new Date(chosen + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
-      await sendText(phoneNumberId, tkn, from, `🕐 *${chosenLabel}*\n\nHorários livres:\n\n${slotMenu}\n\n0️⃣ Voltar ao menu`)
+      const { data: daySvc } = await db.from('services').select('duration_min').eq('id', draft.service_id).maybeSingle()
+      const durTxt = durLabel(daySvc?.duration_min)
+      await sendText(phoneNumberId, tkn, from, `🕐 *${chosenLabel}*\n\nDuração do atendimento: *${durTxt}*\n\nHorários livres:\n\n${slotMenu}\n\n0️⃣ Voltar ao menu`)
       await db.from('conversations').update({ status: 'sched_slot' }).eq('id', conv.id)
       return
     }
@@ -1145,6 +1152,7 @@ async function schedSendServiceMenu() {
         const pixMsg = `📅 *Reserva de horário*
 
 ${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}
+Duração: *${durLabel(dur)}* (até ${et})
 
 Taxa de agendamento: *R$ ${taxa.toFixed(2)}*
 
@@ -1181,6 +1189,7 @@ ${usedMP ? 'Após o pagamento, sua reserva é confirmada automaticamente. ✅' :
           await sendText(phoneNumberId, tkn, from, `📅 *Reserva de horário*
 
 ${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}
+Duração: *${durLabel(dur)}* (até ${et})
 
 Taxa de agendamento: R$ ${taxa.toFixed(2)}.
 

@@ -250,12 +250,16 @@ export default async function handler(req, res) {
                 const { data: apptRow } = await db.from('appointments')
                   .select('date, start_time, service_id').eq('id', meta.appointment_id).maybeSingle()
                 const { data: apptSvc } = apptRow?.service_id
-                  ? await db.from('services').select('name').eq('id', apptRow.service_id).maybeSingle()
+                  ? await db.from('services').select('name, duration_min').eq('id', apptRow.service_id).maybeSingle()
                   : { data: null }
+                const apptDurTxt = apptSvc?.duration_min >= 60
+                  ? (apptSvc.duration_min % 60 ? `${Math.floor(apptSvc.duration_min / 60)}h${String(apptSvc.duration_min % 60).padStart(2, '0')}` : `${apptSvc.duration_min / 60}h`)
+                  : `${apptSvc?.duration_min || 60} min`
                 const apptDate = apptRow ? new Date(apptRow.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' }) : ''
                 const apptText = `📅 *Agendamento confirmado!*
 
 ${apptSvc?.name || 'Atendimento'} — ${apptDate} às ${apptRow?.start_time || ''}
+Duração: ${apptDurTxt}
 
 Seu pagamento foi confirmado automaticamente. Até lá! 🎉`
                 try {
