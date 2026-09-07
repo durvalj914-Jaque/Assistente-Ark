@@ -18,6 +18,8 @@ export default function MarketingPage() {
 
   // Templates de marketing
   const [templates, setTemplates] = useState([])
+  const [analytics, setAnalytics] = useState(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false)
   const [showTplModal, setShowTplModal] = useState(false)
   const [editingTplId, setEditingTplId] = useState(null)
   const [tplName, setTplName] = useState('')
@@ -62,8 +64,21 @@ export default function MarketingPage() {
       await loadHistory(tm.tenants.id)
       await loadTemplates(tm.tenants.id)
       await loadContacts(tm.tenants.id)
+      loadAnalytics(session.access_token)
     }
     setLoading(false)
+  }
+
+  async function loadAnalytics(accessToken) {
+    setLoadingAnalytics(true)
+    try {
+      const res = await fetch('/api/admin/template-analytics', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const data = await res.json()
+      setAnalytics(res.ok ? data : { error: data.error })
+    } catch (e) { setAnalytics({ error: String(e?.message || e) }) }
+    setLoadingAnalytics(false)
   }
 
   async function loadCredits(tid) {
@@ -262,6 +277,39 @@ export default function MarketingPage() {
           Cada envio consome 1 crédito de marketing (R$0,36) por contato.<br />
           Precisa de créditos? Faça a adesão na aba <strong style={{ color: 'var(--text-primary)' }}>⬆️ Upgrades</strong>.
         </div>
+      </div>
+
+      {/* CONTA OFICIAL META (últimos 7 dias) */}
+      <div style={{ margin: '16px 20px', padding: 16, background: 'var(--bg-card)', borderRadius: 16, border: '1px solid var(--border-soft)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>📊 Conversas iniciadas — conferência com a Meta (últimos 7 dias)</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>Dados oficiais da API de Conversation Analytics vs. contabilização da plataforma.</div>
+          </div>
+          <button onClick={() => supabase.auth.getSession().then(({ data }) => loadAnalytics(data?.session?.access_token))} className="ark-btn" style={{ fontSize: 11, padding: '6px 12px' }}>
+            Atualizar
+          </button>
+        </div>
+        {loadingAnalytics ? <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 12 }}>Carregando…</div> : analytics?.error ? (
+          <div style={{ fontSize: 12, color: '#ef4444', marginTop: 12 }}>{analytics.error}</div>
+        ) : analytics ? (
+          <div style={{ display: 'flex', gap: 24, marginTop: 14, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Meta (oficial)</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{analytics.meta_official?.total_conversations ?? 0} <span style={{ fontSize: 11, fontWeight: 500 }}>conversas · R$ {(analytics.meta_official?.total_cost || 0).toFixed(2)}</span></div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Plataforma (tracking)</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)' }}>{analytics.our_tracking?.total ?? 0} <span style={{ fontSize: 11, fontWeight: 500 }}>conversas · R$ {(analytics.our_tracking?.cost || 0).toFixed(2)}</span></div>
+            </div>
+            {Object.entries(analytics.meta_official?.by_category || {}).map(([cat, v]) => (
+              <div key={cat}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cat}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{v.conversations} · R$ {v.cost.toFixed(2)}</div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* LISTA DE MENSAGENS */}
