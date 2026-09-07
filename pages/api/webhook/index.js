@@ -1021,7 +1021,8 @@ Obrigado! 🎉`)
       const dur = svc?.duration_min || 60
       const [sh, sm] = st.split(':').map(Number)
       const et = `${String(Math.floor((sh * 60 + sm + dur) / 60)).padStart(2, '0')}:${String((sh * 60 + sm + dur) % 60).padStart(2, '0')}`
-      await db.from('appointments').update({ start_time: st, end_time: et, status: 'pending_payment', updated_at: new Date().toISOString() }).eq('id', draft.id)
+      const stNorm = st.length < 5 ? '0' + st : st // garante 09:00 e não 9:00
+      await db.from('appointments').update({ start_time: stNorm, end_time: et, status: 'pending_payment', updated_at: new Date().toISOString() }).eq('id', draft.id)
       await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
       const dayLabel = new Date(draft.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
       const taxa = parseFloat(svc?.price || 0)
