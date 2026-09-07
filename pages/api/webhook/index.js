@@ -3,6 +3,7 @@ import { processFlow, getNodeButtons } from '../../../lib/flowEngine'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
 import { sendProductList } from '../../../lib/metaCatalog'
+import { getGoogleBusy, pushAppointmentToGoogle } from '../../../lib/googleCalendar'
 
 export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
 
@@ -702,8 +703,9 @@ Obrigado pela compra! 🎉`)
           // Confirmar agendamento vinculado a este pagamento
           const apptId = JSON.parse(fullPayment?.pix_qr_url || '{}')?.appointment_id
           if (apptId) {
-            const { data: apptRow } = await db.from('appointments').select('id, date, start_time').eq('id', apptId).maybeSingle()
+            const { data: apptRow } = await db.from('appointments').select('id, date, start_time, end_time, service_id, customer_name, customer_phone').eq('id', apptId).maybeSingle()
             await db.from('appointments').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', apptId)
+            try { await pushAppointmentToGoogle(db, tenantId, apptRow) } catch (_) {}
             const apptDate = apptRow ? new Date(apptRow.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' }) : ''
             await sendText(phoneNumberId, tkn, from, `📅 *Agendamento confirmado!*
 
@@ -959,6 +961,18 @@ Obrigado! 🎉`)
         .select('start_time').eq('tenant_id', tenantId).eq('date', chosen)
         .in('status', ['pending_payment', 'confirmed'])
       const takenSet = new Set((taken || []).map(t => t.start_time))
+      // Google Agenda: períodos ocupados na agenda conectada do tenant
+      try {
+        const gBusy = await getGoogleBusy(db, tenantId, chosen)
+        for (const b of gBusy) {
+          const [bh, bm] = b.start.split(':').map(Number)
+          const [eh, em] = b.end.split(':').map(Number)
+          const bs = bh * 60 + bm, be = eh * 60 + em
+          for (let t = Math.floor(bs / slot) * slot; t < be; t += slot) {
+            takenSet.add(`${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`)
+          }
+        }
+      } catch (_) {}
       const [oh, om] = open.split(':').map(Number)
       const [ch, cm] = close.split(':').map(Number)
       let cur = oh * 60 + om
