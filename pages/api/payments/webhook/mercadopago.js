@@ -39,6 +39,41 @@ export default async function handler(req, res) {
 
         await db.from('payments').update(updateData).eq('pix_code', txid)
 
+        // ── PIX expirado/cancelado com agendamento vinculado: liberar o horário ──
+        if ((status === 'expired' || status === 'cancelled') && existMeta.appointment_id) {
+          try {
+            const { data: apptCancel } = await db.from('appointments')
+              .select('id, status').eq('id', existMeta.appointment_id).maybeSingle()
+            if (apptCancel && apptCancel.status === 'pending_payment') {
+              await db.from('appointments')
+                .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+                .eq('id', apptCancel.id)
+              console.log('[webhook-mp] Agendamento cancelado (PIX expirado):', apptCancel.id)
+              // Avisar o cliente que o horário foi liberado
+              try {
+                const { data: bot2 } = await db.from('bots').select('phone_number_id, access_token').eq('tenant_id', existPay?.tenant_id).maybeSingle()
+                const { data: contact2 } = await db.from('contacts').select('phone').eq('id', existMeta.contact_id || '').maybeSingle()
+                if (bot2?.phone_number_id && contact2?.phone) {
+                  const tkn2 = bot2.access_token || process.env.WHATSAPP_ACCESS_TOKEN_2
+                  const txt2 = '⌛ O prazo de pagamento da taxa de agendamento expirou e o horário foi liberado.\n\nSe ainda quiser o atendimento, é só começar o agendamento de novo. Digite *menu* para voltar ao menu principal. 📅'
+                  await fetch(`https://graph.facebook.com/v25.0/${bot2.phone_number_id}/messages`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn2}` },
+                    body: JSON.stringify({ messaging_product: 'whatsapp', to: contact2.phone, type: 'text', text: { body: txt2 } }),
+                  })
+                  await db.from('messages').insert({
+                    tenant_id: existPay?.tenant_id, bot_id: bot2.id,
+                    conversation_id: existMeta.conversation_id || null,
+                    contact_id: existMeta.contact_id || null,
+                    direction: 'outbound', type: 'text', content: txt2, sent_by: 'bot',
+                  })
+                }
+              } catch (_) {}
+            }
+          } catch (e) {
+            console.error('[webhook-mp] Erro ao liberar agendamento expirado:', e?.message)
+          }
+        }
+
         // ── Confirmar pagamento ──
         if (status === 'paid') {
           const { data: payment } = await db.from('payments')
