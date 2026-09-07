@@ -191,6 +191,16 @@ Vamos finalizar o pagamento 👇`)
   }
 }
 
+async function sendImage(phoneId, token, to, link, caption) {
+  try {
+    await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'image', image: { link, ...(caption ? { caption } : {}) } }),
+    })
+  } catch (_) {}
+}
+
 async function sendText(phoneId, token, to, text) {
   const r = await fetch(`https://graph.facebook.com/v19.0/${phoneId}/messages`, {
     method: 'POST',
@@ -904,13 +914,14 @@ Obrigado! 🎉`)
     // PASSO 1: escolher serviço
     if (conv.status === 'sched_service') {
       const { data: services } = await db.from('services')
-        .select('id, name, price, duration_min').eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
+        .select('id, name, price, duration_min, image_url').eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
       const svc = services?.[(num || 0) - 1]
       if (!svc) {
         await sendText(phoneNumberId, tkn, from, '❌ Opção inválida. Digite o número de um serviço ou *0* para voltar ao menu.')
         return
       }
       if (draft) await db.from('appointments').delete().eq('id', draft.id)
+      if (svc.image_url) await sendImage(phoneNumberId, tkn, from, svc.image_url, svc.name)
 
       // Dias disponíveis conforme booking_settings
       const { data: cfg } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()

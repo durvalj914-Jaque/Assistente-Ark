@@ -167,9 +167,11 @@ function ServiceModal({ service, tenantId, onClose, onSaved }) {
     description: service?.description || '',
     price: service?.price ?? '',
     duration_min: service?.duration_min ?? 60,
+    image_url: service?.image_url || '',
     is_active: service?.is_active ?? true,
   })
   const [saving, setSaving] = useState(false)
+  const [uploadingImg, setUploadingImg] = useState(false)
   const setField = useCallback((name, value) => setForm(f => ({ ...f, [name]: value })), [])
 
   async function handleSave() {
@@ -195,8 +197,47 @@ function ServiceModal({ service, tenantId, onClose, onSaved }) {
         </div>
         <Field label="NOME DO SERVIÇO" name="name" value={form.name} onChange={setField} placeholder="Ex: Consulta de rotina" hint="Aparece no menu do bot quando o cliente escolhe 📅 Agendar." />
         <Field label="DESCRIÇÃO" name="description" value={form.description} onChange={setField} placeholder="O que está incluído no atendimento" textarea />
+        <label style={labelStyle}>IMAGEM DO SERVIÇO</label>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 14 }}>
+          {form.image_url ? (
+            <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
+              <img src={form.image_url} alt="Preview" style={{ width: 80, height: 80, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
+              <button type="button" onClick={() => setField('image_url', '')} style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+          ) : (
+            <div style={{ width: 80, height: 80, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🖼️</div>
+          )}
+          <div style={{ flex: 1 }}>
+            <input type="file" accept="image/png,image/jpeg,image/webp" id="service-img-upload" style={{ display: 'none' }}
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                setUploadingImg(true)
+                try {
+                  const fd = new FormData()
+                  fd.append('file', file)
+                  const r = await fetch('/api/products/upload-image', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+                    body: fd,
+                  })
+                  const d = await r.json()
+                  if (d.imageUrl) setField('image_url', d.imageUrl)
+                  else alert(d.error || 'Erro no upload')
+                } catch (err) {
+                  alert('Falha no upload da imagem')
+                }
+                setUploadingImg(false)
+              }} />
+            <label htmlFor="service-img-upload" className="ark-btn" style={{ display: 'inline-block', cursor: 'pointer', fontSize: 12, padding: '8px 14px' }}>
+              {uploadingImg ? 'Enviando…' : form.image_url ? '📷 Trocar imagem' : '📷 Enviar imagem'}
+            </label>
+            <p style={{ color: '#64748b', fontSize: 11, margin: '8px 0 0' }}>JPG, PNG ou WebP. Enviada no WhatsApp quando o cliente escolhe o serviço.</p>
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <Field label="TAXA DE AGENDAMENTO (R$)" name="price" value={form.price} onChange={setField} type="number" placeholder="0.00" hint="0 = grátis. Se &gt; 0, o cliente paga via PIX pra confirmar o horário." />
+          <Field label="TAXA DE AGENDAMENTO (R$)"  name="price" value={form.price} onChange={setField} type="number" placeholder="0.00" hint="0 = grátis. Se &gt; 0, o cliente paga via PIX pra confirmar o horário." />
           <Field label="DURAÇÃO (min)" name="duration_min" value={form.duration_min} onChange={setField} type="number" placeholder="60" hint="Tamanho do horário na agenda." />
         </div>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 18 }}>
@@ -421,6 +462,7 @@ export default function ProductsPage() {
               {services.map(svc => (
                 <div key={svc.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: '14px 16px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                    {svc.image_url && <img src={svc.image_url} alt={svc.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />}
                     <div style={{ flex: 1 }}>
                       <div style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14 }}>
                         {svc.name} {!svc.is_active && <span style={{ color: '#64748b', fontSize: 11 }}>(pausado)</span>}
