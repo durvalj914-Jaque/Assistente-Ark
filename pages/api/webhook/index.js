@@ -699,6 +699,19 @@ Seu pagamento foi confirmado e seu pedido está sendo processado.
 
 Obrigado pela compra! 🎉`)
           }
+          // Confirmar agendamento vinculado a este pagamento
+          const apptId = JSON.parse(fullPayment?.pix_qr_url || '{}')?.appointment_id
+          if (apptId) {
+            const { data: apptRow } = await db.from('appointments').select('id, date, start_time').eq('id', apptId).maybeSingle()
+            await db.from('appointments').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', apptId)
+            const apptDate = apptRow ? new Date(apptRow.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' }) : ''
+            await sendText(phoneNumberId, tkn, from, `📅 *Agendamento confirmado!*
+
+${apptDate} às ${apptRow?.start_time || ''}
+
+Até lá! 🎉`)
+          }
+
           // Avisar cliente
           await sendText(phoneNumberId, tkn, from, `✅ *Comprovante recebido!*
 
@@ -847,6 +860,205 @@ Obrigado! 🎉`)
     } catch (_) {}
     await savelog(db, 'done_human')
     return
+  }
+
+  // ── 📅 Agendamento de serviços: sched_service → sched_day → sched_slot → PIX ──
+  async function schedSendServiceMenu() {
+    const { data: services } = await db.from('services')
+      .select('id, name, description, price, duration_min')
+      .eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
+    if (!services?.length) {
+      await sendText(phoneNumberId, tkn, from, '😕 No momento não temos serviços disponíveis para agendamento. Digite *0* para voltar ao menu.')
+      await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+      return
+    }
+    const menu = services.map((sv, i) => {
+      const taxa = parseFloat(sv.price) > 0 ? ` — taxa R$ ${parseFloat(sv.price).toFixed(2)}` : ''
+      return `${i + 1}️⃣ ${sv.name}${taxa}`
+    }).join('\n')
+    await sendText(phoneNumberId, tkn, from, `📅 *Agendamento*\n\nEscolha um serviço:\n\n${menu}\n\n0️⃣ Voltar ao menu`)
+    await db.from('conversations').update({ status: 'sched_service' }).eq('id', conv.id)
+  }
+
+  if (['sched_service', 'sched_day', 'sched_slot'].includes(conv.status)) {
+    const schedReset = ['0','menu','inicio','início','reiniciar','comecar','começar'].includes((userText || '').trim().toLowerCase())
+    const { data: draftAppts } = await db.from('appointments')
+      .select('id, service_id, date, start_time, notes')
+      .eq('conversation_id', conv.id).eq('status', 'draft')
+      .order('created_at', { ascending: false }).limit(1)
+    const draft = draftAppts?.[0]
+
+    if (schedReset) {
+      if (draft) await db.from('appointments').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', draft.id)
+      await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+      const rNodes = bot.flow?.nodes || []
+      const rNode = rNodes.find(n => !n.parentId) || rNodes[0]
+      await sendText(phoneNumberId, tkn, from, rNode?.text || bot.greeting || 'Ok, de volta ao menu inicial. 👋')
+      return
+    }
+
+    const num = parseInt(userText, 10)
+
+    // PASSO 1: escolher serviço
+    if (conv.status === 'sched_service') {
+      const { data: services } = await db.from('services')
+        .select('id, name, price, duration_min').eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
+      const svc = services?.[(num || 0) - 1]
+      if (!svc) {
+        await sendText(phoneNumberId, tkn, from, '❌ Opção inválida. Digite o número de um serviço ou *0* para voltar ao menu.')
+        return
+      }
+      if (draft) await db.from('appointments').delete().eq('id', draft.id)
+
+      // Dias disponíveis conforme booking_settings
+      const { data: cfg } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
+      const daysOfWeek = (cfg?.days_of_week || '1,2,3,4,5').split(',').map(d => parseInt(d, 10))
+      const maxAhead = cfg?.max_days_ahead || 14
+      const dayList = []
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      for (let i = 1; i <= maxAhead && dayList.length < 7; i++) {
+        const d = new Date(today); d.setDate(d.getDate() + i)
+        if (daysOfWeek.includes(d.getDay())) dayList.push(d)
+      }
+      if (!dayList.length) {
+        await sendText(phoneNumberId, tkn, from, '😕 Não há dias disponíveis para agendamento no momento. Digite *0* para voltar ao menu.')
+        return
+      }
+
+      const { data: appt } = await db.from('appointments').insert({
+        tenant_id: tenantId, service_id: svc.id, contact_id: contact.id, conversation_id: conv.id, bot_id: bot.id,
+        customer_name: contact.name || contact.phone, customer_phone: contact.phone,
+        date: dayList[0].toISOString().slice(0, 10), start_time: '00:00', end_time: '00:00', status: 'draft',
+        notes: 'DAYS:' + dayList.map(d => d.toISOString().slice(0, 10)).join(','),
+      }).select().single()
+
+      const dayMenu = dayList.map((d, i) => {
+        const label = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+        return `${i + 1}️⃣ ${label.charAt(0).toUpperCase() + label.slice(1)}`
+      }).join('\n')
+      await sendText(phoneNumberId, tkn, from, `🗓️ *${svc.name}*\n\nEscolha o dia do atendimento:\n\n${dayMenu}\n\n0️⃣ Voltar ao menu`)
+      await db.from('conversations').update({ status: 'sched_day' }).eq('id', conv.id)
+      return
+    }
+
+    // PASSO 2: escolher dia
+    if (conv.status === 'sched_day') {
+      if (!draft) { await schedSendServiceMenu(); return }
+      const dayMap = (draft.notes || '').startsWith('DAYS:') ? draft.notes.slice(5).split(',') : []
+      const chosen = dayMap[(num || 0) - 1]
+      if (!chosen) {
+        await sendText(phoneNumberId, tkn, from, '❌ Opção inválida. Digite o número do dia ou *0* para voltar ao menu.')
+        return
+      }
+
+      const { data: cfg2 } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
+      const open = cfg2?.open_time || '09:00'
+      const close = cfg2?.close_time || '18:00'
+      const slot = cfg2?.slot_min || 60
+      const { data: taken } = await db.from('appointments')
+        .select('start_time').eq('tenant_id', tenantId).eq('date', chosen)
+        .in('status', ['pending_payment', 'confirmed'])
+      const takenSet = new Set((taken || []).map(t => t.start_time))
+      const [oh, om] = open.split(':').map(Number)
+      const [ch, cm] = close.split(':').map(Number)
+      let cur = oh * 60 + om
+      const end = ch * 60 + cm
+      const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+      const isToday = chosen === new Date().toISOString().slice(0, 10)
+      const slots = []
+      while (cur + slot <= end) {
+        const st = `${String(Math.floor(cur / 60)).padStart(2, '0')}:${String(cur % 60).padStart(2, '0')}`
+        if (!takenSet.has(st) && !(isToday && cur <= nowMin + 30)) slots.push(st)
+        cur += slot
+      }
+      if (!slots.length) {
+        await sendText(phoneNumberId, tkn, from, '😕 Não há horários livres nesse dia. Escolha outro dia acima ou *0* para voltar.')
+        return
+      }
+      await db.from('appointments').update({ date: chosen, notes: 'SLOTS:' + slots.join(','), updated_at: new Date().toISOString() }).eq('id', draft.id)
+      const slotMenu = slots.map((st, i) => `${i + 1}️⃣ ${st}`).join('\n')
+      const chosenLabel = new Date(chosen + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+      await sendText(phoneNumberId, tkn, from, `🕐 *${chosenLabel}*\n\nHorários livres:\n\n${slotMenu}\n\n0️⃣ Voltar ao menu`)
+      await db.from('conversations').update({ status: 'sched_slot' }).eq('id', conv.id)
+      return
+    }
+
+    // PASSO 3: escolher horário → cobrar taxa
+    if (conv.status === 'sched_slot') {
+      if (!draft) { await schedSendServiceMenu(); return }
+      const slotMap = (draft.notes || '').startsWith('SLOTS:') ? draft.notes.slice(7).split(',') : []
+      const st = slotMap[(num || 0) - 1]
+      if (!st) {
+        await sendText(phoneNumberId, tkn, from, '❌ Opção inválida. Digite o número do horário ou *0* para voltar ao menu.')
+        return
+      }
+      const { data: svc } = await db.from('services').select('id, name, price, duration_min').eq('id', draft.service_id).maybeSingle()
+      const dur = svc?.duration_min || 60
+      const [sh, sm] = st.split(':').map(Number)
+      const et = `${String(Math.floor((sh * 60 + sm + dur) / 60)).padStart(2, '0')}:${String((sh * 60 + sm + dur) % 60).padStart(2, '0')}`
+      await db.from('appointments').update({ start_time: st, end_time: et, status: 'pending_payment', updated_at: new Date().toISOString() }).eq('id', draft.id)
+      await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+      const dayLabel = new Date(draft.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+      const taxa = parseFloat(svc?.price || 0)
+
+      if (taxa > 0) {
+        const { data: tenant } = await db.from('tenants').select('pix_key, merchant_name, merchant_city, name').eq('id', tenantId).maybeSingle()
+        const txid = `ARK${Date.now().toString(36).toUpperCase()}`
+        const { data: payment } = await db.from('payments').insert({
+          tenant_id: tenantId, bot_id: bot.id,
+          amount: taxa, status: 'pending', pix_code: txid,
+          pix_qr_url: JSON.stringify({ txid, contact_id: contact.id, conversation_id: conv.id, method: 'pix', appointment_id: draft.id, description: `Agendamento ${svc?.name || ''} — taxa` }),
+        }).select().single()
+        await db.from('appointments').update({ payment_id: payment?.id }).eq('id', draft.id)
+
+        if (tenant?.pix_key) {
+          const { generatePixCode } = await import('../../../lib/pix')
+          const QRCodeModule = await import('qrcode')
+          const pixCode = generatePixCode({
+            pixKey: tenant.pix_key,
+            merchantName: (tenant.merchant_name || tenant.name || 'Arkiel').substring(0, 25),
+            merchantCity: (tenant.merchant_city || 'SAO PAULO').substring(0, 15),
+            amount: taxa, txid,
+          })
+          const qrBuffer = await QRCodeModule.default.toBuffer(pixCode, { width: 400, margin: 2, color: { dark: '#000000', light: '#ffffff' } })
+          const blob = new Blob([qrBuffer], { type: 'image/png' })
+          const formData = new FormData()
+          formData.append('messaging_product', 'whatsapp')
+          formData.append('type', 'image/png')
+          formData.append('file', blob, 'pix_booking.png')
+          const upRes = await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/media`, { method: 'POST', headers: { Authorization: `Bearer ${tkn}` }, body: formData })
+          const upJson = await upRes.json()
+          if (upJson.id) {
+            await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tkn}` },
+              body: JSON.stringify({ messaging_product: 'whatsapp', to: from, type: 'image',
+                image: { id: upJson.id, caption: `📅 *Reserva de horário*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nTaxa de agendamento: *R$ ${taxa.toFixed(2)}*\n\n*Escaneie o QR Code ou copie: *\n\n${pixCode}\n\nApós o pagamento, sua reserva é confirmada automaticamente. ✅` } }),
+            })
+            await db.from('payments').update({ pix_code: pixCode, pix_qr_url: JSON.stringify({ ...JSON.parse(payment.pix_qr_url || '{}'), qr_media_id: upJson.id }) }).eq('id', payment.id)
+          } else {
+            await sendText(phoneNumberId, tkn, from, `📅 *Reserva de horário*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nTaxa de agendamento: *R$ ${taxa.toFixed(2)}*\n\n💠 *PIX Copia e Cola:*\n\n${pixCode}\n\nApós o pagamento, sua reserva é confirmada automaticamente. ✅`)
+            await db.from('payments').update({ pix_code: pixCode }).eq('id', payment.id)
+          }
+        } else {
+          await sendText(phoneNumberId, tkn, from, `📅 *Reserva de horário*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nTaxa de agendamento: R$ ${taxa.toFixed(2)}.\n\n⚠️ Não conseguimos gerar o PIX agora — nossa equipe confirmará sua reserva manualmente.`)
+        }
+      } else {
+        await db.from('appointments').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', draft.id)
+        await sendText(phoneNumberId, tkn, from, `✅ *Agendamento confirmado!*\n\n${svc?.name || 'Atendimento'} — ${dayLabel} às ${st}\n\nAté lá! 🎉`)
+      }
+
+      await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: `[agendamento ${draft.date} ${st} — ${taxa > 0 ? 'PIX R$ ' + taxa.toFixed(2) : 'confirmado'}]`, sent_by: 'bot' })
+      try {
+        const pushPayload = {
+          title: '📅 Novo agendamento',
+          body: `${contact.name || contact.phone} agendou ${svc?.name || 'serviço'} para ${dayLabel} às ${st}`,
+          url: '/admin/products?view=servicos', tag: `ark-appt-${draft.id}`, type: 'appointment',
+        }
+        await Promise.all([sendPushToTenant(tenantId, pushPayload), sendFcmToTenant(tenantId, pushPayload)])
+      } catch (_) {}
+      await savelog(db, 'booking_done', null, { appointment_id: draft.id, service: svc?.name, date: draft.date, start: st })
+      return
+    }
   }
 
   // ── Motor de fluxo unificado (lib/flowEngine.js) ──
@@ -1026,6 +1238,11 @@ Obrigado! 🎉`)
           reply = '[pagamento não configurado]'
         }
       }
+    } else if (result.action === 'scheduling') {
+      // 📅 Bloco Agendar serviço: envia a mensagem do nó e abre o menu de serviços
+      if (reply) await sendText(phoneNumberId, tkn, from, reply)
+      await schedSendServiceMenu()
+      reply = '[agendamento iniciado]'
     } else {
       // ── Menu numerado em texto plano ──
       const targetNode = result.node

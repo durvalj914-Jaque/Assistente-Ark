@@ -37,6 +37,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
   const MENU_ITEMS = [
     { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
     { href: '/admin/products', label: 'Catálogo', icon: '📦' },
+    { href: '/admin/agendamentos', label: 'Agendamentos e Pedidos', icon: '🗓️' },
     { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
     { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖' },
     { href: '/admin/contacts', label: 'Contatos', icon: '👥' },

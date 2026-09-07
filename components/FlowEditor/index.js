@@ -7,6 +7,7 @@ const BLOCK_ACTIONS = {
   transfer:  { label: 'Transferir humano',  icon: '🙋' },
   catalog:   { label: 'Mostrar catálogo',    icon: '📦' },
   payment:   { label: 'Cobrar pagamento',     icon: '💰' },
+  scheduling:{ label: 'Agendar serviço',        icon: '📅' },
   end:       { label: 'Encerrar conversa',   icon: '🔚' },
 }
 
