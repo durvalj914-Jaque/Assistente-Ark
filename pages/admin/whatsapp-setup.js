@@ -15,6 +15,7 @@ export default function WhatsappSetupPage() {
   const [form, setForm] = useState({ business_name: '', whatsapp_number: '', contact_email: '', confirmed_available: false, notes: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [savedAt, setSavedAt] = useState(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [disconnectResult, setDisconnectResult] = useState(null)
 
@@ -38,6 +39,26 @@ export default function WhatsappSetupPage() {
     if (!form.whatsapp_number.trim()) { setError('Informe o número de WhatsApp.'); return }
     if (!form.confirmed_available) { setError('Confirme que o número não está em uso em outra conta de WhatsApp.'); return }
     setSaving(true)
+
+    // Anti-duplicata: pedido pendente → ATUALIZA em vez de criar outro
+    if (request?.status === 'pending') {
+      const { data: upd, error: updErr } = await supabase.from('whatsapp_onboarding_requests')
+        .update({
+          business_name: form.business_name,
+          whatsapp_number: form.whatsapp_number,
+          contact_email: form.contact_email,
+          confirmed_available: form.confirmed_available,
+          notes: form.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', request.id)
+        .select('*').single()
+      setSaving(false)
+      if (updErr) { setError(updErr.message); return }
+      setRequest(upd); setSavedAt(new Date())
+      return
+    }
+
     const { data, error: insErr } = await supabase.from('whatsapp_onboarding_requests').insert({
       tenant_id: tenant.id,
       requested_by: user.id,
@@ -98,6 +119,23 @@ export default function WhatsappSetupPage() {
       <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24, maxWidth: 640 }}>
         Pra ativar seu bot, precisamos transformar um número de WhatsApp em conta Business API. Preencha os dados abaixo e nossa equipe finaliza a configuração junto à Meta.
       </p>
+
+      <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.05)' }}>
+        <h3 style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 10, fontSize: 14 }}>❗ Antes de conectar: seu número precisa estar LIVRE</h3>
+        <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 10, lineHeight: 1.6 }}>
+          Um número não pode estar conectado à plataforma e logado no app do WhatsApp (comum ou Business) ao mesmo tempo. Se o número que você quer usar está num celular com WhatsApp aberto, a conexão <b style={{ color: '#e2e8f0' }}>não sai</b> — é a causa nº 1 de falha.
+        </p>
+        <p style={{ color: '#64748b', fontSize: 12, marginBottom: 8, fontWeight: 600 }}>Como liberar o número (sem perder nada):</p>
+        <div style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.8 }}>
+          <b style={{ color: '#10b981' }}>1. Faça o backup</b> — no app: <b>Ajustes → Conversas → Backup</b> → salvar no Google Drive. Suas conversas ficam guardadas lá.
+          <br/><b style={{ color: '#10b981' }}>2. Exporte o que é crítico</b> — conversas importantes: abra a conversa → ⋮ → <b>Mais → Exportar conversa</b>. Catálogo do app: anote os produtos (você recadastra no painel e ele já vai pro catálogo oficial).
+          <br/><b style={{ color: '#ef4444' }}>3. Exclua a conta daquele app</b> — <b>Ajustes → Conta → Excluir minha conta</b> → confirme. Isso só apaga a conta do app; o backup do Google Drive continua lá.
+          <br/><b style={{ color: '#10b981' }}>4. Aguarde ~10 min</b> e peça a conexão aqui embaixo. O bot assume o número e o backup fica salvo caso você um dia queira voltar pro app.
+        </div>
+        <p style={{ color: '#64748b', fontSize: 11, marginTop: 10, marginBottom: 0 }}>
+          💡 Números que nunca foram logados em nenhum WhatsApp (chip novo) conectam na hora, sem esse passo.
+        </p>
+      </div>
 
       {activeBot && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.3)' }}>
@@ -194,7 +232,8 @@ export default function WhatsappSetupPage() {
               <span style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.5 }}>Confirmo que esse número não está logado em nenhuma conta de WhatsApp (pessoal ou Business) no momento.</span>
             </label>
             {error && <p style={{ color: '#ef4444', fontSize: 12, marginBottom: 14 }}>{error}</p>}
-            <button type="submit" disabled={saving} className="ark-btn">{saving ? 'Enviando...' : (request ? 'Enviar novo pedido' : 'Enviar pedido')}</button>
+            <button type="submit" disabled={saving} className="ark-btn">{saving ? 'Salvando...' : (request?.status === 'pending' ? 'Atualizar pedido pendente' : 'Enviar pedido')}</button>
+            {savedAt && <span style={{ color: '#10b981', fontSize: 12, marginLeft: 12 }}>✅ Salvo em {savedAt.toLocaleTimeString('pt-BR')}</span>}
           </form>
         </div>
 

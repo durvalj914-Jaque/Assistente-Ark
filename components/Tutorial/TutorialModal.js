@@ -169,6 +169,25 @@ export default function TutorialModal({ tutorial, onClose }) {
             </div>
           )}
 
+          {/* Como liberar o número / howTo opcional */}
+          {tutorial.howTo && (
+            <div style={{
+              marginTop: 16, padding: '14px 16px', borderRadius: 14,
+              background: 'linear-gradient(135deg, rgba(251,191,36,0.12), rgba(245,158,11,0.05))',
+              border: '1px solid rgba(251,191,36,0.35)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24', marginBottom: 10 }}>
+                {tutorial.howTo.title}
+              </div>
+              {tutorial.howTo.steps.map((s, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
+                  <span style={{ fontSize: 12, color: '#fbbf24', fontWeight: 800, flexShrink: 0 }}>{i + 1}.</span>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-primary, #e2e8f0)' }}>{s}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Dica de ouro */}
           <div style={{
             marginTop: 16, display: 'flex', gap: 10, alignItems: 'flex-start',
