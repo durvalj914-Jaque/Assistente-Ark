@@ -121,6 +121,23 @@ export default function WhatsappSetupPage() {
         Pra ativar seu bot, precisamos transformar um número de WhatsApp em conta Business API. Preencha os dados abaixo e nossa equipe finaliza a configuração junto à Meta.
       </p>
 
+      <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.05)' }}>
+        <h3 style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 10, fontSize: 14 }}>❗ Antes de conectar: seu número precisa estar LIVRE</h3>
+        <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 10, lineHeight: 1.6 }}>
+          Um número não pode estar conectado à plataforma e logado no app do WhatsApp (comum ou Business) ao mesmo tempo. Se o número que você quer usar está num celular com WhatsApp aberto, a conexão <b style={{ color: '#e2e8f0' }}>não sai</b> — é a causa nº 1 de falha.
+        </p>
+        <p style={{ color: '#64748b', fontSize: 12, marginBottom: 8, fontWeight: 600 }}>Como liberar o número (sem perder nada):</p>
+        <div style={{ color: '#94a3b8', fontSize: 12, lineHeight: 1.8 }}>
+          <b style={{ color: '#10b981' }}>1. Faça o backup</b> — no app: <b>Ajustes → Conversas → Backup</b> → salvar no Google Drive. Suas conversas ficam guardadas lá.
+          <br/><b style={{ color: '#10b981' }}>2. Exporte o que é crítico</b> — conversas importantes: abra a conversa → ⋮ → <b>Mais → Exportar conversa</b>. Catálogo do app: anote os produtos (você recadastra no painel e ele já vai pro catálogo oficial).
+          <br/><b style={{ color: '#ef4444' }}>3. Exclua a conta daquele app</b> — <b>Ajustes → Conta → Excluir minha conta</b> → confirme. Isso só apaga a conta do app; o backup do Google Drive continua lá.
+          <br/><b style={{ color: '#10b981' }}>4. Aguarde ~10 min</b> e peça a conexão aqui embaixo. O bot assume o número e o backup fica salvo caso você um dia queira voltar pro app.
+        </div>
+        <p style={{ color: '#64748b', fontSize: 11, marginTop: 10, marginBottom: 0 }}>
+          💡 Números que nunca foram logados em nenhum WhatsApp (chip novo) conectam na hora, sem esse passo. E atenção: ao migrar, o número sai dos grupos — anote os que você participa pra pedir readmissão depois.
+        </p>
+      </div>
+
       {activeBot && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
