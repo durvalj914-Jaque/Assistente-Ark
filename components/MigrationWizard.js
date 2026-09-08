@@ -82,8 +82,8 @@ export default function MigrationWizard({ activeBot, tenantId, step2 }) {
         {stepHeader(3, '🚀', 'Importar')}
       </div>
 
-      {/* ETAPA 1 — Preparar */}
-      {step === 1 && (
+      {/* ETAPA 1 — Preparar (sempre visível antes da conexão) */}
+      {step !== 3 && (
         <div style={{ padding: '16px 18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary, #fff)' }}>
@@ -127,8 +127,26 @@ export default function MigrationWizard({ activeBot, tenantId, step2 }) {
         </div>
       )}
 
-      {/* ETAPA 2 — Conectar (slot da página) */}
-      {step === 2 && <div style={{ padding: '16px 18px' }}>{step2}</div>}
+      {/* ETAPA 2 — Conectar (slot da página, sempre visível) */}
+      {step !== 3 && (
+        <div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '14px 18px 0',
+            fontSize: 14, fontWeight: 800, color: 'var(--text-primary, #fff)',
+          }}>📲 Etapa 2 — Conectar seu número</div>
+          {!allDone && (
+            <div style={{
+              margin: '10px 18px 0', padding: '10px 12px',
+              borderRadius: 10, fontSize: 12, lineHeight: 1.5, color: '#fbbf24',
+              background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.3)',
+            }}>
+              ⚠️ Recomendo concluir a preparação acima antes de conectar (é o que garante que nada se perde). Chip novo, nunca logado em app? Pode seguir direto.
+            </div>
+          )}
+          <div style={{ padding: '16px 18px' }}>{step2}</div>
+        </div>
+      )}
 
       {/* ETAPA 3 — Importar */}
       {step === 3 && (
