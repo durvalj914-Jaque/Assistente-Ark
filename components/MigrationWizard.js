@@ -17,7 +17,8 @@ const ITEMS = [
   { id: 'export', icon: '📤', title: 'Exportei as conversas mais críticas', desc: 'Abra a conversa → ⋮ → Mais → Exportar conversa. Recomendado pra clientes, pedidos e acertos importantes (vai pro seu e-mail).' },
   { id: 'contacts', icon: '👥', title: 'Contatos prontos pra importar', desc: 'Exporte a agenda do celular (.vcf) ou conecte o Google Contatos. Depois da conexão, você importa na aba Contatos em 1 clique.' },
   { id: 'catalog', icon: '📦', title: 'Catálogo do app anotado (foto, nome, preço)', desc: 'Recadastrando na aba Catálogo, tudo vai pro catálogo oficial do WhatsApp automaticamente — com botão de compra.' },
-  { id: 'freed', icon: '🔓', title: 'Conta excluída no app oficial do número', desc: 'Ajustes → Conta → Excluir minha conta → confirme. Isso libera o número pra plataforma. ⚠️ Só faça DEPOIS do backup (passo 1).' },
+  { id: 'groups', icon: '👥', title: 'Anotei os grupos em que o número participa', desc: 'Ao migrar pra API oficial, o número sai dos grupos — regra da Meta (a plataforma não cria nem gerencia grupos). Backup no Drive não devolve as participações: anote os grupos e peça readmissão depois da conexão.' },
+  { id: 'freed', icon: '🔓', title: 'Conta excluída no app oficial do número', desc: 'Ajustes → Conta → Excluir minha conta → confirme. Isso libera o número pra plataforma. ⚠️ Só faça DEPOIS do backup (passo 1) e de anotar os grupos.' },
 ]
 
 export default function MigrationWizard({ activeBot, tenantId, step2 }) {
