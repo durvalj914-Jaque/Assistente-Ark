@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   const { data: connectedTenants, error: tErr } = await db.from('bots')
     .select('tenant_id')
     .eq('status', 'active')
-    .not('phone_number_id', 'null')
+    .not('phone_number_id', 'is', null)
   if (tErr) return res.status(500).json({ error: tErr.message })
   const allowed = new Set((connectedTenants || []).map(b => b.tenant_id))
 

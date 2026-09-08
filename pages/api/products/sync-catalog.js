@@ -43,7 +43,7 @@ export default async function handler(req, res) {
       .select('id, phone_number_id, status')
       .eq('tenant_id', tenantId)
       .eq('status', 'active')
-      .not('phone_number_id', 'null')
+      .not('phone_number_id', 'is', null)
       .limit(1)
       .maybeSingle()
 
