@@ -1,6 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
+import TutorialModal from '../Tutorial/TutorialModal'
+import { TUTORIALS } from '../../lib/tutorials'
 
 /**
  * Layout estilo WhatsApp Web.
@@ -10,20 +12,22 @@ import { useRouter } from 'next/router'
 export default function AdminLayout({ children, tenant, user, role, profile, hideTopBar }) {
   const router = useRouter()
   const barRef = useRef(null)
+  const [tutOpen, setTutOpen] = useState(false)
+  const [tutUnseen, setTutUnseen] = useState(false)
 
   const NAV_ITEMS = [
-    { href: '/admin/conversations', label: 'Conversas', icon: '💬' },
-    { href: '/admin/contacts', label: 'Contatos', icon: '👥' },
-    { href: '/admin/products', label: 'Catálogo', icon: '📦' },
-    { href: '/admin/agendamentos', label: 'Agendamentos', icon: '🗓️' },
-    { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱' },
-    { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖' },
-    { href: '/admin/marketing', label: 'Marketing', icon: '📣' },
-    { href: '/admin/analytics', label: 'Analytics', icon: '📊' },
-    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰' },
-    { href: '/admin/settings', label: 'Configurações', icon: '⚙️' },
-    { href: '/admin/upgrade', label: 'Upgrades', icon: '⬆️' },
-    { href: '/admin/api', label: 'API', icon: '🔌' },
+    { href: '/admin/conversations', label: 'Conversas', icon: '💬', tut: 'conversations' },
+    { href: '/admin/contacts', label: 'Contatos', icon: '👥', tut: 'contacts' },
+    { href: '/admin/products', label: 'Catálogo', icon: '📦', tut: 'products' },
+    { href: '/admin/agendamentos', label: 'Agendamentos', icon: '🗓️', tut: 'agendamentos' },
+    { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱', tut: 'whatsapp-setup' },
+    { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖', tut: 'bots' },
+    { href: '/admin/marketing', label: 'Marketing', icon: '📣', tut: 'marketing' },
+    { href: '/admin/analytics', label: 'Analytics', icon: '📊', tut: 'analytics' },
+    { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', tut: 'financeiro' },
+    { href: '/admin/settings', label: 'Configurações', icon: '⚙️', tut: 'settings' },
+    { href: '/admin/upgrade', label: 'Upgrades', icon: '⬆️', tut: 'upgrade' },
+    { href: '/admin/api', label: 'API', icon: '🔌', tut: 'api' },
   ]
   if (profile?.is_platform_admin) NAV_ITEMS.push({ href: '/painel', label: 'Painel Arkiel', icon: '⚡' })
 
@@ -36,6 +40,17 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     const el = barRef.current?.querySelector('[data-active="true"]')
     if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [router.asPath])
+
+  // Sinaliza o "?" com um pontinho até o usuário abrir o tutorial da seção pela primeira vez
+  const activeTutKey = NAV_ITEMS.find(isActive)?.tut
+  useEffect(() => {
+    if (activeTutKey) setTutUnseen(!localStorage.getItem('ark-tut-seen-' + activeTutKey))
+  }, [activeTutKey])
+  function openTutorial() {
+    if (activeTutKey) localStorage.setItem('ark-tut-seen-' + activeTutKey, '1')
+    setTutUnseen(false)
+    setTutOpen(true)
+  }
 
   if (hideTopBar) {
     return <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}><div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>{children}</div></div>
@@ -73,12 +88,34 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
         </Link>
 
         {/* Conta: leva às Configurações (onde ficam perfil e Sair) */}
-        <Link href="/admin/settings" title="Configurações da conta"
-          style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#4f8ef7,#8b5cf6)', border: '1.5px solid var(--border-strong)', textDecoration: 'none' }}>
-          {profile?.avatar_url
-            ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{(user?.email || '?')[0].toUpperCase()}</span>}
-        </Link>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        {/* Tutorial da aba atual */}
+        <button onClick={openTutorial} title={`Tutorial: ${TUTORIALS[activeTutKey]?.title || ''}`} style={{
+          width: 38, height: 38, borderRadius: '50%', position: 'relative',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: tutOpen ? 'var(--blue-tint)' : 'var(--bg-secondary)',
+          border: `1px solid ${tutOpen ? 'var(--border-strong)' : 'var(--border-soft)'}`,
+          cursor: 'pointer', fontSize: 17, fontWeight: 800, color: '#4f8ef7',
+          transition: 'all 0.15s',
+        }}>
+          ?
+          {tutUnseen && !tutOpen && (
+            <span style={{
+              position: 'absolute', top: -2, right: -2,
+              width: 10, height: 10, borderRadius: '50%',
+              background: '#4f8ef7', border: '2px solid var(--bg-topbar)',
+              animation: 'ark-tut-pulse 1.6s infinite',
+            }} />
+          )}
+        </button>
+
+          <Link href="/admin/settings" title="Configurações da conta"
+            style={{ width: 38, height: 38, borderRadius: '50%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#4f8ef7,#8b5cf6)', border: '1.5px solid var(--border-strong)', textDecoration: 'none' }}>
+            {profile?.avatar_url
+              ? <img src={profile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{(user?.email || '?')[0].toUpperCase()}</span>}
+          </Link>
+        </div>
       </header>
 
       {/* Barra de navegação única: horizontal, sempre visível, rolável */}
@@ -116,6 +153,9 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
         {children}
       </div>
+
+      {/* Tutorial contextual da aba */}
+      {tutOpen && <TutorialModal tutorial={TUTORIALS[activeTutKey]} onClose={() => setTutOpen(false)} />}
     </div>
   )
 }
