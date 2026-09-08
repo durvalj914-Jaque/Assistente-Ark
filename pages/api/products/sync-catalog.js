@@ -33,6 +33,29 @@ export default async function handler(req, res) {
 
   const db = getDB()
 
+  // ── GUARDA DE ISOLAMENTO ──
+  // O catálogo Meta é compartilhado pela WABA: produto de tenant sem número
+  // conectado NUNCA deve sincronizar, senão aparece na vitrine de outros.
+  // Tenant sem bot ativo com phone_number_id mantém o produto local — o bot
+  // usa o fallback rico (imagem + preço + botão) na hora de vender.
+  if (action === 'upsert') {
+    const { data: bot } = await db.from('bots')
+      .select('id, phone_number_id, status')
+      .eq('tenant_id', tenantId)
+      .eq('status', 'active')
+      .not('phone_number_id', 'null')
+      .limit(1)
+      .maybeSingle()
+
+    if (!bot) {
+      await db.from('products').update({
+        meta_sync_status: 'local_only',
+        meta_sync_error: null,
+      }).eq('id', productId)
+      return res.status(200).json({ ok: true, skipped: true, reason: 'tenant_sem_whatsapp_conectado' })
+    }
+  }
+
   try {
     // ── Remover produto do catálogo ──
     if (action === 'remove') {

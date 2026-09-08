@@ -24,11 +24,31 @@ export default async function handler(req, res) {
   }
 
   const db = getDB()
+
+  // ── GUARDA DE ISOLAMENTO ──
+  // O catálogo Meta é compartilhado pela WABA: só sincroniza produtos de
+  // tenants com WhatsApp conectado (bot ativo com phone_number_id).
+  const { data: connectedTenants, error: tErr } = await db.from('bots')
+    .select('tenant_id')
+    .eq('status', 'active')
+    .not('phone_number_id', 'null')
+  if (tErr) return res.status(500).json({ error: tErr.message })
+  const allowed = new Set((connectedTenants || []).map(b => b.tenant_id))
+
   const { data: products, error } = await db.from('products').select('*').eq('is_active', true)
   if (error) return res.status(500).json({ error: error.message })
 
   const results = []
+  let skipped = 0
   for (const product of products || []) {
+    if (!allowed.has(product.tenant_id)) {
+      skipped++
+      await db.from('products').update({
+        meta_sync_status: 'local_only',
+        meta_sync_error: null,
+      }).eq('id', product.id)
+      continue
+    }
     const result = await upsertCatalogProduct(product, product.tenant_id)
     await db.from('products').update({
       meta_retailer_id: result.retailerId,
@@ -38,5 +58,5 @@ export default async function handler(req, res) {
     results.push({ id: product.id, name: product.name, ok: result.ok, error: result.error })
   }
 
-  return res.status(200).json({ ok: true, total: results.length, results })
+  return res.status(200).json({ ok: true, total: results.length, skipped_sem_whatsapp: skipped, results })
 }
