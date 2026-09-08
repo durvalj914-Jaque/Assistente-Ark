@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { supabase } from '../../lib/supabase'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 /**
  * Aba Marketing — B2B cria suas mensagens de marketing e deixa prontas
@@ -315,7 +316,7 @@ export default function MarketingPage() {
       {/* LISTA DE MENSAGENS */}
       <div style={{ padding: '0 20px 20px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>✉️ Suas mensagens prontas</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)' }}>✉️ Suas mensagens prontas<SectionHelp t='marketing' s='templates' /></h3>
           <button onClick={openNewTemplate}
             style={{ padding: '9px 16px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
             + Nova mensagem
@@ -368,7 +369,7 @@ export default function MarketingPage() {
 
       {/* HISTÓRICO DE USO */}
       <div style={{ padding: '0 20px 20px' }}>
-        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>📋 Últimas conversas cobradas</h3>
+        <h3 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: 'var(--text-primary)' }}>📋 Últimas conversas cobradas<SectionHelp t='marketing' s='conversas' /></h3>
         {history.length === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13, background: 'var(--bg-card)', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
             Nenhuma conversa cobrada ainda. Quando você enviar mensagens proativas, o histórico aparecerá aqui.
@@ -443,7 +444,7 @@ export default function MarketingPage() {
       {showSendModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }} onClick={() => setShowSendModal(false)}>
           <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: 24, maxWidth: 480, width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🚀 Enviar mensagem de marketing</h3>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 4 }}>🚀 Enviar mensagem de marketing<SectionHelp t='marketing' s='enviar' /></h3>
             <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
               {sendTplName ? `Enviando: "${sendTplName}". ` : ''}Cada contato que receber consumirá 1 crédito de marketing (R$0,36). Você tem {credits.marketing} créditos.
             </p>

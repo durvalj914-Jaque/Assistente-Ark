@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import HelpTip from '../../components/HelpTip'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 export default function ContactsPage() {
   const router = useRouter()
@@ -633,7 +634,7 @@ export default function ContactsPage() {
         {selected && (
           <div className="ark-card" style={{ position: 'sticky', top: 80, alignSelf: 'start' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>Detalhes</h3>
+              <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>Detalhes<SectionHelp t='contacts' s='novo' /><SectionHelp t='contacts' s='detalhes' /></h3>
               <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>✕</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

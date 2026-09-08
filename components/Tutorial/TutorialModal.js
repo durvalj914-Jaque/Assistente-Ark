@@ -54,6 +54,16 @@ export default function TutorialModal({ tutorial, onClose }) {
         </div>
 
         <div style={{ padding: '18px 20px 24px' }}>
+          {/* Ilustração */}
+          {tutorial.hero && (
+            <div onClick={onClose} style={{
+              borderRadius: 14, overflow: 'hidden', marginBottom: 18,
+              border: '1px solid rgba(79,142,247,0.25)', cursor: 'pointer',
+            }} title="Fechar">
+              <img src={tutorial.hero} alt={'Ilustração: ' + tutorial.title} style={{ width: '100%', display: 'block' }} />
+            </div>
+          )}
+
           {/* Pra que serve */}
           <p style={{ fontSize: 15, lineHeight: 1.55, color: 'var(--text-primary, #e2e8f0)', margin: '0 0 20px' }}>
             {tutorial.purpose}
@@ -62,7 +72,7 @@ export default function TutorialModal({ tutorial, onClose }) {
           {/* O que dá pra fazer */}
           <SectionTitle>🛠️ O que você consegue fazer aqui</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
-            {tutorial.features.map((f, i) => (
+            {(tutorial.features || []).map((f, i) => (
               <div key={i} style={{
                 display: 'flex', gap: 10, alignItems: 'flex-start',
                 padding: 12, borderRadius: 12,
@@ -136,6 +146,28 @@ export default function TutorialModal({ tutorial, onClose }) {
               {tutorial.example.after}
             </div>
           </div>
+
+          {/* Como automatizar ao máximo */}
+          {tutorial.automation && (
+            <div style={{
+              marginTop: 16, padding: '14px 16px', borderRadius: 14,
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.12), rgba(6,182,212,0.06))',
+              border: '1px solid rgba(16,185,129,0.35)',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#10b981', marginBottom: 8 }}>
+                🚀 Automatize ao máximo
+              </div>
+              <div style={{ fontSize: 12.5, lineHeight: 1.55, color: 'var(--text-primary, #e2e8f0)', marginBottom: tutorial.automation.length ? 10 : 0 }}>
+                {tutorial.automation.intro}
+              </div>
+              {tutorial.automation.items?.map((a, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 6 }}>
+                  <span style={{ fontSize: 12, color: '#10b981', fontWeight: 800, flexShrink: 0 }}>{i + 1}.</span>
+                  <div style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--text-primary, #e2e8f0)' }}>{a}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Dica de ouro */}
           <div style={{

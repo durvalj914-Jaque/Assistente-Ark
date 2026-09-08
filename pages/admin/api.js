@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 export default function ApiPage() {
   const router = useRouter()
@@ -45,7 +46,7 @@ export default function ApiPage() {
 
       <div style={{ display: 'grid', gap: 20, maxWidth: 700 }}>
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>🔑 Sua chave de API</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>🔑 Sua chave de API<SectionHelp t='api' s='chave' /></h3>
           <div style={{ display: 'flex', gap: 8 }}>
             <input readOnly value={apiKey} className="ark-input" style={{ fontFamily: 'monospace', fontSize: 12 }} />
             <button onClick={copyKey} className="ark-btn" style={{ whiteSpace: 'nowrap' }}>{copied ? '✅ Copiado' : 'Copiar'}</button>
@@ -59,7 +60,7 @@ export default function ApiPage() {
         </div>
 
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>📘 Como usar</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 14, fontSize: 14 }}>📘 Como usar<SectionHelp t='api' s='como-usar' /></h3>
           <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>Envie um POST pra <code style={{ color: '#4f8ef7' }}>/api/v1/send</code> com sua chave no cabeçalho <code style={{ color: '#4f8ef7' }}>Authorization</code>:</p>
           <pre style={{ background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, padding: 14, color: '#cbd5e1', fontSize: 12, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>{snippet}</pre>
           <p style={{ color: '#334155', fontSize: 11, marginTop: 10 }}>A mensagem sai pelo primeiro bot ativo da sua conta e aparece normalmente em Conversas.</p>

@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import { PLANS, getEffectiveLimits, isPlanActive, getActivePlanLabel } from '../../lib/plans'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 export default function FinanceiroPage() {
   const { user, tenant, role, profile, loading } = useTenant()
@@ -670,7 +671,7 @@ export default function FinanceiroPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
                   <span style={{ fontSize: 28 }}>📱</span>
                   <div>
-                    <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Point Tap — Celular como Maquininha</h3>
+                    <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 800, marginBottom: 2 }}>Point Tap — Celular como Maquininha<SectionHelp t='financeiro' s='point-tap' /></h3>
                     <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Receba pagamentos por aproximação (NFC) sem hardware extra</span>
                   </div>
                 </div>
@@ -812,7 +813,7 @@ export default function FinanceiroPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 700 }}>
               📄 Comprovantes{receiptCategory !== 'all' ? ` — ${receipts.length} registro(s)` : ''}
-            </h3>
+            <SectionHelp t='financeiro' s='comprovantes' /></h3>
             <button onClick={() => setReceiptModal(true)}
               style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#a78bfa', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
               🏢 + Comprovante Manual

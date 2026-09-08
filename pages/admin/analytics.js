@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import { PLANS, usagePercent } from '../../lib/plans'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 export default function AnalyticsPage() {
   const { user, tenant, role, usage, profile, loading } = useTenant()
@@ -86,7 +87,7 @@ export default function AnalyticsPage() {
       {/* Uso do plano */}
       <div className="ark-card" style={{ marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14 }}>Uso do plano {plan.label} este mês</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14 }}>Uso do plano {plan.label} este mês<SectionHelp t='analytics' s='status' /><SectionHelp t='analytics' s='plano' /></h3>
           <span style={{ fontSize: 12, color: '#475569' }}>
             {(usage?.messages || 0).toLocaleString('pt-BR')} / {plan.max_messages_month === 999999 ? '∞' : plan.max_messages_month.toLocaleString('pt-BR')} msgs
           </span>
@@ -113,7 +114,7 @@ export default function AnalyticsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16, marginBottom: 16 }}>
         {/* Gráfico de barras */}
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 20 }}>Mensagens por mês</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 20 }}>Mensagens por mês<SectionHelp t='analytics' s='mensagens' /></h3>
           {history.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '40px 0', color: '#334155', fontSize: 13 }}>
               Dados aparecerão conforme o bot for usado
@@ -159,7 +160,7 @@ export default function AnalyticsPage() {
       {/* Top contatos */}
       {topContacts.length > 0 && (
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 16 }}>🏆 Contatos mais ativos</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: 14, marginBottom: 16 }}>🏆 Contatos mais ativos<SectionHelp t='analytics' s='contatos' /></h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {topContacts.map(({ contact, count }, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

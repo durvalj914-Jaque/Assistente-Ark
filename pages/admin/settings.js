@@ -5,6 +5,7 @@ import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import { PLANS } from '../../lib/plans'
 import NotificationSettingsCard from '../../components/NotificationSettingsCard'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -107,7 +108,7 @@ export default function SettingsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         {/* Empresa */}
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>🏢 Sua Empresa</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>🏢 Sua Empresa<SectionHelp t='settings' s='empresa' /></h3>
           <div style={{ marginBottom: 14 }}>
             <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 6 }}>NOME DA EMPRESA</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="ark-input" />
@@ -122,7 +123,7 @@ export default function SettingsPage() {
 
         {/* Plano */}
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>💎 Plano Atual</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>💎 Plano Atual<SectionHelp t='settings' s='plano' /></h3>
           <div style={{ background: 'linear-gradient(135deg, rgba(79,142,247,0.1), rgba(6,182,212,0.05))', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#4f8ef7', marginBottom: 4 }}>{plan.label}</div>
             <div style={{ color: '#64748b', fontSize: 13 }}>
@@ -145,7 +146,7 @@ export default function SettingsPage() {
 
         {/* Membros */}
         <div className="ark-card" style={{ gridColumn: '1 / -1' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>👥 Membros da equipe</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>👥 Membros da equipe<SectionHelp t='settings' s='membros' /></h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
             {members.map(m => (
               <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#12121f', borderRadius: 8, padding: '10px 14px' }}>
@@ -181,7 +182,7 @@ export default function SettingsPage() {
 
         {/* Aparência */}
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>🎨 Aparência</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>🎨 Aparência<SectionHelp t='settings' s='aparencia' /></h3>
           <p style={{ color: 'var(--text-muted)', fontSize: 12, marginBottom: 18 }}>Escolha o tema da interface. A preferência é salva neste navegador.</p>
           <div style={{ display: 'flex', gap: 12 }}>
             {/* Escuro */}
@@ -237,7 +238,7 @@ export default function SettingsPage() {
 
         {/* Conta */}
         <div className="ark-card">
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>👤 Minha Conta</h3>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 16, fontSize: 14 }}>👤 Minha Conta<SectionHelp t='settings' s='conta' /></h3>
           <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 6 }}>E-mail: <b style={{ color: 'var(--text-primary)' }}>{user.email}</b></div>
           <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 6 }}>Cargo: <b style={{ color: 'var(--text-primary)' }}>{role}</b></div>
           <div style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>

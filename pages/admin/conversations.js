@@ -1183,7 +1183,7 @@ export default function ConversationsPage() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 💰 Cobrar cliente
-              </h3>
+              <SectionHelp t='conversations' s='cobrar' /></h3>
               <button onClick={() => !sendingPayment && setShowPayModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: 'var(--text-muted)', padding: 4 }}>✕</button>
             </div>
 
@@ -1603,3 +1603,4 @@ export default function ConversationsPage() {
 
 /* ─── Menu três pontinhos (componente separado) ─── */
 import Link from 'next/link'
+import SectionHelp from '../../components/Tutorial/SectionHelp'

@@ -4,6 +4,7 @@ import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
 import HelpTip from '../../components/HelpTip'
+import SectionHelp from '../../components/Tutorial/SectionHelp'
 
 const labelStyle = { color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1, display: 'block', marginBottom: 5 }
 
@@ -59,7 +60,7 @@ function ProductModal({ product, onClose, onSave, editingProduct }) {
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{ background: '#0d0d1a', border: '1px solid rgba(79,142,247,0.2)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 520, maxHeight: '90vh', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 22 }}>
-          <h2 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16 }}>{product ? 'Editar Item' : 'Novo Item'}</h2>
+          <h2 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 16 }}>{product ? 'Editar Item' : 'Novo Item'}<SectionHelp t='products' s='produtos' /></h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: 18 }}>✕</button>
         </div>
 
@@ -450,7 +451,7 @@ export default function ProductsPage() {
         {tab === 'servicos' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-              <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>Serviços que seus clientes agendam pelo bot — com taxa via PIX pra garantir o compromisso.</p>
+              <p style={{ color: '#475569', fontSize: 13, margin: 0 }}>Serviços que seus clientes agendam pelo bot — com taxa via PIX pra garantir o compromisso.</p><SectionHelp t='products' s='servicos' />
               <button onClick={() => { setEditingService(null); setShowServiceModal(true) }} className="ark-btn" style={{ whiteSpace: 'nowrap' }}>+ Novo Serviço</button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
@@ -489,7 +490,7 @@ export default function ProductsPage() {
         {tab === 'horarios' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
             <div className="ark-card" style={{ padding: 20 }}>
-              <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, margin: '0 0 14px' }}>⏰ Horários de atendimento</h3>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, margin: '0 0 14px' }}>⏰ Horários de atendimento<SectionHelp t='products' s='horarios' /></h3>
               {booking && (
                 <>
                   <label style={labelStyle}>DIAS QUE ATENDE</label>
@@ -516,7 +517,7 @@ export default function ProductsPage() {
             </div>
 
             <div className="ark-card" style={{ padding: 20 }}>
-              <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, margin: '0 0 6px' }}>🔗 Google Agenda</h3>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, margin: '0 0 6px' }}>🔗 Google Agenda<SectionHelp t='products' s='google-agenda' /></h3>
               <p style={{ color: '#475569', fontSize: 12, margin: '0 0 14px' }}>
                 Sincronize sua agenda: o bot consulta os horários ocupados do seu Google antes de oferecer slots, e cada agendamento confirmado entra automaticamente no seu calendário.
               </p>
