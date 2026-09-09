@@ -16,15 +16,22 @@ export default function ApiPage() {
   const [showInternal, setShowInternal] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
-  useEffect(() => { if (tenant) setApiKey(tenant.api_key || '') }, [tenant])
+  useEffect(() => {
+    if (!tenant) return
+    if (tenant.api_key) { setApiKey(tenant.api_key); return }
+    // Tenant sem chave (caso raro): gera automaticamente via RPC segura
+    supabase.rpc('regenerate_api_key', { p_tenant: tenant.id }).then(({ data, error }) => {
+      if (!error && data) setApiKey(data)
+    })
+  }, [tenant?.id, tenant?.api_key])
 
   async function regenerate() {
     if (!confirm('Isso vai invalidar a chave atual. Qualquer integração usando a chave antiga vai parar de funcionar. Continuar?')) return
     setRegenerating(true)
-    const newKey = 'ark_live_' + crypto.randomUUID().replace(/-/g, '')
-    const { error } = await supabase.from('tenants').update({ api_key: newKey }).eq('id', tenant.id)
+    const { data: newKey, error } = await supabase.rpc('regenerate_api_key', { p_tenant: tenant.id })
     setRegenerating(false)
-    if (!error) setApiKey(newKey)
+    if (!error && newKey) setApiKey(newKey)
+    else alert('Não foi possível gerar a chave. Tente novamente.')
   }
 
   function copyKey() {
