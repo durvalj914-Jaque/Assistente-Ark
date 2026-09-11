@@ -60,6 +60,11 @@ export default function FinanceiroPage() {
   const [loadingAcp, setLoadingAcp] = useState(false)
   const [acpSim, setAcpSim] = useState('')
 
+  const authHeader = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    return { Authorization: `Bearer ${session?.access_token || ''}` }
+  }, [])
+
   const loadAcp = useCallback(async () => {
     setLoadingAcp(true)
     try {
@@ -74,11 +79,6 @@ export default function FinanceiroPage() {
       setLoadingAcp(false)
     }
   }, [authHeader])
-
-  const authHeader = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession()
-    return { Authorization: `Bearer ${session?.access_token || ''}` }
-  }, [])
 
   // Helper: extract numeric fee value from either flat number or nested object format
   function feeVal(method) {
