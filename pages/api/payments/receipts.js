@@ -4,6 +4,7 @@
  * DELETE /api/payments/receipts?id=xxx — Remove comprovante
  */
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
+import { processCommissionCycle } from '../../../lib/commissionEngine'
 
 export default async function handler(req, res) {
   const authHeader = req.headers.authorization
@@ -67,13 +68,34 @@ export default async function handler(req, res) {
 
     if (payment_id) {
       // Atualizar status e guardar receipt_id no pix_qr_url JSON
-      const { data: pay } = await db.from('payments').select('pix_qr_url').eq('id', payment_id).maybeSingle()
+      const { data: pay } = await db.from('payments').select('pix_qr_url, tenant_id, amount, status').eq('id', payment_id).maybeSingle()
       let existingMeta = {}
       try { existingMeta = JSON.parse(pay?.pix_qr_url || '{}') } catch {}
+      const wasPaid = pay?.status === 'paid'
       await db.from('payments').update({
         status: 'paid', paid_at: new Date().toISOString(),
         pix_qr_url: JSON.stringify({ ...existingMeta, receipt_id: data.id, manual_confirmation: true })
       }).eq('id', payment_id)
+
+      // ── ACP (Acumulador Cíclico Progressivo) ──
+      // PIX manual direto na chave do tenant também é entrada do B2B:
+      // soma no acumulador. Guard: só se o pagamento ainda não estava pago.
+      if (!wasPaid && pay?.tenant_id && parseFloat(pay.amount) > 0) {
+        try {
+          const acp = await processCommissionCycle(db, {
+            tenant_id: pay.tenant_id,
+            payment_id,
+            gross_amount: parseFloat(pay.amount),
+            processor_fee: 0, // PIX direto na chave: sem taxa de processador
+            payment_method: 'pix',
+          })
+          if (acp?.ok && acp.cycles_completed > 0) {
+            console.log(`[receipts] 💎 ACP: ${acp.cycles_completed} ciclo(s) fechado(s) → R$${acp.commission_amount} pro Ark | fragmento: R$${acp.fragmentation_carry}`)
+          }
+        } catch (acpErr) {
+          console.error('[receipts] Erro no ACP:', acpErr.message)
+        }
+      }
     }
 
     return res.status(200).json({ ok: true, receipt: data })

@@ -913,7 +913,7 @@ export default function PainelAdminPage() {
     { key: 'bots',      icon: '\uD83E\uDD16', label: 'Bots' },
     { key: 'contacts', icon: '\uD83D\uDC64', label: 'Contatos' },
     { key: 'planos',    icon: '\uD83D\uDCC4', label: 'Planos' },
-    { key: 'comissoes', icon: '\uD83D\uDC8E', label: 'Comissões' },
+    { key: 'comissoes', icon: '\uD83D\uDC8E', label: 'ACP · Comissões' },
     { key: 'credits',  icon: '\uD83D\uDC53', label: 'Créditos' },
     { key: 'payments', icon: '\uD83D\uDCB2', label: 'Pagamentos' },
     { key: 'receipts', icon: '\uD83D\uDCC4', label: 'Comprovantes' },
@@ -1897,10 +1897,10 @@ export default function PainelAdminPage() {
                 {/* Commission cycle config */}
                 <div style={{ marginBottom: 14, padding: 14, borderRadius: 10, border: '1px solid rgba(16,185,129,0.2)', background: 'rgba(16,185,129,0.04)' }}>
                   <label style={{ color: '#10b981', fontSize: 12, fontWeight: 700, display: 'block', marginBottom: 10 }}>
-                    💎 Configuração de Comissão por Ciclo
+                    💎 ACP — Acumulador Cíclico Progressivo
                   </label>
                   <p style={{ color: 'var(--text-dim)', fontSize: 11, marginBottom: 10, lineHeight: 1.5 }}>
-                    Ciclo Protegido: o cliente B2B põe R$ X líquidos cheios no bolso, e a Arkiel colhe os próximos R$ Y do fluxo. Um ciclo completo consome R$ X + R$ Y (ex: R$10,00 + R$0,50 = R$10,50).
+                    ACP (Acumulador Cíclico Progressivo): o cliente B2B põe R$ X líquidos cheios no bolso, e a Arkiel colhe os próximos R$ Y do fluxo. Um ciclo completo consome R$ X + R$ Y (ex: R$10,00 + R$0,50 = R$10,50).
                   </p>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1 }}>

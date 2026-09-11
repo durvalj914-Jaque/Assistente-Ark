@@ -246,7 +246,14 @@ export default async function handler(req, res) {
         const grossForCommission = parseFloat(order.total) || 0
         const calculatedProcessorFee = Number((grossForCommission * processorFeeRate + processorFeeFixed).toFixed(2))
 
-        const commissionResult = await processCommissionCycle(db, {
+        // ACP (Acumulador Cíclico Progressivo): processa 1x por pagamento.
+        // MP reenvia notificações — sem esta guarda, o acumulador contaria em dobro.
+        const { data: existingAcp } = await db.from('commission_events')
+          .select('id')
+          .eq('payment_id', String(payment.id))
+          .maybeSingle()
+
+        const commissionResult = existingAcp ? { ok: true, skipped: true } : await processCommissionCycle(db, {
           tenant_id: order.tenant_id,
           order_id: order.id,
           payment_id: String(payment.id),
@@ -255,7 +262,7 @@ export default async function handler(req, res) {
           payment_method: mpMethod,
         })
 
-        if (commissionResult?.ok && commissionResult.cycles_completed > 0) {
+        if (commissionResult?.ok && !commissionResult.skipped && commissionResult.cycles_completed > 0) {
           console.log(`[mp-webhook] 💎 Commission cycles: ${commissionResult.cycles_completed}, commission: R$${commissionResult.commission_amount}, fragmentation: R$${commissionResult.fragmentation_carry}`)
         }
       } catch (commErr) {

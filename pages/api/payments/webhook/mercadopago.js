@@ -5,6 +5,7 @@
  */
 import { supabaseAdmin } from '../../../../lib/supabase'
 import { activatePlan } from '../../../../lib/planActivation'
+import { processCommissionCycle } from '../../../../lib/commissionEngine'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ ok: true })
@@ -32,7 +33,7 @@ export default async function handler(req, res) {
         else if (payData.status === 'expired') status = 'expired'
 
         // Buscar pagamento existente pra preservar metadata em pix_qr_url
-        const { data: existPay } = await db.from('payments').select('id, pix_qr_url').eq('pix_code', txid).maybeSingle()
+        const { data: existPay } = await db.from('payments').select('id, pix_qr_url, status').eq('pix_code', txid).maybeSingle()
         const existMeta = JSON.parse(existPay?.pix_qr_url || '{}')
         const updateData = { status, paid_at: status === 'paid' ? new Date().toISOString() : null, pix_qr_url: JSON.stringify({ ...existMeta, mp_payment_id: data.id, mp_status: payData.status, mp_payment_method: payData.payment_method_id }) }
         if (status === 'paid') updateData.paid_at = new Date().toISOString()
@@ -213,6 +214,30 @@ export default async function handler(req, res) {
               console.log(`[webhook-mp] Taxa registrada: R$ ${mpFee > 0 ? mpFee : calculatedFee} (${feePercent}% de R$ ${grossAmount}) | Split: ${splitCollected ? 'automatico' : 'manual'}`)
             } catch (e) {
               console.error('[webhook-mp] Erro ao registrar taxa:', e.message)
+            }
+
+            // ── ACP (Acumulador Cíclico Progressivo) ──
+            // Toda entrada confirmada do tenant (agendamento, cobrança no chat, etc.)
+            // soma no mesmo acumulador de ciclos. MP reenvia notificações:
+            // só processa se o pagamento ainda NÃO estava pago.
+            if (existPay?.status !== 'paid') {
+              try {
+                const acpGross = parseFloat(payment.amount) || parseFloat(payData.transaction_amount) || 0
+                if (acpGross > 0) {
+                  const acp = await processCommissionCycle(db, {
+                    tenant_id: payment.tenant_id,
+                    payment_id: payment.id,
+                    gross_amount: acpGross,
+                    processor_fee: 0, // PIX MP: grátis pro recebedor (mesma convenção do webhook de pedidos)
+                    payment_method: payData.payment_method_id || 'pix',
+                  })
+                  if (acp?.ok && acp.cycles_completed > 0) {
+                    console.log(`[webhook-mp] 💎 ACP: ${acp.cycles_completed} ciclo(s) fechado(s) → R$${acp.commission_amount} pro Ark | fragmento: R$${acp.fragmentation_carry}`)
+                  }
+                }
+              } catch (acpErr) {
+                console.error('[webhook-mp] Erro no ACP:', acpErr.message)
+              }
             }
 
             // ── Confirmar agendamento vinculado (taxa de agendamento) ──
