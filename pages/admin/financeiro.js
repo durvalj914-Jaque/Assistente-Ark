@@ -55,6 +55,26 @@ export default function FinanceiroPage() {
   const [arkielPayments, setArkielPayments] = useState([])
   const [loadingArkielPayments, setLoadingArkielPayments] = useState(false)
 
+  // ── ACP (Acumulador Cíclico Progressivo) ──
+  const [acp, setAcp] = useState(null)
+  const [loadingAcp, setLoadingAcp] = useState(false)
+  const [acpSim, setAcpSim] = useState('')
+
+  const loadAcp = useCallback(async () => {
+    setLoadingAcp(true)
+    try {
+      const h = await authHeader()
+      const res = await fetch('/api/payments/acp', { headers: h })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao carregar ACP')
+      setAcp(data)
+    } catch (e) {
+      console.error('ACP:', e.message)
+    } finally {
+      setLoadingAcp(false)
+    }
+  }, [authHeader])
+
   const authHeader = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     return { Authorization: `Bearer ${session?.access_token || ''}` }
@@ -390,6 +410,7 @@ export default function FinanceiroPage() {
     loadBillingStatus()
     if (subTab === 'payment_methods') { loadPaymentMethods('payment'); loadArkielPayments() }
     else if (subTab === 'receipts') { loadReceipts('all'); loadPayments() }
+    else if (subTab === 'acp') { loadAcp() }
     else if (subTab === 'history') { loadPayments() }
   }, [user, subTab])
 
@@ -398,6 +419,7 @@ export default function FinanceiroPage() {
   if (loading || !user) return <AdminLayout tenant={tenant} user={user} role={role} profile={profile}><div style={{ padding: 40, color: '#64748b' }}>Carregando...</div></AdminLayout>
 
   const SUB_TABS = [
+    { key: 'acp', label: 'ACP · Ganho Participativo', icon: '💎', desc: 'Como o Ark participa do seu faturamento' },
     { key: 'payment_methods', label: 'Formas de Pagamento', icon: '💳', desc: 'Como você paga' },
     { key: 'receipts', label: 'Comprovantes', icon: '📄', desc: 'Seus comprovantes salvos' },
   ]
@@ -448,6 +470,131 @@ export default function FinanceiroPage() {
           </button>
         ))}
       </div>
+
+      {/* ── ACP · GANHO PARTICIPATIVO ── */}
+      {subTab === 'acp' && (
+        <div>
+          {/* Explicação do modelo */}
+          <div style={{ padding: 20, borderRadius: 12, border: '1px solid rgba(16,185,129,0.25)', background: 'var(--bg-card, #fff)', marginBottom: 16 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6 }}>💎 ACP — Acumulador Cíclico Progressivo</div>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
+              O Assistente Ark participa do seu faturamento de forma <b>cíclica e protegida</b>: a cada <b>R$ {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} líquidos</b> que entram no seu bolso, o Ark colhe <b>os próximos R$ {(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} do fluxo</b> — nunca do que já é seu. Um ciclo completo consome R$ {(acp?.cycle_length ?? 10.5).toFixed(2)} de fluxo e a taxa sai sempre do dinheiro seguinte, não do seu bolso.
+            </p>
+            {/* Fluxo visual do ciclo */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: '#22c55e', color: '#fff', fontSize: 12, fontWeight: 700 }}>R$ {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} → 🏦 Seu bolso</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 16 }}>+</div>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: '#4f8ef7', color: '#fff', fontSize: 12, fontWeight: 700 }}>R$ {(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} → 💎 Arkiel</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 16 }}>=</div>
+              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>Ciclo de R$ {(acp?.cycle_length ?? 10.5).toFixed(2)}</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+              <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                🛡️ <b style={{ color: 'var(--text-primary)' }}>Bolso cheio:</b> você nunca vê R$ 9,50. Os {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} entram inteiros — a participação do Ark vem do fluxo seguinte.
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                ♻️ <b style={{ color: 'var(--text-primary)' }}>Fragmento não se perde:</b> o que não completa um ciclo fica guardado e conta no próximo recebimento.
+              </div>
+              <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                📊 <b style={{ color: 'var(--text-primary)' }}>Participação efetiva: {acp ? (acp.effective_rate ?? 4.7619).toFixed(2) : '4,76'}%</b> do fluxo ({(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} ÷ {(acp?.cycle_length ?? 10.5).toFixed(2)}) — de todo tipo de entrada: vendas, agendamentos e cobranças.
+              </div>
+            </div>
+          </div>
+
+          {/* Cards em tempo real */}
+          {loadingAcp && <div style={{ padding: 30, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>Carregando acumulador...</div>}
+          {!loadingAcp && acp && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 16 }}>
+                <div style={{ padding: 18, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'var(--bg-card, #fff)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Fragmento atual</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: '#f59e0b' }}>R$ {(acp.cycle.accumulated_net || 0).toFixed(2)}</div>
+                  <div style={{ height: 6, borderRadius: 3, background: 'var(--bg-secondary, #f1f5f9)', marginTop: 10, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, ((acp.cycle.accumulated_net || 0) / (acp.cycle_length || 10.5)) * 100)}%`, background: '#f59e0b', borderRadius: 3 }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-faint, #94a3b8)', marginTop: 6 }}>faltam R$ {Math.max(0, (acp.cycle_length - (acp.cycle.accumulated_net || 0))).toFixed(2)} p/ fechar o próximo ciclo</div>
+                </div>
+                <div style={{ padding: 18, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'var(--bg-card, #fff)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Ciclos fechados</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-primary)' }}>{acp.cycle.total_cycles_completed || 0}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-faint, #94a3b8)', marginTop: 6 }}>cada ciclo = R$ {(acp.cycle.cycle_threshold ?? 10).toFixed(2)} no seu bolso</div>
+                </div>
+                <div style={{ padding: 18, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'var(--bg-card, #fff)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 6 }}>Repassado ao Ark</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: '#4f8ef7' }}>R$ {(acp.cycle.total_commission_earned || 0).toFixed(2)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-faint, #94a3b8)', marginTop: 6 }}>acumulado via ACP</div>
+                </div>
+              </div>
+
+              {/* Simulador */}
+              <div style={{ padding: 18, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'var(--bg-card, #fff)', marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>🧮 Simule um recebimento</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>R$</span>
+                    <input type="number" min="0" step="0.01" value={acpSim}
+                      onChange={e => setAcpSim(e.target.value)}
+                      placeholder="100,00"
+                      style={{ width: 130, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border-medium, #e2e8f0)', background: 'var(--bg-secondary, #f1f5f9)', color: 'var(--text-primary)', fontSize: 14, outline: 'none' }}
+                    />
+                  </div>
+                  {(() => {
+                    const v = parseFloat(acpSim) || 0
+                    if (v <= 0) return <span style={{ color: 'var(--text-faint, #94a3b8)', fontSize: 12 }}>digite um valor pra ver os ciclos que fechariam</span>
+                    const total = Number(((acp.cycle.accumulated_net || 0) + v).toFixed(2))
+                    const cycles = Math.floor((total + 1e-9) / (acp.cycle_length || 10.5))
+                    const fee = Number((cycles * (acp.cycle.commission_amount || 0.5)).toFixed(2))
+                    const frag = Number((total - cycles * (acp.cycle_length || 10.5)).toFixed(2))
+                    return (
+                      <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                        {cycles > 0
+                          ? <>fecharia <b style={{ color: '#22c55e' }}>{cycles} ciclo(s)</b> → <b style={{ color: '#4f8ef7' }}>R$ {fee.toFixed(2)} pro Ark</b> · você põe <b style={{ color: 'var(--text-primary)' }}>R$ {(v - fee).toFixed(2)}</b> no bolso · </> 
+                          : <>não fecharia ciclo agora · </>}
+                        fragmento iria pra <b style={{ color: '#f59e0b' }}>R$ {frag.toFixed(2)}</b> (guardado pro próximo recebimento)
+                      </div>
+                    )
+                  })()}
+                </div>
+              </div>
+
+              {/* Últimos eventos */}
+              <div style={{ padding: 18, borderRadius: 12, border: '1px solid var(--border-soft)', background: 'var(--bg-card, #fff)' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 10 }}>📜 Últimas entradas no acumulador</div>
+                {(acp.events || []).length === 0 ? (
+                  <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-faint, #94a3b8)', fontSize: 12 }}>
+                    Nenhuma entrada processada ainda. Assim que uma venda, agendamento ou cobrança for confirmado, aparece aqui.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+                          <th style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--border-soft)' }}>Data</th>
+                          <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border-soft)' }}>Entrada</th>
+                          <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border-soft)' }}>Ciclos</th>
+                          <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border-soft)' }}>Pro Ark</th>
+                          <th style={{ textAlign: 'right', padding: '6px 8px', borderBottom: '1px solid var(--border-soft)' }}>Fragmento</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {acp.events.map((e, i) => (
+                          <tr key={i}>
+                            <td style={{ padding: '7px 8px', color: 'var(--text-muted)' }}>{e.created_at ? new Date(e.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                            <td style={{ padding: '7px 8px', textAlign: 'right', color: 'var(--text-primary)', fontWeight: 600 }}>R$ {(e.gross_amount || 0).toFixed(2)}</td>
+                            <td style={{ padding: '7px 8px', textAlign: 'right', color: e.cycles_this_payment > 0 ? '#22c55e' : 'var(--text-faint, #94a3b8)', fontWeight: e.cycles_this_payment > 0 ? 700 : 400 }}>{e.cycles_this_payment || 0}</td>
+                            <td style={{ padding: '7px 8px', textAlign: 'right', color: '#4f8ef7', fontWeight: 600 }}>{(e.commission_this_payment || 0) > 0 ? `R$ ${(e.commission_this_payment || 0).toFixed(2)}` : '—'}</td>
+                            <td style={{ padding: '7px 8px', textAlign: 'right', color: '#f59e0b' }}>R$ {(e.fragmentation_carry || 0).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── MERCADO PAGO (apenas na aba Formas de Pagamento) ── */}
       {subTab === 'payment_methods' && (
