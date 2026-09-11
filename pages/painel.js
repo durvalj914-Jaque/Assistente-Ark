@@ -1900,7 +1900,7 @@ export default function PainelAdminPage() {
                     💎 Configuração de Comissão por Ciclo
                   </label>
                   <p style={{ color: 'var(--text-dim)', fontSize: 11, marginBottom: 10, lineHeight: 1.5 }}>
-                    Define a cada quanto a Arkiel cobra comissão. A cada R$ X líquidos no bolso do cliente, retém R$ Y via split.
+                    Ciclo Protegido: o cliente B2B põe R$ X líquidos cheios no bolso, e a Arkiel colhe os próximos R$ Y do fluxo. Um ciclo completo consome R$ X + R$ Y (ex: R$10,00 + R$0,50 = R$10,50).
                   </p>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div style={{ flex: 1 }}>
@@ -1923,7 +1923,7 @@ export default function PainelAdminPage() {
                     </div>
                   </div>
                   <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 8, lineHeight: 1.5 }}>
-                    Ex: Threshold R$10 + Comissão R$0,50 = a cada R$10 líquidos, Arkiel recebe R$0,50. Valores em branco usam o padrão (R$10 / R$0,50).
+                    Ex: R$10,00 no bolso + R$0,50 da Arkiel = ciclo de R$10,50. Numa entrada de R$100: 9 ciclos = R$4,50 (take efetivo ≈ 4,76%), sobram R$5,50 de fragmento que carregam pro próximo pagamento. O cliente nunca vê R$9,50 no bolso. Valores em branco usam o padrão (R$10 / R$0,50).
                   </div>
                 </div>
 
