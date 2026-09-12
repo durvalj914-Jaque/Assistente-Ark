@@ -84,28 +84,35 @@ export default function PainelAdminPage() {
   const [addonSaving, setAddonSaving] = useState(false)
   const [ newRowModal, setNewRowModal ] = useState(false)
   const [ newRowForm, setNewRowForm ] = useState({ key: '', label: '' })
-  // Linhas padrão da tabela de planos (chave -> label)
+  // Linhas padrão da matriz — ALINHADAS aos serviços reais e metrificáveis da plataforma
+  // Volume = contável no banco (bots, mensagens, conversas, contatos, produtos, agendamentos)
+  // Recursos = capacidades que o sistema entrega (integrações e módulos)
+  // Monetização ACP = ciclo de comissão por plano
   const [ planRows, setPlanRows ] = useState([
-    { key: 'max_bots',              label: 'Bots ativos' },
-    { key: 'max_messages_month',    label: 'Mensagens/mês' },
-    { key: 'max_conversations_month', label: 'Conversas Iniciadas/mês' },
-    { key: 'max_contacts',          label: 'Contatos' },
-    { key: 'has_catalog',           label: 'Catálogo de Produtos' },
-    { key: 'has_pix',               label: 'Pagamentos via PIX' },
-    { key: 'has_mercadopago',        label: 'Mercado Pago' },
-    { key: 'has_flow_editor',       label: 'Flow Editor Avançado' },
-    { key: 'has_ai',                label: 'Respostas com IA' },
-    { key: 'has_human_transfer',    label: 'Transferência para Humano' },
-    { key: 'has_push',              label: 'Notificações Web Push' },
-    { key: 'has_multiuser',         label: 'Multiusuário' },
-    { key: 'has_google_import',     label: 'Importação Google' },
-    { key: 'has_api',               label: 'Acesso à API' },
-    { key: 'has_reports',           label: 'Relatórios Avançados' },
-    { key: 'storage_gb',            label: 'Armazenamento (GB)' },
-    { key: 'support_level',         label: 'Nível de Suporte' },
-    { key: 'has_dedicated_number',  label: 'Número WhatsApp Dedicado' },
-    { key: 'commission_cycle_threshold', label: '💎 Ciclo de Comissão (R$)' },
-    { key: 'commission_amount',          label: '💎 Comissão/Ciclo (R$)' },
+    { key: 'max_bots',              label: 'Bots ativos',                group: '📈 Volume' },
+    { key: 'max_messages_month',    label: 'Mensagens/mês',              group: '📈 Volume' },
+    { key: 'max_conversations_month', label: 'Conversas Iniciadas/mês',  group: '📈 Volume' },
+    { key: 'max_contacts',          label: 'Contatos',                   group: '📈 Volume' },
+    { key: 'max_products',           label: 'Produtos no Catálogo',      group: '📈 Volume' },
+    { key: 'max_appointments_month', label: 'Agendamentos/mês',          group: '📈 Volume' },
+    { key: 'has_catalog',           label: 'Catálogo de Produtos (WhatsApp)', group: '🔌 Recursos' },
+    { key: 'has_pix',               label: 'Pagamentos via PIX',         group: '🔌 Recursos' },
+    { key: 'has_mercadopago',        label: 'Mercado Pago',              group: '🔌 Recursos' },
+    { key: 'has_flow_editor',       label: 'Flow Editor Avançado',       group: '🔌 Recursos' },
+    { key: 'has_ai',                label: 'Respostas com IA',          group: '🔌 Recursos' },
+    { key: 'has_human_transfer',    label: 'Transferência para Humano',  group: '🔌 Recursos' },
+    { key: 'has_push',              label: 'Notificações Web Push',     group: '🔌 Recursos' },
+    { key: 'has_multiuser',         label: 'Multiusuário',              group: '🔌 Recursos' },
+    { key: 'has_google_import',     label: 'Importação Google (Contatos)', group: '🔌 Recursos' },
+    { key: 'has_google_calendar',   label: 'Google Agenda (Agendamentos)', group: '🔌 Recursos' },
+    { key: 'has_broadcast',         label: 'Broadcast & Templates (Marketing)', group: '🔌 Recursos' },
+    { key: 'has_api',               label: 'Acesso à API',              group: '🔌 Recursos' },
+    { key: 'has_reports',           label: 'Relatórios Avançados',      group: '🔌 Recursos' },
+    { key: 'storage_gb',            label: 'Armazenamento (GB)',        group: '🔌 Recursos' },
+    { key: 'has_dedicated_number',  label: 'Número WhatsApp Dedicado',   group: '🔌 Recursos' },
+    { key: 'support_level',         label: 'Nível de Suporte',           group: '🔌 Recursos' },
+    { key: 'commission_cycle_threshold', label: '💎 Ciclo de Comissão (R$)', group: '💎 Monetização ACP' },
+    { key: 'commission_amount',          label: '💎 Comissão/Ciclo (R$)',      group: '💎 Monetização ACP' },
   ])
   const [mpDiag, setMpDiag] = useState(null)
   const [mpDiagLoading, setMpDiagLoading] = useState(false)
@@ -1486,7 +1493,7 @@ export default function PainelAdminPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
             <div>
               <h2 style={{ color: 'var(--text-primary)', fontSize: 16, fontWeight: 700 }}>📋 Planos da Plataforma</h2>
-              <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Defina os limites de cada recurso por plano. Clique nas células para editar.</p>
+              <p style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 4 }}>Matriz alinhada aos serviços reais da plataforma (Volume metrificável · Recursos entregues · Monetização ACP). Clique nas células para editar e monte planos combinando os itens.</p>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => setNewRowModal(true)}
@@ -1549,7 +1556,18 @@ export default function PainelAdminPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {planRows.map((row, ri) => (
+                  {planRows.flatMap((row, ri) => {
+                    const prev = planRows[ri - 1]
+                    const newGroup = !prev || prev.group !== row.group
+                    return [
+                      ...(newGroup ? [(
+                        <tr key={'g-' + row.group} style={{ background: 'var(--bg-secondary)' }}>
+                          <td colSpan={plans.length + 1} style={{ padding: '6px 14px', fontSize: 10, fontWeight: 800, letterSpacing: 1, color: '#4f8ef7', textTransform: 'uppercase', borderBottom: '1px solid var(--border-soft)' }}>
+                            {row.group || 'Outros'}
+                          </td>
+                        </tr>
+                      )] : []),
+                    (
                     <tr key={row.key} style={{ borderBottom: '1px solid var(--border-soft)' }}>
                       <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', position: 'sticky', left: 0, background: ri % 2 === 0 ? 'var(--bg-card)' : 'var(--bg-secondary)', zIndex: 1, whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -1581,7 +1599,8 @@ export default function PainelAdminPage() {
                         )
                       })}
                     </tr>
-                  ))}
+                    )
+                  ]})}
                   {/* Linha de Preço */}
                   <tr style={{ borderBottom: '1px solid var(--border-soft)', background: 'rgba(79,142,247,0.04)' }}>
                     <td style={{ padding: '10px 14px', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', position: 'sticky', left: 0, background: 'rgba(79,142,247,0.08)', zIndex: 1 }}>

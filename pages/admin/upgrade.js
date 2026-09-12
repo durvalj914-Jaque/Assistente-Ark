@@ -30,6 +30,14 @@ function featuresFromLimits(limits = {}) {
   if (l.max_contacts >= 999999) feats.push('Contatos ilimitados')
   else if (l.max_contacts) feats.push(`${Number(l.max_contacts).toLocaleString('pt-BR')} contatos`)
 
+  // Produtos no catálogo
+  if (l.max_products >= 999999) feats.push('Produtos ilimitados no catálogo')
+  else if (l.max_products) feats.push(`${Number(l.max_products).toLocaleString('pt-BR')} produtos no catálogo`)
+
+  // Agendamentos
+  if (l.max_appointments_month >= 999999) feats.push('Agendamentos ilimitados')
+  else if (l.max_appointments_month) feats.push(`${Number(l.max_appointments_month).toLocaleString('pt-BR')} agendamentos/mês`)
+
   // Flow Editor
   if (l.has_flow_editor) feats.push('Editor de fluxos avançado')
 
@@ -59,6 +67,12 @@ function featuresFromLimits(limits = {}) {
 
   // Google Import
   if (l.has_google_import) feats.push('Importação de contatos Google')
+
+  // Google Agenda
+  if (l.has_google_calendar) feats.push('Google Agenda (eventos automáticos)')
+
+  // Broadcast & Templates
+  if (l.has_broadcast) feats.push('Broadcast & campanhas (Marketing)')
 
   // Número dedicado
   if (l.has_dedicated_number) feats.push('Número WhatsApp dedicado')
