@@ -7,6 +7,10 @@ import { supabaseAdmin } from '../../../../lib/supabase'
 import { activatePlan } from '../../../../lib/planActivation'
 import { processCommissionCycle } from '../../../../lib/commissionEngine'
 
+async function trackEvent(db, event) {
+  try { await db.from('analytics_events').insert(event) } catch (_) {}
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(200).json({ ok: true })
 
@@ -33,12 +37,15 @@ export default async function handler(req, res) {
         else if (payData.status === 'expired') status = 'expired'
 
         // Buscar pagamento existente pra preservar metadata em pix_qr_url
-        const { data: existPay } = await db.from('payments').select('id, pix_qr_url, status').eq('pix_code', txid).maybeSingle()
+        const { data: existPay } = await db.from('payments').select('id, tenant_id, pix_qr_url, status').eq('pix_code', txid).maybeSingle()
         const existMeta = JSON.parse(existPay?.pix_qr_url || '{}')
         const updateData = { status, paid_at: status === 'paid' ? new Date().toISOString() : null, pix_qr_url: JSON.stringify({ ...existMeta, mp_payment_id: data.id, mp_status: payData.status, mp_payment_method: payData.payment_method_id }) }
         if (status === 'paid') updateData.paid_at = new Date().toISOString()
 
         await db.from('payments').update(updateData).eq('pix_code', txid)
+        if ((status === 'expired' || status === 'cancelled') && existPay && existPay.status !== status) {
+          await trackEvent(db, { tenant_id: existPay.tenant_id || null, event_type: 'payment_cancelled', payment_id: existPay.id, value_brl: payData.transaction_amount || null })
+        }
 
         // ── PIX expirado/cancelado com agendamento vinculado: liberar o horário ──
         if ((status === 'expired' || status === 'cancelled') && existMeta.appointment_id) {
@@ -48,6 +55,7 @@ export default async function handler(req, res) {
             if (apptCancel && apptCancel.status === 'pending_payment') {
               await db.from('appointments')
                 .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+              await trackEvent(db, { tenant_id: existPay.tenant_id || null, event_type: 'appointment_cancelled', appointment_id: existMeta.appointment_id, payment_id: existPay.id })
                 .eq('id', apptCancel.id)
               console.log('[webhook-mp] Agendamento cancelado (PIX expirado):', apptCancel.id)
               // Avisar o cliente que o horário foi liberado
@@ -76,14 +84,14 @@ export default async function handler(req, res) {
         }
 
         // ── Confirmar pagamento ──
-        if (status === 'paid') {
+        if (status === 'paid' && existPay?.status !== 'paid') {
           const { data: payment } = await db.from('payments')
             .select('id, tenant_id, bot_id, amount, pix_qr_url')
             .eq('pix_code', txid).maybeSingle()
-
           if (payment) {
             // ── COMPRA DE CRÉDITOS: creditar e sair (não é transação de tenant) ──
             const payMeta = JSON.parse(payment.pix_qr_url || '{}')
+            if (payMeta.type !== 'credit_purchase') await trackEvent(db, { tenant_id: payment.tenant_id, event_type: 'payment_confirmed', payment_id: payment.id, value_brl: Number(payment.amount) || Number(payData.transaction_amount) || null })
             if (payMeta.type === 'credit_purchase') {
               try {
                 // Registrar a compra como paga
@@ -248,6 +256,7 @@ export default async function handler(req, res) {
                 .eq('id', apptPayMeta.appointment_id).maybeSingle()
               if (apptRow && apptRow.status !== 'confirmed') {
                 await db.from('appointments').update({ status: 'confirmed', updated_at: new Date().toISOString() }).eq('id', apptPayMeta.appointment_id)
+                await trackEvent(db, { tenant_id: payment.tenant_id, event_type: 'appointment_confirmed', appointment_id: apptPayMeta.appointment_id, payment_id: payment.id, conversation_id: apptPayMeta.conversation_id || null, value_brl: payment.amount })
                 try {
                   const { pushAppointmentToGoogle } = await import('../../../../lib/googleCalendar')
                   await pushAppointmentToGoogle(db, payment.tenant_id, apptRow)

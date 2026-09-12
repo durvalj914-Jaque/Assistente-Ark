@@ -47,6 +47,7 @@ async function handleOrder(db, msg, from, phoneNumberId) {
   }).select().single()
 
   const orderId = orderRow?.id
+  await safeInsert(db, 'analytics_events', { tenant_id: bot.tenant_id, event_type: 'order_created', order_id: orderId || null, contact_id: contact?.id || null, value_brl: total })
 
   // Criar comprovante automático de pedido do catálogo (B2C Catálogo)
   if (total > 0) {
@@ -90,6 +91,7 @@ async function handleOrder(db, msg, from, phoneNumberId) {
         amount: total,
         status: 'pending', pix_code: txid, pix_qr_url: meta,
       }).select().single()
+      await safeInsert(db, 'analytics_events', { tenant_id: bot.tenant_id, event_type: 'payment_created', payment_id: payment?.id || null, order_id: orderId || null, contact_id: contact?.id || null, value_brl: total })
 
       // O vínculo payment→order fica em payments.metadata.order_id (não precisa de coluna extra)
 
@@ -552,6 +554,7 @@ async function processWebhook(body) {
       .from('conversations').insert({ tenant_id: tenantId, bot_id: bot.id, contact_id: contact.id, status: 'bot' }).select('*').single()
     if (convErr) { await savelog(db, 'conv_error', convErr.message); return }
     conv = newConv
+    await safeInsert(db, 'analytics_events', { tenant_id: tenantId, event_type: 'conversation_started', conversation_id: conv.id, contact_id: contact.id, bot_id: bot.id })
   }
   await savelog(db, 'conv_ok', null, { node: conv.current_node_id, status: conv.status })
 
@@ -857,6 +860,7 @@ Obrigado! 🎉`)
   // Human takeover keyword (atalho direto, sem depender do fluxo)
   if (bot.human_takeover_keyword && userText?.toLowerCase().includes(bot.human_takeover_keyword.toLowerCase())) {
     await db.from('conversations').update({ status: 'human' }).eq('id', conv.id)
+    await safeInsert(db, 'analytics_events', { tenant_id: tenantId, event_type: 'human_handoff', conversation_id: conv.id, contact_id: contact.id, bot_id: bot.id })
     const reply = '👤 Transferindo para nossa equipe! Em breve um atendente entrará em contato. 😊'
     try { await sendText(phoneNumberId, tkn, from, reply) } catch(_) {}
     await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: reply, sent_by: 'bot' })
@@ -1015,6 +1019,7 @@ async function schedSendServiceMenu() {
         date: dayList[0].toISOString().slice(0, 10), start_time: '00:00', end_time: '00:00', status: 'draft',
         notes: 'DAYS:' + dayList.map(d => d.toISOString().slice(0, 10)).join(','),
       }).select().single()
+      await safeInsert(db, 'analytics_events', { tenant_id: tenantId, event_type: 'appointment_created', appointment_id: appt?.id || null, conversation_id: conv.id, contact_id: contact.id })
 
       const dayMenu = dayList.map((d, i) => {
         const label = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
