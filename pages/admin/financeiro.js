@@ -478,7 +478,7 @@ export default function FinanceiroPage() {
           <div style={{ padding: 20, borderRadius: 12, border: '1px solid rgba(16,185,129,0.25)', background: 'var(--bg-card, #fff)', marginBottom: 16 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary)', marginBottom: 6 }}>💎 ACP — Acumulador Cíclico Progressivo</div>
             <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, marginBottom: 14 }}>
-              O Assistente Ark participa do seu faturamento de forma <b>cíclica e protegida</b>: a cada <b>R$ {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} líquidos</b> que entram no seu bolso, o Ark colhe <b>os próximos R$ {(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} do fluxo</b> — nunca do que já é seu. Um ciclo completo consome R$ {(acp?.cycle_length ?? 10.5).toFixed(2)} de fluxo e a taxa sai sempre do dinheiro seguinte, não do seu bolso.
+              O Assistente Ark participa do seu faturamento de forma <b>cíclica e transparente</b>: a cada ciclo, <b>R$ {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} são destinados ao seu faturamento</b> e <b>R$ {(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} correspondem à participação do Ark</b>. O ciclo completo utiliza R$ {(acp?.cycle_length ?? 10.5).toFixed(2)} do fluxo acumulado — e o fragmento que não completa um ciclo carrega para o próximo.
             </p>
             {/* Fluxo visual do ciclo */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -490,14 +490,18 @@ export default function FinanceiroPage() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
               <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                🛡️ <b style={{ color: 'var(--text-primary)' }}>Bolso cheio:</b> você nunca vê R$ 9,50. Os {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} entram inteiros — a participação do Ark vem do fluxo seguinte.
+                🛡️ <b style={{ color: 'var(--text-primary)' }}>Bolso cheio:</b> você nunca vê R$ 9,50. Os R$ {(acp?.cycle?.cycle_threshold ?? 10).toFixed(2)} do ciclo entram inteiros no seu faturamento — a participação do Ark é a fatia seguinte do fluxo acumulado, não um desconto no seu recebimento.
               </div>
               <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
                 ♻️ <b style={{ color: 'var(--text-primary)' }}>Fragmento não se perde:</b> o que não completa um ciclo fica guardado e conta no próximo recebimento.
               </div>
               <div style={{ padding: 12, borderRadius: 10, background: 'var(--bg-secondary, #f1f5f9)', fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                📊 <b style={{ color: 'var(--text-primary)' }}>Participação efetiva: {acp ? (acp.effective_rate ?? 4.7619).toFixed(2) : '4,76'}%</b> do fluxo ({(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} ÷ {(acp?.cycle_length ?? 10.5).toFixed(2)}) — de todo tipo de entrada: vendas, agendamentos e cobranças.
+                📊 <b style={{ color: 'var(--text-primary)' }}>Participação efetiva: {acp ? (acp.effective_rate ?? 4.7619).toFixed(2) : '4,76'}% por ciclo</b> ({(acp?.cycle?.commission_amount ?? 0.5).toFixed(2)} ÷ {(acp?.cycle_length ?? 10.5).toFixed(2)}) — calculada sobre o fluxo acumulado, não sobre cada venda individual. Vale para todo tipo de entrada: vendas, agendamentos e cobranças.
               </div>
+            </div>
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-soft)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, background: 'linear-gradient(90deg,#22c55e,#06b6d4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>⚡ MONETIZAÇÃO BASEADA EM ACP™</span>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>— tecnologia Arkiel. Teste na simulação abaixo: R$ 100,00 → 9 ciclos → R$ 95,50 no seu faturamento + R$ 4,50 de participação + R$ 5,50 de fragmento guardado.</span>
             </div>
           </div>
 
