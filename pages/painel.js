@@ -1521,7 +1521,7 @@ export default function PainelAdminPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                           <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{p.name}</span>
                           <span style={{ fontSize: 16, fontWeight: 800, color: '#4f8ef7' }}>
-                            R$ {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : p.price}
+                            R$ {typeof p.price === 'number' ? p.price.toFixed(2).replace('.', ',') : (p.price == null ? 'Consultar' : p.price)}
                           </span>
                           <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
                             {p.billing_cycle === 'monthly' ? 'Mensal' :

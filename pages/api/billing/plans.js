@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     const { data, error } = await db.from('plans')
       .select('*')
       .or('active.eq.true,active.is.null')
-      .order('price', { ascending: true })
+      .order('price', { ascending: true, nullsFirst: false })
     if (!error && data) plans = data
   } catch {}
 

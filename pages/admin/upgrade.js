@@ -19,7 +19,16 @@ function featuresFromLimits(limits = {}) {
 
   // Conversas
   if (l.max_conversations_month >= 999999) feats.push('Conversas ilimitadas')
-  else if (l.max_conversations_month) feats.push(`${l.max_conversations_month.toLocaleString('pt-BR')} conversas iniciadas/mês`)
+  else if (l.max_conversations_month) feats.push(`${Number(l.max_conversations_month).toLocaleString('pt-BR')} conversas iniciadas/mês`)
+  else if (l.max_conversations_month === 0) feats.push('Conversas iniciadas via créditos pré-pagos')
+
+  // Mensagens service
+  if (l.max_messages_month >= 999999) feats.push('Mensagens ilimitadas')
+  else if (l.max_messages_month) feats.push(`${Number(l.max_messages_month).toLocaleString('pt-BR')} mensagens/mês`)
+
+  // Contatos
+  if (l.max_contacts >= 999999) feats.push('Contatos ilimitados')
+  else if (l.max_contacts) feats.push(`${Number(l.max_contacts).toLocaleString('pt-BR')} contatos`)
 
   // Flow Editor
   if (l.has_flow_editor) feats.push('Editor de fluxos avançado')
@@ -183,7 +192,9 @@ export default function Upgrade() {
 
   // Preparar planos para exibição: dinâmicos com features geradas dos limits
   const displayPlans = dynamicPlans.map(p => {
-    const feats = (p.features && p.features.length > 0) ? p.features : featuresFromLimits(p.limits)
+    // A matriz de limites da aba Planos é a fonte da verdade — features estáticas só como fallback
+    const hasLimits = p.limits && Object.keys(p.limits).length > 0
+    const feats = hasLimits ? featuresFromLimits(p.limits) : (p.features && p.features.length > 0 ? p.features : ['Painel básico'])
     return { ...p, _features: feats }
   })
 
@@ -285,8 +296,8 @@ export default function Upgrade() {
               const planName = (p.name || '').toLowerCase()
               const isCurrent = planName === currentPlan
               const isFeatured = i === finalFeaturedIdx
-              const isContact = p.price === 0 && planName === 'enterprise' // Enterprise = falar com vendas
-              const isFree = p.price === 0 && planName !== 'enterprise'
+              const isContact = p.price == null || (p.price === 0 && planName === 'enterprise') // Enterprise / preço sob consulta = falar com vendas
+              const isFree = p.price === 0 && !isContact
 
               return (
                 <div key={p.id || i} className={`upg-card ${isFeatured ? 'featured' : ''}`}>
