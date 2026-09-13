@@ -35,7 +35,7 @@ export default async function handler(req, res) {
       .eq('id', ARKIEL_TENANT_ID)
       .maybeSingle()
     const parsed = JSON.parse(tenant?.mp_access_token || '{}')
-    resources = parsed.plan_resources || []
+    resources = (parsed.addons && parsed.addons.length ? parsed.addons : parsed.plan_resources) || []
   } catch {}
 
   // ── 3. Plano atual do tenant ──

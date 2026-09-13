@@ -222,7 +222,7 @@ export default function Upgrade() {
     acc[cat].push(r)
     return acc
   }, {})
-  const catLabels = { bot: 'Bots', mensagens: 'Mensagens', contatos: 'Contatos', integracao: 'Integrações', suporte: 'Suporte', geral: 'Geral', conversas: 'Conversas' }
+  const catLabels = { bot: 'Bots', bots: 'Bots', mensagens: 'Mensagens', contatos: 'Contatos', integracao: 'Integrações', suporte: 'Suporte', geral: 'Geral', conversas: 'Conversas', features: 'Recursos', credits: 'Créditos' }
 
   return (
     <AdminLayout tenant={tenant} user={user}>
@@ -359,7 +359,7 @@ export default function Upgrade() {
                   <div className="upg-res-cat">{catLabels[cat] || cat}</div>
                   <div className="upg-res-name">{r.name}</div>
                   <div className="upg-res-desc">{r.description}</div>
-                  <div className="upg-res-price">R$ {r.price?.toFixed(2) || '0,00'}</div>
+                  <div className="upg-res-price">R$ {r.price?.toFixed(2) || '0,00'}{r.billing_type === 'monthly' ? <span style={{ fontSize: 11, fontWeight: 500 }}> /mês</span> : <span style={{ fontSize: 11, fontWeight: 500 }}> único</span>}</div>
                   <a href={`https://wa.me/5511913751590?text=Quero%20contratar:%20${encodeURIComponent(r.name)}`} target="_blank" rel="noreferrer" className="upg-btn upg-btn-ghost" style={{fontSize:12,padding:'8px'}}>Contratar</a>
                 </div>
               ))
