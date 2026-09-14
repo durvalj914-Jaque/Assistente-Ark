@@ -68,11 +68,12 @@ export default async function handler(req, res) {
   // TODO: criar template customizado de marketing e usar ele
   let templateName = 'hello_world'
   let templateLanguage = 'en_US'
+  let templateHasVar = false // template customizado tem variável {{1}} no corpo?
 
   // Tentar buscar template de marketing customizado
   try {
     const templatesRes = await fetch(
-      `https://graph.facebook.com/v25.0/${process.env.WABA_ID || '1867398900635798'}/message_templates?fields=name,language,status,category&limit=100`,
+      `https://graph.facebook.com/v25.0/${process.env.WABA_ID || '1867398900635798'}/message_templates?fields=name,language,status,category,components&limit=100`,
       { headers: { Authorization: `Bearer ${waToken}` } }
     )
     const templatesData = await templatesRes.json()
@@ -83,6 +84,8 @@ export default async function handler(req, res) {
     if (approvedMarketing) {
       templateName = approvedMarketing.name
       templateLanguage = approvedMarketing.language
+      const bodyText = (approvedMarketing.components || []).find(c => c.type === 'BODY')?.text || ''
+      templateHasVar = /\{\{\d+\}\}/.test(bodyText)
     }
   } catch (e) {
     console.error('[marketing/send] Erro ao buscar templates:', e.message)
@@ -128,20 +131,17 @@ export default async function handler(req, res) {
           },
         }
       } else {
-        // Template de marketing customizado com variável
-        body = {
-          messaging_product: 'whatsapp',
-          to: phone,
-          type: 'template',
-          template: {
-            name: templateName,
-            language: { code: templateLanguage },
-            components: [{
-              type: 'body',
-              parameters: [{ type: 'text', text: message.substring(0, 1024) }],
-            }],
-          },
+        // Template de marketing customizado: só injeta a mensagem como parâmetro
+        // se o corpo do template tiver variável {{1}} — template sem variável com
+        // parâmetro extra é rejeitado pela Meta (erro do envio "teste_simples")
+        const template = { name: templateName, language: { code: templateLanguage } }
+        if (templateHasVar) {
+          template.components = [{
+            type: 'body',
+            parameters: [{ type: 'text', text: message.substring(0, 1024) }],
+          }]
         }
+        body = { messaging_product: 'whatsapp', to: phone, type: 'template', template }
       }
 
       const sendRes = await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
@@ -181,8 +181,8 @@ export default async function handler(req, res) {
                 image: { link: image_url, caption: message.substring(0, 1024) },
               }),
             })
-          } else if (templateName === 'hello_world' && message !== 'hello_world') {
-            // Enviar a mensagem de marketing como texto (após abrir a janela)
+          } else if (!templateHasVar && message) {
+            // Enviar a mensagem de marketing como texto (após abrir a janela com o template)
             await fetch(`https://graph.facebook.com/v25.0/${phoneId}/messages`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${waToken}` },
@@ -221,7 +221,7 @@ export default async function handler(req, res) {
   try {
     await db.from('webhook_logs').insert({
       step: 'marketing_broadcast',
-      error: `enviado para ${sent} contatos (${failed} falhas) — template: ${templateName}`,
+      error: `enviado para ${sent} contatos (${failed} falhas) — template: ${templateName}` + (errors.length ? ` — erros: ${errors.map(e => e.error).join(' | ').substring(0, 200)}` : ''),
     })
   } catch (_) {}
 
