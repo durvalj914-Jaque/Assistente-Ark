@@ -151,11 +151,14 @@ export default async function handler(req, res) {
       })
       const sendData = await sendRes.json()
 
-      if (sendData.id || sendData.message_status === 'accepted') {
+      // Cloud API responde { messages: [{ id: 'wamid...' }] } no sucesso —
+      // sendData.id/message_status não existem nesse shape e faziam sucesso
+      // ser contado como falha (follow-up da mensagem real nunca disparava)
+      const wamid = sendData?.messages?.[0]?.id
+      if (wamid || sendData.message_status === 'accepted') {
         sent++
         // Debita 1 crédito de marketing + registra janela de conversa (conferência com a Meta)
         try {
-          const wamid = sendData?.messages?.[0]?.id || `marketing_${phone}_${Date.now()}`
           await db.rpc('deduct_credit', {
             p_tenant_id: tenant_id, p_credit_type: 'marketing',
             p_conversation_id: wamid, p_origin_type: 'marketing',
@@ -195,7 +198,7 @@ export default async function handler(req, res) {
         } catch (_) {}
       } else {
         failed++
-        errors.push({ phone, error: sendData.error?.message || 'unknown' })
+        errors.push({ phone, error: sendData.error?.message || JSON.stringify(sendData).substring(0, 150) })
       }
     } catch (e) {
       failed++
