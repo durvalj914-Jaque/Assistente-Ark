@@ -1,8 +1,27 @@
+import crypto from 'crypto'
+import { rateLimit, clientKey } from '../../../lib/serverAuth'
 import { supabaseAdmin } from '../../../lib/supabase'
 import { processCommissionCycle } from '../../../lib/commissionEngine'
 import { sendText } from '../../../lib/meta'
 
 export default async function handler(req, res) {
+  // rate limit: evita spam que esgota a cota da API da MP
+  if (!rateLimit('mpwh2:' + clientKey(req), 60, 60000)) return res.status(429).json({ error: 'Too many requests' })
+
+  // defense-in-depth: se MP_WEBHOOK_SECRET estiver configurado, exige x-signature válida
+  // (mesmo sem ela, o pagamento é reconfirmado direto na API da MP — forjar notificação não libera nada)
+  const MP_SECRET = process.env.MP_WEBHOOK_SECRET
+  if (MP_SECRET) {
+    const sig = String(req.headers['x-signature'] || '')
+    const parts = Object.fromEntries(sig.split(',').map(s => s.split('=').map(x => x.trim())))
+    const ts = parts.ts || '', hash = parts.v1 || ''
+    const manifest = `id:${(req.body?.data?.id ?? '')};request-id:${req.headers['x-request-id'] || ''};ts:${ts};`
+    const expected = crypto.createHmac('sha256', MP_SECRET).update(manifest).digest('hex')
+    const a = Buffer.from(hash), b = Buffer.from(expected)
+    if (hash.length !== expected.length || a.length === 0 || !crypto.timingSafeEqual(a, b)) {
+      return res.status(401).json({ error: 'Assinatura inválida' })
+    }
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const db = supabaseAdmin()
