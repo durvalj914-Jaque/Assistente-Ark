@@ -12,7 +12,12 @@ const db = createClient(
 
 export default async function handler(req, res) {
   const secret = req.headers['x-setup-secret'] || req.query.secret
-  if (secret !== SETUP_SECRET) return res.status(403).json({ error: 'Forbidden' })
+  if (secret !== SETUP_SECRET) {
+    // alternativa: session de platform admin (secret hardcoded não deve ser única porta)
+    const { requirePlatformAdmin } = await import('../../../lib/adminAuth')
+    const admin = await requirePlatformAdmin(req, res)
+    if (!admin) return
+  }
 
   if (req.method === 'GET') {
     try {
