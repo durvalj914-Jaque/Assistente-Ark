@@ -153,6 +153,22 @@ export default async function handler(req, res) {
 
       if (sendData.id || sendData.message_status === 'accepted') {
         sent++
+        // Debita 1 crédito de marketing + registra janela de conversa (conferência com a Meta)
+        try {
+          const wamid = sendData?.messages?.[0]?.id || `marketing_${phone}_${Date.now()}`
+          await db.rpc('deduct_credit', {
+            p_tenant_id: tenant_id, p_credit_type: 'marketing',
+            p_conversation_id: wamid, p_origin_type: 'marketing',
+            p_bot_id: bot.id, p_contact_phone: phone,
+          })
+          await db.rpc('track_conversation', {
+            p_conversation_id: wamid, p_tenant_id: tenant_id,
+            p_bot_id: bot.id, p_origin_type: 'marketing',
+            p_category: 'marketing', p_phone_number: phone,
+          })
+        } catch (e) {
+          console.error('[marketing/send] erro ao debitar crédito/rastrear janela:', e.message)
+        }
         // Follow-up com o conteúdo real de marketing (após abrir a janela 24h)
         try {
           if (image_url) {
@@ -190,13 +206,22 @@ export default async function handler(req, res) {
     if (sent % 10 === 0 && sent > 0) await new Promise(r => setTimeout(r, 500))
   }
 
-  // 5. Registrar no log
+  // 5. Registrar no log (analytics_events + webhook_logs — activity_logs não existe mais)
   try {
-    await db.from('activity_logs').insert({
-      tenant_id,
-      event_type: 'marketing_broadcast',
-      description: `Broadcast de marketing enviado para ${sent} contatos (${failed} falhas)`,
-      metadata: JSON.stringify({ sent, failed, template: templateName, has_image: Boolean(image_url), message_preview: message.substring(0, 100) }),
+    if (sent > 0) {
+      await db.from('analytics_events').insert({
+        tenant_id,
+        event_type: 'marketing_broadcast',
+        bot_id: bot.id,
+        value_brl: sent * 0.36,
+        payload: { sent, failed, template: templateName, has_image: Boolean(image_url), message_preview: message.substring(0, 100) },
+      })
+    }
+  } catch (e) { console.error('[marketing/send] erro ao registrar analytics:', e.message) }
+  try {
+    await db.from('webhook_logs').insert({
+      step: 'marketing_broadcast',
+      error: `enviado para ${sent} contatos (${failed} falhas) — template: ${templateName}`,
     })
   } catch (_) {}
 
