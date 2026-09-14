@@ -2,6 +2,8 @@ import { supabaseAdmin } from '../../../lib/supabase'
 import { generatePixCode } from '../../../lib/pix'
 
 export default async function handler(req, res) {
+  // Bloqueado em produção (pentest 2026-09-13): endpoint de teste/diagnóstico
+  if (process.env.NODE_ENV === 'production') return res.status(404).json({ error: 'Not found' })
   const db = supabaseAdmin()
   
   // Get all tenants

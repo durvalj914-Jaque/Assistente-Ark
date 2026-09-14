@@ -1,3 +1,4 @@
+import { requirePlatformAdmin } from '../../../lib/adminAuth'
 import { createClient } from '@supabase/supabase-js'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -8,6 +9,8 @@ function getDB() {
 }
 
 export default async function handler(req, res) {
+  const admin = await requirePlatformAdmin(req, res)
+  if (!admin) return
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

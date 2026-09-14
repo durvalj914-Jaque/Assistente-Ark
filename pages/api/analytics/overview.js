@@ -88,12 +88,17 @@ export default async function handler(req, res) {
   const topProducts = Object.values(prodMap).sort((a, b) => b.brl - a.brl).slice(0, 5)
 
   // ── Funil do negócio ──
+  // Conta por CHAVE ÚNICA (pedido/conversa), não por tentativa:
+  // um pedido com 3 tentativas de PIX conta 1 pagamento iniciado.
+  const payKey = p => p.order_id || p.conversation_id || p.id
+  const paymentsCreated = new Set(payList.map(payKey)).size
+  const paymentsConfirmed = new Set(paidPays.map(payKey)).size
   const funnel = {
     conversations: convList.length,
     orders: orderList.length,
-    paymentsCreated: payList.length,
-    paymentsConfirmed: paidPays.length,
-    conversion: convList.length ? Number(((paidPays.length / convList.length) * 100).toFixed(2)) : 0,
+    paymentsCreated,
+    paymentsConfirmed,
+    conversion: convList.length ? Number(((paymentsConfirmed / convList.length) * 100).toFixed(2)) : 0,
   }
 
   // ── Agendamentos ──

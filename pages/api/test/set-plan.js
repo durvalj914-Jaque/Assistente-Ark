@@ -8,6 +8,8 @@ const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export default async function handler(req, res) {
+  // Bloqueado em produção (pentest 2026-09-13): endpoint de teste/diagnóstico
+  if (process.env.NODE_ENV === 'production') return res.status(404).json({ error: 'Not found' })
   const db = createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
   const action = req.query.action || 'free'
   

@@ -90,7 +90,7 @@ export default function AnalyticsPage() {
   if (!user || !tenant) return null
 
   const plan   = PLANS[tenant.plan] || PLANS.free
-  const pct    = usagePercent(tenant, usage)
+const pct    = usagePercent(tenant, usage)
   const o      = ov?.overview || {}
   const f      = ov?.funnel || { conversations: 0, orders: 0, paymentsCreated: 0, paymentsConfirmed: 0, conversion: 0 }
   const conv   = ov?.conversations || { perDay: [], byHour: new Array(24).fill(0), statusNow: {}, inbound: 0, outbound: 0 }

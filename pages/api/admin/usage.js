@@ -2,9 +2,12 @@
  * GET /api/admin/usage
  * Retorna uso agregado de todos os tenants no mês atual
  */
+import { requirePlatformAdmin } from '../../../lib/adminAuth'
 import { supabase, supabaseAdmin } from '../../../lib/supabase'
 
 export default async function handler(req, res) {
+  const admin = await requirePlatformAdmin(req, res)
+  if (!admin) return
   if (req.method !== 'GET') return res.status(405).end()
 
   const authHeader = req.headers.authorization || ''

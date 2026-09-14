@@ -4,6 +4,7 @@
  * Chamado automaticamente ao criar/editar/pausar/apagar um produto na aba Produtos.
  * Body: { productId, tenantId, action: 'upsert' | 'remove' }
  */
+import { requirePlatformAdmin } from '../../../lib/adminAuth'
 import { createClient } from '@supabase/supabase-js'
 import { upsertCatalogProduct, removeCatalogProduct } from '../../../lib/metaCatalog'
 
@@ -16,6 +17,8 @@ function getDB() {
 }
 
 export default async function handler(req, res) {
+  const admin = await requirePlatformAdmin(req, res)
+  if (!admin) return
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

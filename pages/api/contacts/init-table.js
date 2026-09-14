@@ -6,6 +6,8 @@
 import { requirePlatformAdmin } from '../../../lib/adminAuth'
 
 export default async function handler(req, res) {
+  // Bloqueado em produção (pentest 2026-09-13): endpoint de teste/diagnóstico
+  if (process.env.NODE_ENV === 'production') return res.status(404).json({ error: 'Not found' })
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const ctx = await requirePlatformAdmin(req, res)
   if (!ctx) return
@@ -37,10 +39,10 @@ export default async function handler(req, res) {
         created_at TIMESTAMPTZ DEFAULT now(), created_by UUID
       );
       ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
-      CREATE POLICY IF NOT EXISTS "contacts_read" ON contacts FOR SELECT USING (true);
-      CREATE POLICY IF NOT EXISTS "contacts_insert" ON contacts FOR INSERT WITH CHECK (true);
-      CREATE POLICY IF NOT EXISTS "contacts_update" ON contacts FOR UPDATE USING (true);
-      CREATE POLICY IF NOT EXISTS "contacts_delete" ON contacts FOR DELETE USING (true);
+      CREATE POLICY IF NOT EXISTS "contacts_select" ON contacts FOR SELECT USING (tenant_id IN (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid()));
+      CREATE POLICY IF NOT EXISTS "contacts_insert" ON contacts FOR INSERT WITH CHECK (tenant_id IN (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid()));
+      CREATE POLICY IF NOT EXISTS "contacts_update" ON contacts FOR UPDATE USING (tenant_id IN (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid()));
+      CREATE POLICY IF NOT EXISTS "contacts_delete" ON contacts FOR DELETE USING (tenant_id IN (SELECT tenant_id FROM tenant_members WHERE user_id = auth.uid()));
       CREATE INDEX IF NOT EXISTS idx_contacts_tenant ON contacts(tenant_id);
       CREATE INDEX IF NOT EXISTS idx_contacts_email ON contacts(email);
       CREATE INDEX IF NOT EXISTS idx_contacts_phone ON contacts(phone_e164);

@@ -1,11 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 import { processFlow, getNodeButtons } from '../../../lib/flowEngine'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
 import { sendProductList } from '../../../lib/metaCatalog'
 import { getGoogleBusy, pushAppointmentToGoogle } from '../../../lib/googleCalendar'
 
-export const config = { api: { bodyParser: { sizeLimit: '10mb' } } }
+export const config = { api: { bodyParser: false } }
 
 const SUPA_URL  = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -331,6 +332,14 @@ async function processWebhook(body) {
                         : fromRaw
   const phoneNumberId = change?.metadata?.phone_number_id || PHONE_ID
   const wamId         = msg.id
+
+  // ── Dedupe: a Meta re-entrega webhooks; mensagem já processada é ignorada ──
+  if (wamId) {
+    try {
+      const { data: dup } = await db.from('messages').select('id').eq('meta_message_id', wamId).limit(1)
+      if (dup?.length) { await savelog(db, 'duplicate_wamid', wamId); return }
+    } catch (_) {}
+  }
 
   let userText = ''
   if (msg.type === 'text')        userText = msg.text?.body?.trim() || ''
@@ -1452,8 +1461,44 @@ export default async function handler(req, res) {
   }
   if (req.method !== 'POST') return res.status(405).end()
 
+  // ── Corpo bruto (necessário p/ validar assinatura) ──
+  const raw = await new Promise((resolve) => {
+    const chunks = []
+    let size = 0
+    req.on('data', (c) => {
+      size += c.length
+      if (size > 11 * 1024 * 1024) { req.destroy(); return resolve(null) }
+      chunks.push(c)
+    })
+    req.on('end', () => resolve(Buffer.concat(chunks)))
+    req.on('error', () => resolve(null))
+  })
+  if (!raw) return res.status(413).end()
+
+  // ── Validação da assinatura X-Hub-Signature-256 (app secret da Meta) ──
+  // Fail-closed: com META_APP_SECRET configurado, payload sem assinatura
+  // válida é rejeitado. Sem o secret configurado, segue com warning (não
+  // deve ocorrer — a variável existe no ambiente da Vercel).
+  const APP_SECRET = process.env.META_APP_SECRET
+  if (APP_SECRET) {
+    const sig = req.headers['x-hub-signature-256'] || ''
+    const expected = 'sha256=' + crypto.createHmac('sha256', APP_SECRET).update(raw).digest('hex')
+    const a = Buffer.from(String(sig))
+    const b = Buffer.from(expected)
+    const valid = a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b)
+    if (!valid) {
+      try { getDB().from('webhook_logs').insert({ step: 'signature_rejected', error: 'assinatura inválida ou ausente' }).then(()=>{}) } catch (_) {}
+      return res.status(401).json({ error: 'Assinatura inválida' })
+    }
+  } else {
+    console.warn('[webhook] META_APP_SECRET ausente — assinatura NÃO validada')
+  }
+
+  let body
+  try { body = JSON.parse(raw.toString('utf8')) } catch (_) { return res.status(400).end() }
+
   try {
-    await processWebhook(req.body)
+    await processWebhook(body)
   } catch(err) {
     try {
       const db = getDB()

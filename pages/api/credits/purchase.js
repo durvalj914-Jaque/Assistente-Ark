@@ -1,3 +1,4 @@
+import { requireTenant } from '../../../lib/serverAuth'
 import { createClient } from '@supabase/supabase-js'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,6 +20,9 @@ function getArkielMpToken() {
 }
 
 export default async function handler(req, res) {
+  const auth = await requireTenant(req, res)
+  if (!auth) return
+  if (req.body) { req.body.tenant_id = auth.tenant_id; req.body.tenantId = auth.tenant_id }
   const db = getDB()
 
   if (req.method === 'POST') {
@@ -38,6 +42,20 @@ export default async function handler(req, res) {
 
     const price = CREDIT_PRICES[credit_type]
     const total = Number((price.unit * qty).toFixed(2))
+
+    // ── Idempotência: compra pendente do mesmo tipo nos últimos 10 min reaproveita o PIX ──
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    const { data: pend } = await db.from('payments')
+      .select('id, pix_code, pix_qr_url, status, created_at')
+      .eq('tenant_id', tenant_id)
+      .eq('status', 'pending')
+      .gte('created_at', tenMinAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (pend?.pix_code) {
+      return res.status(200).json({ ok: true, payment_id: pend.id, pix_code: pend.pix_code, pix_qr_url: pend.pix_qr_url, reused: true, message: 'Já existe uma compra pendente — reutilizando o PIX gerado.' })
+    }
 
     // Verificar se o tenant existe
     const { data: tenant } = await db.from('tenants')

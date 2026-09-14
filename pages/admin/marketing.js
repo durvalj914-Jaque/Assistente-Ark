@@ -75,6 +75,7 @@ export default function MarketingPage() {
     try {
       const res = await fetch('/api/admin/template-analytics', {
         headers: { Authorization: `Bearer ${accessToken}` },
+        signal: AbortSignal.timeout(20000), // não trava em "Carregando…" eterno
       })
       const data = await res.json()
       setAnalytics(res.ok ? data : { error: data.error })

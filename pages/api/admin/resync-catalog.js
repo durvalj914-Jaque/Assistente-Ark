@@ -5,6 +5,7 @@
  * que falharam silenciosamente na sincronização automática.
  * Protegido por secret (mesma convenção dos outros endpoints /api/admin/*).
  */
+import { requirePlatformAdmin } from '../../../lib/adminAuth'
 import { createClient } from '@supabase/supabase-js'
 import { upsertCatalogProduct } from '../../../lib/metaCatalog'
 
@@ -15,6 +16,8 @@ function getDB() {
 }
 
 export default async function handler(req, res) {
+  const admin = await requirePlatformAdmin(req, res)
+  if (!admin) return
   const secret = req.headers['x-setup-secret'] || req.query.secret
   if (secret !== SETUP_SECRET) return res.status(403).json({ error: 'Forbidden' })
   if (req.method !== 'POST' && req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })

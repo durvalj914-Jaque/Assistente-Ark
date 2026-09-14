@@ -1,4 +1,6 @@
 export default async function handler(req, res) {
+  // Bloqueado em produção (pentest 2026-09-13): endpoint de teste/diagnóstico
+  if (process.env.NODE_ENV === 'production') return res.status(404).json({ error: 'Not found' })
   if (req.method === 'GET') {
     // Simular exatamente o fluxo do webhook
     const results = {}
