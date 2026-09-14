@@ -1,3 +1,4 @@
+import crypto from 'crypto'
 // GET /api/calendar/callback?code=...&state=<tenantId> → troca code por tokens e salva conexão
 import { createClient } from '@supabase/supabase-js'
 import { getGoogleOAuthCreds } from '../../../lib/googleCalendar'
@@ -7,10 +8,16 @@ function getDB() {
 }
 
 export default async function handler(req, res) {
-  const { code, state: tenantId, error } = req.query
+  const { code, state: stateParam, error } = req.query
   const back = (msg) => res.redirect(`/admin/products?tab=horarios&cal=${msg}`)
 
-  if (error || !code || !tenantId) return back('erro')
+  if (error || !code || !stateParam) return back('erro')
+
+  // ── valida assinatura do state: tenantId.DDD… (HMAC) ──
+  const [tenantId, sig] = String(stateParam).split('.')
+  const SECRET = process.env.CALENDAR_STATE_SECRET || process.env.META_APP_SECRET || 'ark_secret_arkiel_2025'
+  const expected = crypto.createHmac('sha256', SECRET).update(String(tenantId)).digest('hex').slice(0, 16)
+  if (!tenantId || !sig || sig !== expected) return back('state_invalido')
 
   const { clientId, clientSecret } = getGoogleOAuthCreds()
   if (!clientId || !clientSecret) return back('nao_configurado')

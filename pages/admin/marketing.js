@@ -45,6 +45,11 @@ export default function MarketingPage() {
     loadSession()
   }, [])
 
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }
+  }
+
   async function loadSession() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { window.location.href = '/login'; return }
@@ -225,9 +230,10 @@ export default function MarketingPage() {
     setSendResult(null)
     try {
       const targetContacts = recipients === 'all' ? contacts : contacts.filter(c => selectedContacts.includes(c.id))
+      const h = await authHeaders()
       const res = await fetch('/api/marketing/send', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: h,
         body: JSON.stringify({
           tenant_id: tenant.id,
           message: msgText,

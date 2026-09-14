@@ -185,7 +185,9 @@ export default function AgendamentosPage() {
   }
 
   function loadCalStatus() {
-    fetch(`/api/calendar/status?tenantId=${tenant.id}`).then(r => r.json()).then(setCalStatus).catch(() => {})
+    supabase.auth.getSession().then(({ data }) =>
+      fetch(`/api/calendar/status?tenantId=${tenant.id}`, { headers: { Authorization: `Bearer ${data?.session?.access_token || ''}` } })
+    ).then(r => r.json()).then(setCalStatus).catch(() => {})
   }
 
   async function saveBookingCfg() {

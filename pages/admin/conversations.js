@@ -443,7 +443,7 @@ export default function ConversationsPage() {
     try {
       const h = await authHeaders()
       const [mpRes, cfgRes] = await Promise.all([
-        fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}&platform_fallback=true`),
+        fetch(`/api/mercadopago/methods?tenant_id=${selected.tenant_id}&platform_fallback=true`, { headers: h }),
         fetch('/api/payments/config', { headers: h })
       ])
       const json = await mpRes.json()

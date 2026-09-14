@@ -6,6 +6,7 @@
  */
 import { createClient } from '@supabase/supabase-js'
 import { upsertCatalogProduct, removeCatalogProduct } from '../../../lib/metaCatalog'
+import { requireTenant } from '../../../lib/serverAuth'
 
 function getDB() {
   return createClient(
@@ -16,6 +17,9 @@ function getDB() {
 }
 
 export default async function handler(req, res) {
+  const auth = await requireTenant(req, res)
+  if (!auth) return
+  if (req.body) req.body.tenantId = auth.tenant_id
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }

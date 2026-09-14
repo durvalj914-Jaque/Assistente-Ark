@@ -7,8 +7,11 @@
 import { supabaseAdmin } from '../../../lib/supabase'
 import { generatePixCode } from '../../../lib/pix'
 import { retailerIdFor } from '../../../lib/metaCatalog'
+import { rateLimit, clientKey } from '../../../lib/serverAuth'
 
 export default async function handler(req, res) {
+  // rate limit: vitrine pública, blinda spam de pedidos
+  if (!rateLimit('buy:' + clientKey(req), 30, 60000)) return res.status(429).json({ error: 'Muitos pedidos em sequência' })
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { tenantId, productId, customerName, customerPhone, method = 'whatsapp' } = req.body || {}

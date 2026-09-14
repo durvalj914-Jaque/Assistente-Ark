@@ -51,6 +51,11 @@ function ProfilePhotoSection({ botId }) {
 
   useEffect(() => { loadCurrent() }, [loadCurrent])
 
+  async function authHeaders() {
+    const { data: { session } } = await supabase.auth.getSession()
+    return { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }
+  }
+
   function handlePick(e) {
     const f = e.target.files?.[0]
     setMessage(null)
@@ -270,9 +275,10 @@ export default function BotsPage() {
     setDeleteError(null)
 
     // Chama endpoint server-side que usa service role key (bypassa RLS)
+    const h = await authHeaders()
     const res = await fetch('/api/bots/delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: h,
       body: JSON.stringify({ botId })
     })
     const data = await res.json()

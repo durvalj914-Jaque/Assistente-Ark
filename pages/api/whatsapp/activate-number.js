@@ -11,8 +11,17 @@
 import { supabaseAdmin } from '../../../lib/supabase'
 
 const ARK_SECRET = 'ark_secret_arkiel_2025'
+import { requirePlatformAdmin, requireUser, rateLimit, clientKey } from '../../../lib/serverAuth'
 
 export default async function handler(req, res) {
+  // rate limit: blinda spam de ativação
+  if (!rateLimit('activate:' + clientKey(req), 20, 60000)) return res.status(429).json({ error: 'Muitas tentativas' })
+  // auth: platform admin OU secret administrativo (mantém workflow de curl do dono)
+  const secretOk = req.query?.secret === ARK_SECRET || req.body?.secret === ARK_SECRET
+  if (!secretOk) {
+    const admin = await requirePlatformAdmin(req, res)
+    if (!admin) return
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const secret = req.query.secret || req.body.secret
