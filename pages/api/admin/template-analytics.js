@@ -30,8 +30,11 @@ export default async function handler(req, res) {
     const start = req.query.start || new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
 
     // Conversation Analytics oficial da Meta — contagem e custo por categoria
+    // (start/end da Graph API são timestamps Unix em segundos, não datas YYYY-MM-DD)
+    const startTs = Math.floor(new Date(start + 'T00:00:00Z').getTime() / 1000)
+    const endTs = Math.floor(new Date(end + 'T23:59:59Z').getTime() / 1000)
     const url = `https://graph.facebook.com/${API}/${wabaId}/conversation_analytics` +
-      `?start=${start}&end=${end}&granularity=DAILY&phone_numbers=[${phoneId}]&metrics=[CONVERSATION,COST]`
+      `?start=${startTs}&end=${endTs}&granularity=DAILY&phone_numbers=[${phoneId}]&metrics=[CONVERSATION,COST]`
     const r = await fetch(url, { headers: { Authorization: `Bearer ${TOKEN}` } })
     const data = await r.json()
     if (!r.ok) {
