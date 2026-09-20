@@ -88,7 +88,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
         </Link>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Link href={siteUrl} className="nav-back">← Site</Link>
-          <Link href="/assistente-ark/entrar" className="nav-login">Entrar</Link>
+          <Link href="/admin" className="nav-login">Entrar</Link>
         </div>
       </nav>
 
@@ -97,7 +97,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
         <h1>Assistente <span>Ark</span></h1>
         <p>Crie e gerencie chatbots de WhatsApp com inteligência artificial. Catálogo de produtos, pagamentos integrados e atendimento automatizado — tudo em um painel.</p>
         <div className="hero-cta">
-          <Link href="/assistente-ark/entrar" className="btn-hero-primary">Acessar plataforma</Link>
+          <Link href="/admin" className="btn-hero-primary">Acessar plataforma</Link>
           <a href="#recursos" className="btn-hero-ghost">Conhecer recursos</a>
         </div>
       </section>
@@ -137,7 +137,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
         <h2>Pronto para começar?</h2>
         <p>Acesse a plataforma e gerencie seus bots de WhatsApp.</p>
         <div className="hero-cta">
-          <Link href="/assistente-ark/entrar" className="btn-hero-primary">Entrar na plataforma</Link>
+          <Link href="/admin" className="btn-hero-primary">Entrar na plataforma</Link>
           <a href="https://wa.me/5511913751590" target="_blank" rel="noopener" className="btn-hero-ghost">Falar no WhatsApp</a>
         </div>
       </section>
@@ -148,7 +148,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
         </div>
         <div className="footer-links">
           <Link href={siteUrl}>Arkiel</Link>
-          <Link href="/assistente-ark/entrar">Entrar</Link>
+          <Link href="/admin">Entrar</Link>
           <a href="https://www.arkiel.com.br/termos">Termos</a>
           <a href="https://www.arkiel.com.br/privacidade">Privacidade</a>
         </div>

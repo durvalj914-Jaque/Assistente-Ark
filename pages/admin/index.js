@@ -15,8 +15,8 @@ export default function AdminDashboard() {
   }, [user, loading])
 
   useEffect(() => {
-    if (!loading && user && tenant) router.replace('/admin/conversations')
-  }, [loading, user, tenant])
+    if (!loading && user && tenant) router.replace(profile?.is_platform_admin ? '/painel' : '/admin/conversations')
+  }, [loading, user, tenant, profile])
 
   useEffect(() => {
     if (!tenant) return

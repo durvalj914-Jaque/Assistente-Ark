@@ -12,7 +12,7 @@ export default function Entrar() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) router.replace('/painel')
+      if (session) router.replace('/admin')
       else setChecking(false)
     })
   }, [])
@@ -24,7 +24,7 @@ export default function Entrar() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/painel`,
+          redirectTo: `${window.location.origin}/admin`,
         },
       })
       if (error) setError(error.message)
