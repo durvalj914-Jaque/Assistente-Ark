@@ -46,7 +46,7 @@ export default function Entrar() {
       <Head>
         <title>Entrar — Assistente Ark</title>
         <meta name="description" content="Acesse a plataforma Assistente Ark." />
-        <link rel="icon" href="/logo-arkiel.png" />
+        <link rel="icon" href="/assistente-ark-mascot.png" />
       </Head>
 
       <style>{`
@@ -83,7 +83,7 @@ export default function Entrar() {
         <Link href="/assistente-ark" className="back-link">← Assistente Ark</Link>
 
         <div className="login-logo">
-          <img src="/logo-arkiel.png" alt="Arkiel" />
+          <img src="/assistente-ark-mascot.png" alt="Assistente Ark" style={{ borderRadius: "14px" }} />
         </div>
         <div className="login-badge">ASSISTENTE ARK</div>
 

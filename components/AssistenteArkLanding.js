@@ -22,7 +22,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
       <Head>
         <title>Assistente Ark — Automação Inteligente para WhatsApp Business</title>
         <meta name="description" content="Plataforma SaaS para criar e gerenciar chatbots de WhatsApp com IA, catálogo de produtos, pagamentos integrados e painel administrativo." />
-        <link rel="icon" href="/logo-arkiel.png" />
+        <link rel="icon" href="/assistente-ark-mascot.png" />
       </Head>
 
       <style>{`
@@ -36,7 +36,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
           display: flex; align-items: center; padding: 0 40px; justify-content: space-between;
         }
         .nav-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
-        .nav-logo img { height: 36px; width: auto; }
+        .nav-logo img { height: 38px; width: 38px; border-radius: 10px; }
         .nav-back { padding: 8px 18px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.12); color: rgba(255,255,255,0.65); font-size: 13px; font-weight: 500; text-decoration: none; transition: all .15s; background: transparent; }
         .nav-back:hover { border-color: rgba(255,255,255,0.25); color: #fff; }
         .nav-login { padding: 8px 20px; border-radius: 8px; background: #25D366; color: #0a0a0a; font-size: 13px; font-weight: 700; text-decoration: none; transition: all .15s; }
@@ -44,6 +44,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
 
         .hero { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 120px 24px 80px; text-align: center; position: relative; overflow: hidden; }
         .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 0%, rgba(37,211,102,0.12), transparent 60%); pointer-events: none; }
+        .hero-logo { height: 112px; width: 112px; border-radius: 26px; margin-bottom: 24px; border: 1px solid rgba(37,211,102,0.25); box-shadow: 0 16px 48px rgba(37,211,102,0.12); }
         .hero-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 100px; background: rgba(37,211,102,0.1); border: 1px solid rgba(37,211,102,0.2); color: #25D366; font-size: 12px; font-weight: 600; margin-bottom: 28px; }
         .hero h1 { font-size: clamp(36px, 5.5vw, 64px); font-weight: 800; letter-spacing: -2px; line-height: 1.05; max-width: 720px; margin-bottom: 24px; }
         .hero h1 span { background: linear-gradient(135deg, #25D366, #00d4ff); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
@@ -84,7 +85,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
 
       <nav className="nav">
         <Link href="/" className="nav-logo">
-          <img src="/logo-arkiel.png" alt="Arkiel" />
+          <img src="/assistente-ark-mascot.png" alt="Assistente Ark" />
         </Link>
         <div style={{ display: 'flex', gap: '10px' }}>
           <Link href={siteUrl} className="nav-back">← Site</Link>
@@ -93,6 +94,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
       </nav>
 
       <section className="hero">
+        <img src="/assistente-ark-mascot.png" alt="Assistente Ark" className="hero-logo" />
         <div className="hero-badge">💬 WhatsApp Business</div>
         <h1>Assistente <span>Ark</span></h1>
         <p>Crie e gerencie chatbots de WhatsApp com inteligência artificial. Catálogo de produtos, pagamentos integrados e atendimento automatizado — tudo em um painel.</p>
@@ -144,7 +146,7 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
 
       <footer className="footer">
         <div className="footer-logo">
-          <img src="/logo-arkiel.png" alt="Arkiel" />
+          <img src="/assistente-ark-mascot.png" alt="Assistente Ark" />
         </div>
         <div className="footer-links">
           <Link href={siteUrl}>Arkiel</Link>
