@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { withCors } from '../../lib/v1Cors'
 import { sendText } from '../../../lib/meta'
 import { canSendToB2C } from '../../../lib/messageGuard'
 
@@ -9,7 +10,7 @@ function getDB() {
   return createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
 
   const auth = req.headers.authorization || ''
@@ -111,3 +112,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ ok: true, window_open: sendCheck.window_open, credit_used: !sendCheck.window_open })
 }
+
+export default withCors(handler)

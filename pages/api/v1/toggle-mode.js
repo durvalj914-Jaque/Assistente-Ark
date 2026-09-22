@@ -6,11 +6,12 @@
  * Retorna: { ok: true, mode }
  */
 import { createClient } from '@supabase/supabase-js'
+import { withCors } from '../../lib/v1Cors'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
 
   const { conversation_id, mode } = req.body || {}
@@ -46,3 +47,5 @@ export default async function handler(req, res) {
 
   return res.status(200).json({ ok: true, mode })
 }
+
+export default withCors(handler)
