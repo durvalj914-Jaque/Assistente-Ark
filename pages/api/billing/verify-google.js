@@ -85,7 +85,22 @@ export default async function handler(req, res) {
     max_bots:              planCfg.max_bots,
     max_messages_month:    planCfg.max_messages_month,
     max_conversations_month: planCfg.max_conversations_month,
-    updated_at:            new Date().toISOString()
+    updated_at:            new Date().toISOString(),
+    subscription:          JSON.stringify({
+      plan:                newPlan,
+      plan_name:           planCfg.label,
+      billing_provider:    'google_play',
+      activated_at:        new Date().toISOString(),
+      expires_at:          expiresAt,
+      status:              'active',
+      limits: {
+        commission_cycle_threshold: planCfg.commission_cycle_threshold ?? 10,
+        commission_amount:          0.50,
+        max_bots:                   planCfg.max_bots,
+        max_messages_month:         planCfg.max_messages_month,
+        max_conversations_month:    planCfg.max_conversations_month,
+      },
+    }),
   }).eq('id', tenantId)
 
   return res.status(200).json({

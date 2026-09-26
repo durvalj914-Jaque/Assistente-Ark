@@ -104,6 +104,8 @@ export default function Upgrade() {
   const [buyResult, setBuyResult] = useState(null)
   const [buying, setBuying] = useState(false)
   const [copied, setCopied] = useState(false)
+  // ACP — resumo real do mês (bloco "Seu mês real")
+  const [acpMonth, setAcpMonth] = useState(null)
 
   useEffect(() => {
     if (!loading && !user) router.replace('/assistente-ark/entrar')
@@ -117,6 +119,21 @@ export default function Upgrade() {
   useEffect(() => {
     if (tenant?.id) loadCredits(tenant.id)
   }, [tenant?.id])
+
+  useEffect(() => {
+    if (tenant?.id) loadAcpMonth()
+  }, [tenant?.id])
+
+  async function loadAcpMonth() {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/payments/acp-summary', {
+        headers: { Authorization: `Bearer ${session?.access_token || ''}` },
+      })
+      const data = await res.json()
+      if (!data.error) setAcpMonth(data)
+    } catch (e) { console.error('loadAcpMonth:', e) }
+  }
 
   async function loadCredits(tid) {
     try {
@@ -213,6 +230,35 @@ export default function Upgrade() {
     return { ...p, _features: feats }
   })
 
+  // ── ACP: projeção por plano no volume real do mês do tenant ──
+  const fmtBRL = v => Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const estimateArkTake = (net, threshold, commission) => {
+    const len = Number(threshold || 10) + Number(commission || 0.5)
+    if (!net || len <= 0) return 0
+    return Math.floor(net / len) * Number(commission || 0.5)
+  }
+  const acpComparison = (() => {
+    if (!acpMonth || acpMonth.month_net <= 0) return null
+    const cur = displayPlans.find(p => (p.name || '').toLowerCase() === currentPlan)
+    const currentTake = acpMonth.month_commission // participação real paga no mês
+    const currentPrice = cur && cur.price != null ? Number(cur.price) : 0
+    const currentTotal = currentPrice + currentTake
+    const rows = displayPlans
+      .map((p, i) => {
+        const thr = Number(p.limits?.commission_cycle_threshold ?? 10)
+        const com = Number(p.limits?.commission_amount ?? 0.5)
+        const price = p.price == null ? null : Number(p.price)
+        const take = estimateArkTake(acpMonth.month_net, thr, com)
+        const total = price == null ? null : price + take
+        const savings = total == null ? null : currentTotal - total
+        return { p, idx: i, thr, com, take, price, total, savings, effRate: (com / (thr + com)) * 100 }
+      })
+      .filter(r => r.total != null && !((r.p.name || '').toLowerCase().includes('enterprise')))
+    if (!rows.length) return null
+    const best = rows.reduce((a, b) => (b.total < a.total ? b : a), rows[0])
+    return { rows, best, currentTotal, currentTake }
+  })()
+
   // Fallback hardcoded (só se não houver planos dinâmicos)
 
 
@@ -274,6 +320,33 @@ export default function Upgrade() {
         .upg-vbtn:disabled { opacity: 0.45; cursor: not-allowed; }
         .upg-msg { margin-top: 12px; font-size: 13px; line-height: 1.6; }
         .upg-empty { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+        .upg-realdash { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .upg-realkpi { background: var(--bg-card); border: 1px solid var(--border-soft); border-radius: 12px; padding: 14px 16px; }
+        .upg-realkpi.wide { grid-column: 1 / -1; }
+        .upg-realkpi-label { font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px; }
+        .upg-realkpi-val { font-size: 22px; font-weight: 900; color: var(--text-primary); letter-spacing: -0.5px; }
+        .upg-realkpi-val.muted { color: var(--text-muted); font-size: 18px; }
+        .upg-realkpi-val.accent { color: #4f8ef7; }
+        .upg-realkpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+        .upg-realfrag { display: flex; align-items: center; gap: 12px; }
+        .upg-frag-track { flex: 1; height: 10px; background: var(--bg-secondary); border-radius: 100px; overflow: hidden; }
+        .upg-frag-fill { height: 100%; background: linear-gradient(90deg,#22c55e,#06b6d4); border-radius: 100px; }
+        .upg-frag-val { font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+        .upg-realtable-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+        .upg-realtable-wrap { overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--bg-card); }
+        .upg-realtable { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 680px; }
+        .upg-realtable th { text-align: left; padding: 10px 12px; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+        .upg-realtable td { padding: 10px 12px; color: var(--text-secondary); border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+        .upg-realtable tr:last-child td { border-bottom: none; }
+        .upg-realtable tr.cur { background: rgba(34,197,94,0.05); }
+        .upg-realtable tr.best { background: rgba(79,142,247,0.06); }
+        .upg-realtable tr.cur td:first-child, .upg-realtable tr.best td:first-child { font-weight: 700; color: var(--text-primary); }
+        .upg-tag-cur { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 100px; background: rgba(34,197,94,0.12); color: #22c55e; font-size: 9px; font-weight: 700; }
+        .upg-tag-best { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 100px; background: rgba(79,142,247,0.14); color: #4f8ef7; font-size: 9px; font-weight: 700; }
+        .upg-save { color: #22c55e; font-weight: 700; }
+        .upg-nosave { color: var(--text-muted); }
+        .upg-realcta { margin-top: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(34,197,94,0.06); border: 1px solid rgba(34,197,94,0.15); font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+        .upg-save-chip { margin-bottom: 10px; padding: 6px 10px; border-radius: 8px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); color: #22c55e; font-size: 11px; font-weight: 700; }
         @media(max-width:800px){.upg-grid{grid-template-columns:1fr;}}
       `}</style>
 
@@ -302,6 +375,81 @@ export default function Upgrade() {
         </div>
       )}
 
+      {/* ── Seu mês real — ACP em tempo real ── */}
+      {acpMonth && acpMonth.month_gross > 0 && (
+        <div className="upg-section">
+          <div className="upg-section-title">💎 Seu mês real — valores do seu ACP</div>
+          <div className="upg-realdash">
+            <div className="upg-realkpi">
+              <div className="upg-realkpi-label">Faturado via Ark</div>
+              <div className="upg-realkpi-val">{fmtBRL(acpMonth.month_gross)}</div>
+            </div>
+            <div className="upg-realkpi">
+              <div className="upg-realkpi-label">Taxas de processamento</div>
+              <div className="upg-realkpi-val muted">- {fmtBRL(acpMonth.fees)}</div>
+            </div>
+            <div className="upg-realkpi">
+              <div className="upg-realkpi-label">Líquido contado no ciclo</div>
+              <div className="upg-realkpi-val">{fmtBRL(acpMonth.month_net)}</div>
+            </div>
+            <div className="upg-realkpi">
+              <div className="upg-realkpi-label">Participação Ark</div>
+              <div className="upg-realkpi-val accent">{fmtBRL(acpMonth.month_commission)}</div>
+              <div className="upg-realkpi-sub">{acpMonth.month_cycles} ciclo(s) fechado(s) · {acpMonth.effective_rate.toFixed(2).replace('.', ',')}% por ciclo</div>
+            </div>
+            <div className="upg-realkpi wide">
+              <div className="upg-realkpi-label">Acumulado pra você (próximo ciclo)</div>
+              <div className="upg-realfrag">
+                <div className="upg-frag-track"><div className="upg-frag-fill" style={{ width: `${Math.min(100, ((acpMonth.fragment / acpMonth.cycle_length) * 100) || 0).toFixed(1)}%` }} /></div>
+                <span className="upg-frag-val">{fmtBRL(acpMonth.fragment)} <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>de {fmtBRL(acpMonth.cycle_length)}</span></span>
+              </div>
+            </div>
+          </div>
+
+          {acpComparison && (
+            <>
+              <div className="upg-realtable-title">Com o SEU volume de <b>{fmtBRL(acpMonth.month_net)}</b> este mês, em cada plano:</div>
+              <div className="upg-realtable-wrap">
+                <table className="upg-realtable">
+                  <thead>
+                    <tr><th>Plano</th><th>Ciclo</th><th>Taxa por ciclo</th><th>Participação Ark</th><th>Assinatura</th><th>Custo total no seu volume</th><th>Você economiza</th></tr>
+                  </thead>
+                  <tbody>
+                    {acpComparison.rows.map(r => {
+                      const isCur = (r.p.name || '').toLowerCase() === currentPlan
+                      const isBest = acpComparison.best === r && !isCur
+                      return (
+                        <tr key={r.p.id || r.idx} className={isCur ? 'cur' : isBest ? 'best' : ''}>
+                          <td>{r.p.name}{isCur && <span className="upg-tag-cur">você está aqui</span>}{isBest && <span className="upg-tag-best">mais econômico pro seu volume</span>}</td>
+                          <td>{fmtBRL(r.thr + r.com)}</td>
+                          <td>{r.effRate.toFixed(2).replace('.', ',')}%</td>
+                          <td>{fmtBRL(r.take)}</td>
+                          <td>{r.price === 0 ? 'Grátis' : fmtBRL(r.price)}</td>
+                          <td><b>{fmtBRL(r.total)}</b></td>
+                          <td>{isCur ? '—' : r.savings > 0 ? <span className="upg-save">✓ {fmtBRL(r.savings)}/mês</span> : <span className="upg-nosave">—</span>}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {(() => {
+                const up = acpComparison.rows.find(r => r.savings != null && r.savings > 0 && (r.p.name || '').toLowerCase() !== currentPlan)
+                if (!up) return null
+                const realCost = up.price - up.savings
+                return (
+                  <div className="upg-realcta">
+                    {realCost <= 0
+                      ? <>✨ No <b>{up.p.name}</b>, a economia de {fmtBRL(up.savings)} na participação já cobre a assinatura de {fmtBRL(up.price)} — e você ainda leva todos os recursos do plano.</>
+                      : <>💡 No <b>{up.p.name}</b> seu custo real seria {fmtBRL(realCost)}/mês (assinatura {fmtBRL(up.price)} menos economia de {fmtBRL(up.savings)}), com todos os recursos do plano.</>}
+                  </div>
+                )
+              })()}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Planos dinâmicos do painel — alinhados com a aba Planos */}
       <div className="upg-section">
         <div className="upg-section-title">📦 Planos disponíveis</div>
@@ -313,11 +461,14 @@ export default function Upgrade() {
               const isFeatured = i === finalFeaturedIdx
               const isContact = p.price == null || (p.price === 0 && planName === 'enterprise') // Enterprise / preço sob consulta = falar com vendas
               const isFree = p.price === 0 && !isContact
+              const planAcp = acpComparison?.rows.find(r => (r.p.name || '').toLowerCase() === planName)
+              const planSavings = planAcp && !isCurrent && planAcp.savings > 0 ? planAcp.savings : null
 
               return (
                 <div key={p.id || i} className={`upg-card ${isFeatured ? 'featured' : ''}`}>
                   {isFeatured && <span className="upg-popular">⭐ Recomendado</span>}
                   <div className="upg-plan-name">{p.name}</div>
+                  {planSavings && <div className="upg-save-chip">💡 Economize {fmtBRL(planSavings)}/mês no seu volume</div>}
                   <div className="upg-price">
                     {isContact ? 'Consultar' : isFree ? 'Grátis' : `R$ ${p.price.toFixed(0).replace('.', ',')}`}
                   </div>
@@ -336,7 +487,7 @@ export default function Upgrade() {
                       ? <a href="https://wa.me/5511913751590" target="_blank" rel="noreferrer" className="upg-btn upg-btn-ghost">💬 Falar com vendas</a>
                       : isFree
                         ? <span className="upg-btn upg-btn-ghost" style={{opacity:0.5,cursor:'default'}}>Plano básico</span>
-                        : <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${isFeatured ? 'upg-btn-solid' : 'upg-btn-ghost'}`}>Assinar →</a>
+                        : <a href={`https://play.google.com/store/apps/details?id=${GOOGLE_PLAY_PACKAGE}`} target="_blank" rel="noreferrer" className={`upg-btn ${isFeatured ? 'upg-btn-solid' : 'upg-btn-ghost'}`}>{planSavings ? 'Migrar e economizar →' : 'Assinar →'}</a>
                   }
                 </div>
               )
