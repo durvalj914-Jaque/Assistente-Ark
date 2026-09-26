@@ -6,7 +6,7 @@
  * Retorna: { messages: [{ id, direction, type, content, created_at, sent_by }] }
  */
 import { createClient } from '@supabase/supabase-js'
-import { withCors } from '../../../../lib/v1Cors'
+import { withCors } from '../../../../../lib/v1Cors'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY

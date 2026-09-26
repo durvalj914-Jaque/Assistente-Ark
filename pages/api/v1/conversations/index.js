@@ -5,7 +5,7 @@
  * Retorna: { conversations: [{ id, contact, last_message, last_message_at, mode, status }] }
  */
 import { createClient } from '@supabase/supabase-js'
-import { withCors } from '../../../lib/v1Cors'
+import { withCors } from '../../../../lib/v1Cors'
 
 const SUPA_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
 const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY

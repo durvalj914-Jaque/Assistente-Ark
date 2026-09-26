@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { withCors } from '../../lib/v1Cors'
+import { withCors } from '../../../lib/v1Cors'
 import { sendText } from '../../../lib/meta'
 import { canSendToB2C } from '../../../lib/messageGuard'
 
