@@ -376,9 +376,14 @@ export default function Upgrade() {
       )}
 
       {/* ── Seu mês real — ACP em tempo real ── */}
-      {acpMonth && acpMonth.month_gross > 0 && (
+      {acpMonth && (
         <div className="upg-section">
           <div className="upg-section-title">💎 Seu mês real — valores do seu ACP</div>
+          {acpMonth.month_gross === 0 && (
+            <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: 12, padding: '12px 14px', fontSize: 13, lineHeight: 1.55, marginBottom: 14 }}>
+              <b>Como funciona o seu ACP:</b> a cada R$ 10,00 líquidos que entram no seu bolso, R$ 0,50 seguem pra Arkiel (ciclo de R$ 10,50 — nunca sai do seu valor). Assim que sua primeira venda passar pelo bot, este painel mostra seus números <b>reais</b> do mês em tempo real, com o comparativo de planos no seu volume.
+            </div>
+          )}
           <div className="upg-realdash">
             <div className="upg-realkpi">
               <div className="upg-realkpi-label">Faturado via Ark</div>
