@@ -37,8 +37,39 @@ function ProductModal({ product, onClose, onSave, editingProduct }) {
     stock:       product?.stock ?? '',
     is_active:   product?.is_active ?? true,
   })
+  // Galeria: todas as fotos do produto, em ordem. A primeira é a principal (catálogo da Meta).
+  const [photos, setPhotos] = useState(() => {
+    const arr = Array.isArray(product?.image_urls) ? product.image_urls.filter(Boolean) : []
+    if (arr.length) return arr
+    return product?.image_url ? [product.image_url] : []
+  })
   const [saving, setSaving] = useState(false)
   const [uploadingImg, setUploadingImg] = useState(false)
+
+  async function uploadFiles(fileList) {
+    if (!fileList?.length) return
+    setUploadingImg(true)
+    for (const file of Array.from(fileList)) {
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        const r = await fetch('/api/products/upload-image', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
+          body: fd,
+        })
+        const d = await r.json()
+        if (d.imageUrl) setPhotos(prev => [...prev, d.imageUrl])
+        else alert(d.error || 'Erro no upload')
+      } catch (err) {
+        alert('Falha no upload da imagem')
+      }
+    }
+    setUploadingImg(false)
+  }
+
+  function removePhoto(i) { setPhotos(prev => prev.filter((_, idx) => idx !== i)) }
+  function makePrimary(i) { setPhotos(prev => { const c = [...prev]; const [x] = c.splice(i, 1); return [x, ...c] }) }
 
   const setField = useCallback((name, value) => {
     setForm(f => ({ ...f, [name]: value }))
@@ -49,6 +80,8 @@ function ProductModal({ product, onClose, onSave, editingProduct }) {
     setSaving(true)
     await onSave({
       ...form,
+      image_url: photos[0] || '',
+      image_urls: photos,
       price: form.price === '' ? 0 : parseFloat(form.price),
       stock: form.stock === '' ? null : parseInt(form.stock, 10),
     })
@@ -78,62 +111,50 @@ function ProductModal({ product, onClose, onSave, editingProduct }) {
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={labelStyle}>IMAGEM DO PRODUTO</label>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-            {form.image_url ? (
-              <div style={{ position: 'relative', width: 80, height: 80, flexShrink: 0 }}>
-                <img src={form.image_url} alt="Preview" style={{ width: 80, height: 80, borderRadius: 10, objectFit: 'cover', border: '1px solid rgba(255,255,255,0.1)' }} />
-                <button
-                  type="button"
-                  onClick={() => setField('image_url', '')}
-                  style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                >✕</button>
+          <label style={labelStyle}>FOTOS DO PRODUTO <HelpTip text="A primeira foto é a principal: é ela que aparece no catálogo do WhatsApp. Suba quantas quiser — o bot envia todas pro cliente na hora de mostrar o produto." /></label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+            {photos.map((url, i) => (
+              <div key={i} style={{ position: 'relative', width: 76, height: 76 }}>
+                <img src={url} alt={`Foto ${i + 1}`} style={{ width: 76, height: 76, borderRadius: 10, objectFit: 'cover', border: i === 0 ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.1)' }} />
+                <button type="button" onClick={() => removePhoto(i)}
+                  style={{ position: 'absolute', top: -6, right: -6, background: '#ef4444', color: '#fff', border: 'none', borderRadius: '50%', width: 20, height: 20, cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+                {i === 0 ? (
+                  <span style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(34,197,94,0.9)', color: '#fff', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 6 }}>PRINCIPAL</span>
+                ) : (
+                  <button type="button" onClick={() => makePrimary(i)}
+                    style={{ position: 'absolute', bottom: 4, left: 4, background: 'rgba(15,15,26,0.85)', color: '#94a3b8', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 6, border: 'none', cursor: 'pointer' }}>★ principal</button>
+                )}
               </div>
-            ) : (
-              <div style={{ width: 80, height: 80, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>🖼️</div>
+            ))}
+            {photos.length === 0 && (
+              <div style={{ width: 76, height: 76, borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>🖼️</div>
             )}
-            <div style={{ flex: 1 }}>
-              <input
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  setUploadingImg(true)
-                  try {
-                    const fd = new FormData()
-                    fd.append('file', file)
-                    if (editingProduct?.id) fd.append('productId', editingProduct.id)
-                    const r = await fetch('/api/products/upload-image', {
-                      method: 'POST',
-                      headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
-                      body: fd,
-                    })
-                    const d = await r.json()
-                    if (d.imageUrl) setField('image_url', d.imageUrl)
-                    else alert(d.error || 'Erro no upload')
-                  } catch (err) {
-                    alert('Falha no upload da imagem')
-                  }
-                  setUploadingImg(false)
-                }}
-                style={{ display: 'none' }}
-                id="product-img-upload"
-              />
-              <label htmlFor="product-img-upload" className="ark-btn-ghost" style={{ cursor: 'pointer', padding: '8px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', background: 'rgba(255,255,255,0.03)' }}>
-                {uploadingImg ? '⏳ Enviando…' : '📤 Enviar imagem'}
-              </label>
-              <input
-                type="text"
-                value={form.image_url}
-                onChange={e => setField('image_url', e.target.value)}
-                placeholder="ou cole uma URL…"
-                className="ark-input"
-                style={{ marginTop: 8, fontSize: 12 }}
-              />
-              <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>PNG, JPG ou WebP até 5MB. Aparece no catálogo do WhatsApp.</p>
-            </div>
           </div>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            onChange={(e) => { uploadFiles(e.target.files); e.target.value = '' }}
+            style={{ display: 'none' }}
+            id="product-img-upload"
+          />
+          <label htmlFor="product-img-upload" className="ark-btn-ghost" style={{ cursor: 'pointer', padding: '8px 14px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', background: 'rgba(255,255,255,0.03)' }}>
+            {uploadingImg ? '⏳ Enviando…' : '📤 Adicionar fotos'}
+          </label>
+          <input
+            type="text"
+            placeholder="ou cole uma URL e pressione Enter pra adicionar…"
+            className="ark-input"
+            style={{ marginTop: 8, fontSize: 12 }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                const v = e.target.value.trim()
+                if (v) { setPhotos(prev => [...prev, v]); e.target.value = '' }
+              }
+            }}
+          />
+          <p style={{ color: '#334155', fontSize: 11, marginTop: 4 }}>PNG, JPG ou WebP até 5MB cada. Sem limite de quantidade — a primeira foto é a do catálogo.</p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, marginBottom: 4 }}>
@@ -417,9 +438,14 @@ export default function ProductsPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                     {product.image_url ? (
-                      <img src={product.image_url} alt={product.name}
-                        style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
-                        onError={e => { e.target.style.display = 'none' }} />
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <img src={product.image_url} alt={product.name}
+                          style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover' }}
+                          onError={e => { e.target.style.display = 'none' }} />
+                        {(() => { const n = (product.image_urls || []).filter(Boolean).length; return n > 1 ? (
+                          <span style={{ position: 'absolute', bottom: -3, right: -3, background: '#4f8ef7', color: '#fff', fontSize: 9, fontWeight: 700, borderRadius: 8, padding: '0 4px' }}>{n}📷</span>
+                        ) : null })()}
+                      </div>
                     ) : (
                       <div style={{ width: 40, height: 40, borderRadius: 10, background: 'linear-gradient(135deg,#4f8ef7,#06b6d4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>📦</div>
                     )}
