@@ -509,6 +509,12 @@ export default function AgendamentosPage() {
 
   function fmtDate(d) { return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' }) }
 
+  async function removeBlock(id) {
+    if (!confirm('Remover esse bloqueio e liberar o horário na agenda?')) return
+    await authFetch(`/api/schedule/blocks?id=${id}`, { method: 'DELETE' })
+    refreshAll()
+  }
+
   const TABS = [
     { id: 'agendamentos', label: '📋 Agendamentos' },
     { id: 'servicos', label: '📅 Serviços' },
@@ -643,8 +649,8 @@ export default function AgendamentosPage() {
                         const top = (sh * 60 + sm - gridStart) * PX_PER_MIN
                         const h = Math.max(14, ((eh * 60 + em) - (sh * 60 + sm)) * PX_PER_MIN - 2)
                         return (
-                          <div key={b.id} onClick={ev => ev.stopPropagation()}
-                            style={{ position: 'absolute', left: 2, right: 2, top, height: h, borderRadius: 6, background: 'repeating-linear-gradient(45deg, rgba(239,68,68,0.35), rgba(239,68,68,0.35) 4px, rgba(239,68,68,0.15) 4px, rgba(239,68,68,0.15) 8px)', border: '1px solid #ef4444', padding: '2px 5px', overflow: 'hidden' }}>
+                          <div key={b.id} onClick={ev => { ev.stopPropagation(); removeBlock(b.id) }} title="Clique pra remover o bloqueio"
+                            style={{ position: 'absolute', left: 2, right: 2, top, height: h, borderRadius: 6, background: 'repeating-linear-gradient(45deg, rgba(239,68,68,0.35), rgba(239,68,68,0.35) 4px, rgba(239,68,68,0.15) 4px, rgba(239,68,68,0.15) 8px)', border: '1px solid #ef4444', padding: '2px 5px', overflow: 'hidden', cursor: 'pointer' }}>
                             <div style={{ fontSize: 9, fontWeight: 700, color: '#fecaca' }}>🚫 {b.reason || 'bloqueado'}</div>
                           </div>
                         )
