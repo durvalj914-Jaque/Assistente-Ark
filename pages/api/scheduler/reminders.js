@@ -7,8 +7,12 @@ import { sendDueReminders, nowSP } from '../../../lib/scheduleEngine'
 export default async function handler(req, res) {
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
   const secret = process.env.CRON_SECRET
-  if (secret && req.headers['x-cron-secret'] !== secret) {
-    return res.status(401).json({ error: 'Não autorizado' })
+  // Aceita: header próprio x-cron-secret OU Authorization: Bearer <CRON_SECRET>
+  // (formato que a Vercel envia automaticamente nas invocações de cron)
+  if (secret) {
+    const ok = req.headers['x-cron-secret'] === secret
+      || req.headers['authorization'] === `Bearer ${secret}`
+    if (!ok) return res.status(401).json({ error: 'Não autorizado' })
   }
 
   const db = supabaseAdmin()
