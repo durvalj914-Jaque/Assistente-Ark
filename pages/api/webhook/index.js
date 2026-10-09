@@ -915,7 +915,7 @@ async function schedSendServiceMenu() {
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId).eq('contact_id', contact.id)
         .in('status', ['pending_payment', 'confirmed']).gte('date', todayISO)
-      if (count > 0) cancelLine = '\n9️⃣ Cancelar meu horário'
+      if (count > 0 && services.length <= 8) cancelLine = '\n9️⃣ Cancelar meu horário'
     } catch (_) {}
     await sendText(phoneNumberId, tkn, from, `📅 *Agendamento*\n\nEscolha um serviço:\n\n${menu}${cancelLine}\n\n0️⃣ Voltar ao menu`)
     await db.from('conversations').update({ status: 'sched_service' }).eq('id', conv.id)
@@ -966,7 +966,7 @@ async function schedSendServiceMenu() {
 
     // PASSO 1: escolher serviço
     if (conv.status === 'sched_service') {
-      if (num === 9) { await schedSendCancelMenu(); return }
+      if (num === 9 && (await db.from('services').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('is_active', true)).count <= 8) { await schedSendCancelMenu(); return }
       const { data: services } = await db.from('services')
         .select('id, name, price, duration_min, image_url').eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
       const svc = services?.[(num || 0) - 1]
