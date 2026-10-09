@@ -5,6 +5,7 @@ import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
 import { sendProductList } from '../../../lib/metaCatalog'
 import { getGoogleBusy, pushAppointmentToGoogle } from '../../../lib/googleCalendar'
+import { buildFreeSlots, getDayWindow, isDateBlocked, sendDueReminders } from '../../../lib/scheduleEngine'
 
 export const config = { api: { bodyParser: false } }
 
@@ -431,6 +432,10 @@ async function processWebhook(body) {
 
   const tenantId = bot.tenant_id
   const tkn      = bot.access_token || WA_TOKEN
+
+  // ── Lembretes automáticos: varre agendamentos que entram na janela de aviso ──
+  // (best-effort; idempotente via reminder_sent_at)
+  try { await sendDueReminders(db, bot) } catch (_) {}
 
   // ── AUTO-VERIFICAÇÃO: o remetente é um bot do Arkiel? ──
   // Se o número de origem é um phone_number_id cadastrado como bot ativo,
@@ -888,76 +893,6 @@ Obrigado! 🎉`)
   }
 
   // ── 📅 Agendamento de serviços: sched_service → sched_day → sched_slot → PIX ──
-  // ── Motor de horários inteligente (agendamento) ──
-function normHM(t) {
-  if (!t) return null
-  const m = /^(\d{1,2}):(\d{1,2})/.exec(String(t).trim())
-  if (!m) return null
-  return parseInt(m[1], 10) * 60 + parseInt(m[2], 10)
-}
-function hm(mins) {
-  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
-}
-function durLabel(mins) {
-  if (!mins || mins < 60) return `${mins || 60} min`
-  const h = Math.floor(mins / 60), m = mins % 60
-  return m ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
-}
-
-// Gera horários livres de forma inteligente:
-// - respeita a duração do serviço (horários "quebrados" tipo 09:45 são permitidos)
-// - respeita o horário de atendimento (booking_settings)
-// - respeita agendamentos existentes (por sobreposição de intervalos, não por string)
-// - respeita a agenda Google conectada do tenant (freeBusy)
-// - preenche lacunas após períodos ocupados (ex.: evento até 09:30 → oferece 09:30)
-async function buildFreeSlots(db, tenantId, date, serviceId) {
-  const { data: cfg } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
-  const openM = normHM(cfg?.open_time || '09:00')
-  const closeM = normHM(cfg?.close_time || '18:00')
-  if (openM == null || closeM == null || closeM <= openM) return []
-
-  const { data: svc } = await db.from('services').select('duration_min').eq('id', serviceId).maybeSingle()
-  const dur = Math.max(5, svc?.duration_min || 60)
-  const step = Math.max(10, dur)      // opções alinhadas à duração do serviço
-  const probe = Math.max(5, Math.min(15, step)) // resolução de busca de lacunas
-
-  // Períodos ocupados: agendamentos do banco (com qualquer formatação de hora)
-  const { data: taken } = await db.from('appointments')
-    .select('start_time, end_time').eq('tenant_id', tenantId).eq('date', date)
-    .in('status', ['pending_payment', 'confirmed'])
-  const busy = []
-  for (const t of (taken || [])) {
-    const s = normHM(t.start_time)
-    if (s == null) continue
-    const e = normHM(t.end_time) ?? s + dur
-    busy.push([s, Math.max(e, s + 5)])
-  }
-  // Períodos ocupados: Google Agenda do tenant
-  try {
-    const gBusy = await getGoogleBusy(db, tenantId, date)
-    for (const b of (gBusy || [])) {
-      const s = normHM(b.start)
-      if (s == null) continue
-      const e = normHM(b.end) ?? s + 60
-      busy.push([s, Math.max(e, s + 5)])
-    }
-  } catch (_) {}
-
-  const overlaps = (s) => busy.some(([bs, be]) => s < be && s + dur > bs)
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
-  const isToday = date === new Date().toISOString().slice(0, 10)
-  const minStart = isToday ? nowMin + 30 : openM
-
-  const slots = []
-  let cursor = openM
-  while (slots.length < 12) {
-    while (cursor + dur <= closeM && (overlaps(cursor) || cursor < minStart)) cursor += probe
-    if (cursor + dur > closeM) break
-    slots.push(hm(cursor))
-    cursor += Math.max(step, probe)
-  }
-  return slots
-}
 
 async function schedSendServiceMenu() {
     const { data: services } = await db.from('services')
@@ -972,11 +907,45 @@ async function schedSendServiceMenu() {
       const taxa = parseFloat(sv.price) > 0 ? ` — taxa R$ ${parseFloat(sv.price).toFixed(2)}` : ''
       return `${i + 1}️⃣ ${sv.name} (${durLabel(sv.duration_min)})${taxa}`
     }).join('\n')
-    await sendText(phoneNumberId, tkn, from, `📅 *Agendamento*\n\nEscolha um serviço:\n\n${menu}\n\n0️⃣ Voltar ao menu`)
+    // Se o contato tem horário marcado, oferece o cancelamento (opção 9)
+    let cancelLine = ''
+    try {
+      const todayISO = new Date().toISOString().slice(0, 10)
+      const { count } = await db.from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId).eq('contact_id', contact.id)
+        .in('status', ['pending_payment', 'confirmed']).gte('date', todayISO)
+      if (count > 0) cancelLine = '\n9️⃣ Cancelar meu horário'
+    } catch (_) {}
+    await sendText(phoneNumberId, tkn, from, `📅 *Agendamento*\n\nEscolha um serviço:\n\n${menu}${cancelLine}\n\n0️⃣ Voltar ao menu`)
     await db.from('conversations').update({ status: 'sched_service' }).eq('id', conv.id)
   }
 
-  if (['sched_service', 'sched_day', 'sched_slot'].includes(conv.status)) {
+  // Lista os horários futuros do contato (máx. 3) e entra no fluxo de cancelamento
+  async function schedSendCancelMenu() {
+    const todayISO = new Date().toISOString().slice(0, 10)
+    const { data: mine } = await db.from('appointments')
+      .select('id, date, start_time, end_time, status, service_id')
+      .eq('tenant_id', tenantId).eq('contact_id', contact.id)
+      .in('status', ['pending_payment', 'confirmed']).gte('date', todayISO)
+      .order('date').order('start_time').limit(3)
+    if (!mine?.length) {
+      await sendText(phoneNumberId, tkn, from, '😕 Você não tem horários futuros marcados. Digite *0* para voltar ao menu.')
+      await db.from('conversations').update({ status: 'sched_service' }).eq('id', conv.id)
+      await schedSendServiceMenu()
+      return
+    }
+    const items = []
+    for (const a of mine) {
+      const { data: sv } = await db.from('services').select('name').eq('id', a.service_id).maybeSingle()
+      const dt = new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+      items.push(`${items.length + 1}️⃣ ${dt} às ${a.start_time} — ${sv?.name || 'Atendimento'}${a.status === 'pending_payment' ? ' (pagamento pendente)' : ''}`)
+    }
+    await sendText(phoneNumberId, tkn, from, `🗑️ *Cancelar horário*\n\nQual deseja cancelar?\n\n${items.join('\n')}\n\n0️⃣ Voltar ao menu`)
+    await db.from('conversations').update({ status: 'sched_cancel' }).eq('id', conv.id)
+  }
+
+  if (['sched_service', 'sched_day', 'sched_slot'].includes(conv.status) || conv.status === 'sched_cancel' || (conv.status || '').startsWith('sched_cancel_confirm')) {
     const schedReset = ['0','menu','inicio','início','reiniciar','comecar','começar'].includes((userText || '').trim().toLowerCase())
     const { data: draftAppts } = await db.from('appointments')
       .select('id, service_id, date, start_time, notes')
@@ -997,6 +966,7 @@ async function schedSendServiceMenu() {
 
     // PASSO 1: escolher serviço
     if (conv.status === 'sched_service') {
+      if (num === 9) { await schedSendCancelMenu(); return }
       const { data: services } = await db.from('services')
         .select('id, name, price, duration_min, image_url').eq('tenant_id', tenantId).eq('is_active', true).order('created_at')
       const svc = services?.[(num || 0) - 1]
@@ -1007,15 +977,15 @@ async function schedSendServiceMenu() {
       if (draft) await db.from('appointments').delete().eq('id', draft.id)
       if (svc.image_url) await sendImage(phoneNumberId, tkn, from, svc.image_url, svc.name)
 
-      // Dias disponíveis conforme booking_settings
+      // Dias disponíveis conforme booking_settings (horário por dia + feriados/folgas)
       const { data: cfg } = await db.from('booking_settings').select('*').eq('tenant_id', tenantId).maybeSingle()
-      const daysOfWeek = (cfg?.days_of_week || '1,2,3,4,5').split(',').map(d => parseInt(d, 10))
       const maxAhead = cfg?.max_days_ahead || 14
       const dayList = []
       const today = new Date(); today.setHours(0, 0, 0, 0)
       for (let i = 1; i <= maxAhead && dayList.length < 7; i++) {
         const d = new Date(today); d.setDate(d.getDate() + i)
-        if (daysOfWeek.includes(d.getDay())) dayList.push(d)
+        const iso = d.toISOString().slice(0, 10)
+        if (getDayWindow(cfg, d.getDay()) && !isDateBlocked(cfg, iso)) dayList.push(d)
       }
       if (!dayList.length) {
         await sendText(phoneNumberId, tkn, from, '😕 Não há dias disponíveis para agendamento no momento. Digite *0* para voltar ao menu.')
@@ -1036,6 +1006,51 @@ async function schedSendServiceMenu() {
       }).join('\n')
       await sendText(phoneNumberId, tkn, from, `🗓️ *${svc.name}*\n\nEscolha o dia do atendimento:\n\n${dayMenu}\n\n0️⃣ Voltar ao menu`)
       await db.from('conversations').update({ status: 'sched_day' }).eq('id', conv.id)
+      return
+    }
+
+    // CANCELAMENTO (opção 9): escolhe o horário → confirma
+    if (conv.status === 'sched_cancel') {
+      if (num === 9) { await schedSendCancelMenu(); return }
+      const todayISO = new Date().toISOString().slice(0, 10)
+      const { data: mine } = await db.from('appointments')
+        .select('id, date, start_time, end_time, status, service_id')
+        .eq('tenant_id', tenantId).eq('contact_id', contact.id)
+        .in('status', ['pending_payment', 'confirmed']).gte('date', todayISO)
+        .order('date').order('start_time').limit(3)
+      const chosenA = mine?.[(num || 0) - 1]
+      if (!chosenA) {
+        await sendText(phoneNumberId, tkn, from, '❌ Opção inválida. Digite o número do horário ou *0* para voltar ao menu.')
+        return
+      }
+      const { data: sv } = await db.from('services').select('name').eq('id', chosenA.service_id).maybeSingle()
+      const dt = new Date(chosenA.date + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' })
+      await sendText(phoneNumberId, tkn, from, `Tem certeza que deseja cancelar *${sv?.name || 'o atendimento'}* de *${dt} às ${chosenA.start_time}*?\n\n1️⃣ Sim, cancelar\n2️⃣ Não, manter\n\n0️⃣ Voltar ao menu`)
+      await db.from('conversations').update({ status: 'sched_cancel_confirm:' + chosenA.id }).eq('id', conv.id)
+      return
+    }
+
+    if ((conv.status || '').startsWith('sched_cancel_confirm:')) {
+      const cancelId = conv.status.split(':')[1]
+      if (num === 1) {
+        const { data: appt } = await db.from('appointments').select('*').eq('id', cancelId).maybeSingle()
+        if (!appt || !['pending_payment', 'confirmed'].includes(appt.status)) {
+          await sendText(phoneNumberId, tkn, from, '😕 Esse horário já não está mais ativo. Digite *0* para voltar ao menu.')
+          await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+          return
+        }
+        await db.from('appointments').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', cancelId)
+        // Libera a taxa PIX pendente, se houver
+        if (appt.payment_id) {
+          await db.from('payments').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', appt.payment_id).eq('status', 'pending')
+        }
+        await safeInsert(db, 'analytics_events', { tenant_id: tenantId, event_type: 'appointment_cancelled', appointment_id: cancelId, conversation_id: conv.id, contact_id: contact.id })
+        await sendText(phoneNumberId, tkn, from, '✅ *Horário cancelado!*\n\nO slot foi liberado na nossa agenda. Quando quiser remarcar, é só pedir aqui. 👋')
+        await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
+        return
+      }
+      await sendText(phoneNumberId, tkn, from, '👍 Tudo certo, seu horário *continua marcado*. Digite *0* para voltar ao menu.')
+      await db.from('conversations').update({ status: 'bot', current_node_id: null }).eq('id', conv.id)
       return
     }
 
