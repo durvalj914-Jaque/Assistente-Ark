@@ -20,9 +20,10 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const target = req.query.url || 'https://www.assistente-ark.com.br/api/webhook'
     const vt = req.query.verify_token || process.env.WEBHOOK_VERIFY_TOKEN || 'ark_secret_arkiel_2025'
-    const wa = (subs.data || []).find(s => s.object === 'whatsapp') || {}
-    const fields = (wa.fields && wa.fields.length ? wa.fields : ['messages', 'message_template_status_update']).join(',')
-    const body = new URLSearchParams({ object: 'whatsapp', callback_url: target, verify_token: vt, fields })
+    const wa = (subs.data || []).find(s => s.object === 'whatsapp_business_account') || (subs.data || [])[0] || {}
+    const fieldNames = (wa.fields || []).map(f => typeof f === 'string' ? f : f.name).filter(Boolean)
+    const fields = (fieldNames.length ? fieldNames : ['messages', 'message_template_status_update']).join(',')
+    const body = new URLSearchParams({ object: wa.object || 'whatsapp_business_account', callback_url: target, verify_token: vt, fields })
     const r2 = await fetch(`${graph}/${APP_ID}/subscriptions?access_token=${encodeURIComponent(appToken)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body
     })
