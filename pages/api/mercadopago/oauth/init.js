@@ -5,7 +5,7 @@
 import { createClient } from '@supabase/supabase-js'
 
 const MP_CLIENT_ID = '3158906703766924'
-const REDIRECT_URI = 'https://arkiel.com.br/api/mercadopago/oauth/callback'
+const REDIRECT_URI = 'https://www.assistente-ark.com.br/api/mercadopago/oauth/callback'
 
 export default async function handler(req, res) {
   const authHeader = req.headers.authorization

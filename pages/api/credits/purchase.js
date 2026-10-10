@@ -95,7 +95,7 @@ export default async function handler(req, res) {
               credit_type,
               quantity: qty,
             },
-            notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+            notification_url: 'https://www.assistente-ark.com.br/api/payments/webhook/mercadopago',
           })
         })
         const pixData = await pixRes.json()

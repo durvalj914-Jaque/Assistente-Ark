@@ -47,7 +47,7 @@ export default function PlatformTutorial({ onClose }) {
 
         <Section title="Duas formas de uma empresa virar cliente">
           <Step n="A" title="Cadastro automático (o normal)">
-            A empresa entra em <code style={{ color: '#4f8ef7' }}>arkiel.com.br/login</code> e faz login com o Google dela. Isso já cria a conta, o tenant e um bot padrão sozinho — você não precisa fazer nada.
+            A empresa entra em <code style={{ color: '#4f8ef7' }}>assistente-ark.com.br/admin</code> e faz login com o Google dela. Isso já cria a conta, o tenant e um bot padrão sozinho — você não precisa fazer nada.
           </Step>
           <Step n="B" title="Você cria antes (venda direta / offline)">
             Quando fecha com um cliente que ainda não entrou no site, use o botão <b style={{ color: '#e2e8f0' }}>"+ Novo Cliente"</b> aqui embaixo. Você informa o nome da empresa, o e-mail Google que ela vai usar pra entrar, e o plano — o sistema já deixa a conta e o bot prontos. Quando essa pessoa entrar de fato com esse e-mail, ela cai direto na conta certa, nada duplica.

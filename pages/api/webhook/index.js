@@ -164,9 +164,9 @@ Vamos finalizar o pagamento 👇`)
             items: [{ title: `Pedido Catálogo - ${itemCount} item(s)`, quantity: 1, unit_price: total, currency_id: 'BRL' }],
             marketplace: 'ARKIEL',
             marketplace_fee: _catFee,
-            back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
+            back_urls: { success: 'https://www.assistente-ark.com.br/pagamento/sucesso', failure: 'https://www.assistente-ark.com.br/pagamento/erro', pending: 'https://www.assistente-ark.com.br/pagamento/pendente' },
             auto_return: 'approved', external_reference: txid,
-            notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+            notification_url: 'https://www.assistente-ark.com.br/api/mercadopago/webhook',
           }),
         })
         const mpData = await mpRes.json()
@@ -1143,7 +1143,7 @@ async function schedSendServiceMenu() {
                 description: `Taxa de agendamento — ${svc?.name || 'Atendimento'}`,
                 payment_method_id: 'pix',
                 external_reference: txid,
-                notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+                notification_url: 'https://www.assistente-ark.com.br/api/payments/webhook/mercadopago',
                 date_of_expiration: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
                 payer: { email: cleanPhone ? cleanPhone + '@arkiel.com.br' : 'cliente@arkiel.com.br' },
               }),
@@ -1401,9 +1401,9 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
               items: [{ title: reply?.substring(0, 50) || 'Pagamento', quantity: 1, unit_price: payAmount, currency_id: 'BRL' }],
               marketplace: 'ARKIEL',
               marketplace_fee: _flowFee,
-              back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
+              back_urls: { success: 'https://www.assistente-ark.com.br/pagamento/sucesso', failure: 'https://www.assistente-ark.com.br/pagamento/erro', pending: 'https://www.assistente-ark.com.br/pagamento/pendente' },
               auto_return: 'approved', external_reference: txid,
-              notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+              notification_url: 'https://www.assistente-ark.com.br/api/mercadopago/webhook',
             }),
           })
           const mpData = await mpRes.json()

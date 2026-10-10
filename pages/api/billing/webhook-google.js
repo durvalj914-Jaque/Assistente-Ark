@@ -5,7 +5,7 @@
  *
  * Configure no Google Play Console:
  * Configuração do app → Monetização → Notificações de desenvolvedor em tempo real
- * → URL do endpoint: https://arkiel.com.br/api/billing/webhook-google
+ * → URL do endpoint: https://www.assistente-ark.com.br/api/billing/webhook-google
  */
 import { supabaseAdmin }            from '../../../lib/supabase'
 import { verifyGoogleSubscription, isSubscriptionActive } from '../../../lib/googleBilling'

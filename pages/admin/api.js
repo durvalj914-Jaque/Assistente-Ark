@@ -42,7 +42,7 @@ export default function ApiPage() {
 
   if (loading || !user || !tenant) return null
 
-  const snippet = `curl -X POST https://arkiel.com.br/api/v1/send \\
+  const snippet = `curl -X POST https://www.assistente-ark.com.br/api/v1/send \\
   -H "Authorization: Bearer ${apiKey}" \\
   -H "Content-Type: application/json" \\
   -d '{"to": "5511999999999", "message": "Olá! Essa mensagem veio pela API."}'`

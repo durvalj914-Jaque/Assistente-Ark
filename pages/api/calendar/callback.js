@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   if (!clientId || !clientSecret) return back('nao_configurado')
 
   try {
-    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://arkiel.com.br'}/api/calendar/callback`
+    const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.assistente-ark.com.br'}/api/calendar/callback`
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

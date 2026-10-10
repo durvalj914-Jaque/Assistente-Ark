@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     connected: !!conn,
     email: conn?.google_email || null,
-    icsUrl: conn?.ics_token ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://arkiel.com.br'}/api/calendar/ics?token=${conn.ics_token}` : null,
+    icsUrl: conn?.ics_token ? `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.assistente-ark.com.br'}/api/calendar/ics?token=${conn.ics_token}` : null,
     lastSyncedAt: conn?.last_synced_at || null,
   })
 }

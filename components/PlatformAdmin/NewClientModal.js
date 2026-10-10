@@ -95,7 +95,7 @@ export default function NewClientModal({ onClose, onCreated }) {
               {result.linked_existing ? (
                 <> Esse e-mail já tinha conta no Assistente Ark — já foi vinculado direto como dono(a).</>
               ) : (
-                <> Assim que <b style={{ color: '#e2e8f0' }}>{ownerEmail}</b> entrar em arkiel.com.br com login do Google, a conta já vai estar pronta e vinculada automaticamente.</>
+                <> Assim que <b style={{ color: '#e2e8f0' }}>{ownerEmail}</b> entrar em assistente-ark.com.br com login do Google, a conta já vai estar pronta e vinculada automaticamente.</>
               )}
             </div>
 
@@ -169,7 +169,7 @@ export default function NewClientModal({ onClose, onCreated }) {
                     borderRadius: 8, padding: '12px 14px', marginBottom: 16, fontSize: 12.5, color: '#cbd5e1', lineHeight: 1.6
                   }}>
                     ⚠️ <b style={{ color: '#e2e8f0' }}>WhatsApp:</b> {result.whatsapp.error}
-                    <br/>O cliente pode ativar o número pelo portal (arkiel.com.br/client).
+                    <br/>O cliente pode ativar o número pelo portal (assistente-ark.com.br/client).
                   </div>
                 )}
               </>

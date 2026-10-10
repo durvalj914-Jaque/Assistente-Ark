@@ -135,13 +135,13 @@ export default async function handler(req, res) {
         marketplace: 'ARKIEL',
         marketplace_fee: _buyFee,
         back_urls: {
-          success: 'https://arkiel.com.br/catalog/success',
-          failure: 'https://arkiel.com.br/catalog/error',
-          pending: 'https://arkiel.com.br/catalog/pending',
+          success: 'https://www.assistente-ark.com.br/catalog/success',
+          failure: 'https://www.assistente-ark.com.br/catalog/error',
+          pending: 'https://www.assistente-ark.com.br/catalog/pending',
         },
         auto_return: 'approved',
         external_reference: orderRef,
-        notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+        notification_url: 'https://www.assistente-ark.com.br/api/mercadopago/webhook',
       }),
     })
     const mpData = await mpRes.json()

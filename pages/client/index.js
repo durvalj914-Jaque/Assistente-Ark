@@ -488,13 +488,13 @@ export default function ClientPortal() {
               <div style={{ display: 'flex', gap: 10, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                   readOnly
-                  value={`https://arkiel.com.br/catalog/${tenant?.id || ''}`}
+                  value={`https://www.assistente-ark.com.br/catalog/${tenant?.id || ''}`}
                   style={{ ...styles.searchInput, flex: 1, maxWidth: 400, cursor: 'pointer' }}
                   onClick={e => e.target.select()}
                 />
                 <button
                   onClick={() => {
-                    const link = `https://arkiel.com.br/catalog/${tenant?.id || ''}`
+                    const link = `https://www.assistente-ark.com.br/catalog/${tenant?.id || ''}`
                     navigator.clipboard?.writeText(link)
                     setCopied(true)
                     setTimeout(() => setCopied(false), 2000)
@@ -504,7 +504,7 @@ export default function ClientPortal() {
                   {copied ? '✓ Copiado!' : '📋 Copiar link'}
                 </button>
                 <a
-                  href={`https://arkiel.com.br/catalog/${tenant?.id || ''}`}
+                  href={`https://www.assistente-ark.com.br/catalog/${tenant?.id || ''}`}
                   target="_blank"
                   rel="noreferrer"
                   style={{ ...styles.logoutBtn, color: '#10b981', borderColor: 'rgba(16,185,129,0.25)', padding: '9px 16px', textDecoration: 'none', whiteSpace: 'nowrap' }}

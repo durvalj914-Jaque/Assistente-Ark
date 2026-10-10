@@ -104,7 +104,7 @@ export default async function handler(req, res) {
           description: description || 'Pagamento Arkiel',
           payment_method_id: 'pix',
           external_reference: txid,
-          notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+          notification_url: 'https://www.assistente-ark.com.br/api/payments/webhook/mercadopago',
           payer: { email: cleanPhone ? cleanPhone + '@arkiel.com.br' : 'cliente@arkiel.com.br' }
         })
       })
@@ -289,9 +289,9 @@ export default async function handler(req, res) {
         items: [{ title: description || 'Pagamento', quantity: 1, unit_price: _payAmount, currency_id: 'BRL' }],
         marketplace: 'ARKIEL',
         marketplace_fee: _mpFee,
-        back_urls: { success: 'https://arkiel.com.br/pagamento/sucesso', failure: 'https://arkiel.com.br/pagamento/erro', pending: 'https://arkiel.com.br/pagamento/pendente' },
+        back_urls: { success: 'https://www.assistente-ark.com.br/pagamento/sucesso', failure: 'https://www.assistente-ark.com.br/pagamento/erro', pending: 'https://www.assistente-ark.com.br/pagamento/pendente' },
         auto_return: 'approved', external_reference: txid, statement_descriptor: finalName.substring(0, 12),
-        notification_url: 'https://arkiel.com.br/api/payments/webhook/mercadopago',
+        notification_url: 'https://www.assistente-ark.com.br/api/payments/webhook/mercadopago',
       }),
     })
     const mpData = await mpRes.json()

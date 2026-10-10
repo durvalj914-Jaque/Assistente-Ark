@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'GOOGLE_CALENDAR_CLIENT_ID não configurado na Vercel' })
   }
 
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://arkiel.com.br'}/api/calendar/callback`
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL || 'https://www.assistente-ark.com.br'}/api/calendar/callback`
   // state assinado (HMAC): impede conectar agenda de outro tenant
   const SECRET = process.env.CALENDAR_STATE_SECRET || process.env.META_APP_SECRET || 'ark_secret_arkiel_2025'
   const sig = crypto.createHmac('sha256', SECRET).update(String(tenantId)).digest('hex').slice(0, 16)

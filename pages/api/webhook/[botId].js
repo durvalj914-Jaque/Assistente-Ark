@@ -223,7 +223,7 @@ export default async function handler(req, res) {
             await new Promise(r => setTimeout(r, 300))
           }
           if (products.length > 5) {
-            await sendText(phoneId, waToken, from, `📱 Mais ${products.length - 5} produtos disponíveis. Acesse: arkiel.com.br/catalog/${tenantId}`)
+            await sendText(phoneId, waToken, from, `📱 Mais ${products.length - 5} produtos disponíveis. Acesse: assistente-ark.com.br/catalog/${tenantId}`)
           }
           await db.from('messages').insert({
             tenant_id: tenantId, conversation_id: conv.id, bot_id: botId,
@@ -422,7 +422,7 @@ async function handleCatalogOrder(db, botId, order, from) {
           payment_method_id: 'pix',
           payer: { email: `cliente${from.slice(-4)}@arkiel.com.br` },
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
-          notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+          notification_url: 'https://www.assistente-ark.com.br/api/mercadopago/webhook',
           ...(useOfficialSplit
             ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('pix', orderTotal), collector: { id: marketplaceConfig.collector_id } }
             : usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('pix', orderTotal) } : {})
@@ -460,13 +460,13 @@ async function handleCatalogOrder(db, botId, order, from) {
             currency_id: 'BRL'
           }],
           metadata: { order_id: savedOrder.id, tenant_id: tenantId },
-          notification_url: 'https://arkiel.com.br/api/mercadopago/webhook',
+          notification_url: 'https://www.assistente-ark.com.br/api/mercadopago/webhook',
           ...(useOfficialSplit
             ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('credit_card', orderTotal), collector: { id: marketplaceConfig.collector_id } }
             : usingTenantToken ? { marketplace: 'ARKIEL', marketplace_fee: calcFee('credit_card', orderTotal) } : {}),
           back_urls: {
-            success: 'https://arkiel.com.br/payment/success',
-            failure: 'https://arkiel.com.br/payment/failure'
+            success: 'https://www.assistente-ark.com.br/payment/success',
+            failure: 'https://www.assistente-ark.com.br/payment/failure'
           },
           auto_return: 'approved'
         })

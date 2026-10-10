@@ -174,7 +174,7 @@ export default function SettingsPage() {
                   {inviting ? 'Enviando…' : '+ Convidar'}
                 </button>
               </div>
-              <p style={{ color: '#334155', fontSize: 11, marginTop: 8 }}>ℹ️ A pessoa precisa entrar em arkiel.com.br com login do Google usando esse e-mail exato pra entrar na sua equipe automaticamente.</p>
+              <p style={{ color: '#334155', fontSize: 11, marginTop: 8 }}>ℹ️ A pessoa precisa entrar em assistente-ark.com.br com login do Google usando esse e-mail exato pra entrar na sua equipe automaticamente.</p>
               {inviteMsg && <p style={{ fontSize: 12, marginTop: 8, color: inviteMsg.startsWith('✅') ? '#10b981' : '#ef4444' }}>{inviteMsg}</p>}
             </div>
           ) : null}
