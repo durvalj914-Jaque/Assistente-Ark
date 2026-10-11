@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { processFlow, getNodeButtons } from '../../../lib/flowEngine'
+import { tryAIResponse } from '../../../lib/aiBot'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
 import { sendProductList } from '../../../lib/metaCatalog'
@@ -1298,6 +1299,22 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
 
   const result = processFlow(nodes, conv.current_node_id, userText, { greeting: bot.greeting })
   await savelog(db, 'flow_result', null, { action: result.action, nodeId: result.nodeId, reply: result.reply?.substring(0,60) })
+
+  // ── IA do tenant (aba "IA"): mensagem fora do menu → IA responde ──
+  if (result.invalidOption && conv.status === 'bot') {
+    try {
+      const ai = await tryAIResponse({ db, tenantId, bot, conv, contact, userText })
+      if (ai?.handled) {
+        await sendText(phoneNumberId, tkn, from, ai.reply)
+        await db.from('conversations').update({
+          last_message: ai.reply, last_message_at: new Date().toISOString(),
+        }).eq('id', conv.id)
+        await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: ai.reply, sent_by: 'ai' })
+        await savelog(db, 'ai_response', null, { provider: ai.provider, model: ai.model, reply: ai.reply.substring(0, 60) })
+        return res.status(200).json({ ok: true })
+      }
+    } catch (_) {} // IA falhou → segue o comportamento normal do menu
+  }
 
   let reply = result.reply || bot.fallback_message || 'Não entendi. Digite *0* para voltar ao menu.'
   let nodeId = result.nodeId

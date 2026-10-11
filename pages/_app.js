@@ -128,7 +128,7 @@ export default function App({ Component, pageProps }) {
 
   // Aplicar tema salvo
   useEffect(() => {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'dark' : 'dark'
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'light' : 'light'
     document.documentElement.setAttribute('data-theme', saved)
   }, [])
 
@@ -147,7 +147,7 @@ export default function App({ Component, pageProps }) {
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://www.assistente-ark.com.br/assistente-ark-logo.png" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="theme-color" content="#000000" />
+        <meta name="theme-color" content="#ffffff" />
         <link rel="canonical" href={canonicalUrl} />
         <link rel="icon" href="/favicon.ico" />
         <link rel="manifest" href="/manifest.json" />

@@ -26,7 +26,7 @@ export default function SettingsPage() {
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
   useEffect(() => {
-    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'dark' : 'dark'
+    const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('ark-theme') || 'light' : 'light'
     setTheme(saved)
   }, [])
 

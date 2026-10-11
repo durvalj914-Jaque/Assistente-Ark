@@ -22,6 +22,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     { href: '/admin/agendamentos', label: 'Agendamentos', icon: '🗓️', tut: 'agendamentos' },
     { href: '/admin/whatsapp-setup', label: 'Conectar WhatsApp', icon: '📱', tut: 'whatsapp-setup' },
     { href: '/admin/bots', label: 'Configurar Bot', icon: '🤖', tut: 'bots' },
+    { href: '/admin/ai', label: 'IA', icon: '🧠', tut: 'ia' },
     { href: '/admin/marketing', label: 'Marketing', icon: '📣', tut: 'marketing' },
     { href: '/admin/analytics', label: 'Analytics', icon: '📊', tut: 'analytics' },
     { href: '/admin/financeiro', label: 'Financeiro', icon: '💰', tut: 'financeiro' },

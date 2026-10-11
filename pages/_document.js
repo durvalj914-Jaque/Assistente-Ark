@@ -2,12 +2,12 @@ import { Html, Head, Main, NextScript } from 'next/document'
 
 export default function Document() {
   return (
-    <Html data-theme="dark">
+    <Html data-theme="light">
       <Head />
       <body>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('ark-theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('ark-theme')||'light';document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`,
           }}
         />
         <Main />
