@@ -151,7 +151,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
       </nav>
 
       {/* Conteúdo */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
+      <div className="ark-content" style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>
         {children}
       </div>
 

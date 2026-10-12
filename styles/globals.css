@@ -390,3 +390,12 @@ select.ark-input {
     overflow-y: auto !important;
   }
 }
+
+/* ── Mobile: máxima responsividade — todas as abas (12/10) ── */
+@media (max-width: 768px) {
+  /* formulários em 2 colunas (agendamentos, bots, conversas) → 1 coluna */
+  [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+  /* conteúdo mais largo que a tela rola em vez de ser cortado */
+  .ark-content { overflow-x: auto !important; }
+}
