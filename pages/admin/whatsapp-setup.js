@@ -3,10 +3,12 @@ import { useRouter } from 'next/router'
 import AdminLayout from '../../components/Layout/AdminLayout'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import { PLANS } from '../../lib/plans'
 import WhatsAppEmbeddedSignup from '../../components/WhatsAppEmbeddedSignup'
 import WhatsAppSmsConnect from '../../components/WhatsAppSmsConnect'
 import SectionHelp from '../../components/Tutorial/SectionHelp'
 import MigrationWizard from '../../components/MigrationWizard'
+import NumberHealthCard from '../../components/NumberHealthCard'
 
 export default function WhatsappSetupPage() {
   const router = useRouter()
@@ -17,35 +19,9 @@ export default function WhatsappSetupPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [savedAt, setSavedAt] = useState(null)
-  const [disconnecting, setDisconnecting] = useState(false)
-  const [disconnectResult, setDisconnectResult] = useState(null)
-  const [health, setHealth] = useState(null)
-  const [healthLoading, setHealthLoading] = useState(false)
-
-  // Busca a saúde do número (qualidade Meta, limite de envio) quando há bot conectado
-  useEffect(() => {
-    if (!activeBot) { setHealth(null); return }
-    let alive = true
-    async function loadHealth() {
-      setHealthLoading(true)
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const r = await fetch('/api/whatsapp/number-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
-          body: JSON.stringify({ bot_id: activeBot.id }),
-        })
-        const d = await r.json()
-        if (alive) setHealth(r.ok ? { ...d, ok: true } : { ok: false, error: d.error })
-      } catch (e) {
-        if (alive) setHealth({ ok: false, error: 'Falha ao consultar a Meta' })
-      } finally {
-        if (alive) setHealthLoading(false)
-      }
-    }
-    loadHealth()
-    return () => { alive = false }
-  }, [activeBot?.id])
+  const [disconnectingId, setDisconnectingId] = useState(null)
+  const [disconnectResults, setDisconnectResults] = useState({})
+  const [creatingBot, setCreatingBot] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -59,7 +35,12 @@ export default function WhatsappSetupPage() {
     }
   }, [tenant, user])
 
-  const activeBot = bots?.find(b => b.status === 'active' && b.phone_number_id)
+  // ── Multi-número: cada bot é um número de WhatsApp com seu próprio fluxo ──
+  const allBots = bots || []
+  const connectedBots = allBots.filter(b => b.status === 'active' && b.phone_number_id)
+  const freeBot = allBots.find(b => !b.phone_number_id)
+  const plan = PLANS[tenant?.plan] || PLANS.free
+  const canCreateBot = allBots.length < plan.max_bots
 
   async function submitRequest(e) {
     e.preventDefault()
@@ -102,33 +83,38 @@ export default function WhatsappSetupPage() {
     setRequest(data)
   }
 
-  async function disconnectWhatsApp() {
-    if (!activeBot) return
-    if (!confirm('⚠️ Desconectar o WhatsApp?\n\nO número será desvinculado da plataforma e liberado. Você poderá:\n• Voltar para o app oficial do WhatsApp\n• Recadastrar em outra conta\n\nConversas existentes serão encerradas (não deletadas).\n\nDeseja continuar?')) return
-    setDisconnecting(true)
-    setDisconnectResult(null)
-    setError('')
+  async function disconnectWhatsApp(bot) {
+    if (!confirm(`⚠️ Desconectar o WhatsApp do bot "${bot.name}"?\n\nO número será desvinculado da plataforma e liberado. Você poderá:\n• Voltar para o app oficial do WhatsApp\n• Recadastrar em outra conta\n\nConversas existentes serão encerradas (não deletadas).\n\nDeseja continuar?`)) return
+    setDisconnectingId(bot.id)
+    setDisconnectResults(prev => ({ ...prev, [bot.id]: null }))
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        throw new Error('Sessão expirada. Faça login novamente.')
-      }
+      if (!session?.access_token) throw new Error('Sessão expirada. Faça login novamente.')
       const res = await fetch('/api/whatsapp/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ bot_id: activeBot.id })
+        body: JSON.stringify({ bot_id: bot.id })
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Falha ao desconectar')
-      setDisconnectResult({ success: true, message: json.message, steps: json.results?.steps || [] })
-      // Reload after 3s to show disconnected state
+      setDisconnectResults(prev => ({ ...prev, [bot.id]: { success: true, message: json.message, steps: json.results?.steps || [] } }))
       setTimeout(() => window.location.reload(), 3000)
     } catch (e) {
-      console.error('[disconnect]', e)
-      setDisconnectResult({ success: false, message: e.message })
+      setDisconnectResults(prev => ({ ...prev, [bot.id]: { success: false, message: e.message } }))
     } finally {
-      setDisconnecting(false)
+      setDisconnectingId(null)
     }
+  }
+
+  // Cria um novo bot (vaga de número) dentro do limite do plano
+  async function createBotSlot() {
+    if (!canCreateBot) return
+    setCreatingBot(true)
+    const { error: insErr } = await supabase.from('bots')
+      .insert({ tenant_id: tenant.id, name: `Bot ${allBots.length + 1}` })
+    if (!insErr) window.location.reload()
+    else setError(insErr.message)
+    setCreatingBot(false)
   }
 
   if (loading || !user || !tenant || checkingRequest) return null
@@ -145,7 +131,7 @@ export default function WhatsappSetupPage() {
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>📱 Conectar WhatsApp</h1>
       <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24, maxWidth: 640 }}>
-        Pra ativar seu bot, precisamos transformar um número de WhatsApp em conta Business API. Preencha os dados abaixo e nossa equipe finaliza a configuração junto à Meta.
+        Cada número de WhatsApp é um bot com seu próprio fluxo de atendimento. Você pode conectar mais de um número — o limite do seu plano é <b style={{ color: '#4f8ef7' }}>{plan.max_bots > 900 ? 'ilimitado' : plan.max_bots}</b>.
       </p>
 
       <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.05)' }}>
@@ -165,37 +151,38 @@ export default function WhatsappSetupPage() {
         </p>
       </div>
 
-      {activeBot && (
-        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.3)' }}>
+      {/* ── Números conectados: um card por bot ativo ── */}
+      {connectedBots.map(bot => (
+        <div key={bot.id} className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
-              <div style={{ color: '#10b981', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>✅ WhatsApp já conectado</div>
-              <div style={{ color: '#94a3b8', fontSize: 13 }}>Bot <b style={{ color: '#e2e8f0' }}>{activeBot.name}</b> ativo no número configurado.</div>
+              <div style={{ color: '#10b981', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>✅ WhatsApp conectado</div>
+              <div style={{ color: '#94a3b8', fontSize: 13 }}>Bot <b style={{ color: '#e2e8f0' }}>{bot.name}</b> ativo no número configurado.</div>
             </div>
             <button
-              onClick={disconnectWhatsApp}
-              disabled={disconnecting}
+              onClick={() => disconnectWhatsApp(bot)}
+              disabled={disconnectingId === bot.id}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', borderRadius: 10, cursor: disconnecting ? 'not-allowed' : 'pointer',
+                padding: '10px 18px', borderRadius: 10, cursor: disconnectingId === bot.id ? 'not-allowed' : 'pointer',
                 border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)',
-                color: '#ef4444', fontSize: 13, fontWeight: 700, opacity: disconnecting ? 0.6 : 1,
+                color: '#ef4444', fontSize: 13, fontWeight: 700, opacity: disconnectingId === bot.id ? 0.6 : 1,
                 transition: 'all .15s',
               }}
             >
-              {disconnecting ? '⏳ Desconectando...' : '🗑️ Desconectar WhatsApp'}
+              {disconnectingId === bot.id ? '⏳ Desconectando...' : '🗑️ Desconectar WhatsApp'}
             </button>
           </div>
-          {disconnectResult && (
+          {disconnectResults[bot.id] && (
             <div style={{ marginTop: 14, padding: '12px 16px', borderRadius: 10,
-              background: disconnectResult.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-              border: `1px solid ${disconnectResult.success ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
-              fontSize: 13, color: disconnectResult.success ? '#10b981' : '#ef4444',
+              background: disconnectResults[bot.id].success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
+              border: `1px solid ${disconnectResults[bot.id].success ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
+              fontSize: 13, color: disconnectResults[bot.id].success ? '#10b981' : '#ef4444',
             }}>
-              {disconnectResult.success ? '✅ ' : '❌ '}{disconnectResult.message}
-              {disconnectResult.steps?.length > 0 && (
+              {disconnectResults[bot.id].success ? '✅ ' : '❌ '}{disconnectResults[bot.id].message}
+              {disconnectResults[bot.id].steps?.length > 0 && (
                 <div style={{ marginTop: 8, fontSize: 11, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {disconnectResult.steps.map((s, i) => (
+                  {disconnectResults[bot.id].steps.map((s, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>{s.success === false ? '❌' : s.success === true ? '✅' : '⏭️'}</span>
                       <span>{s.step}{s.error ? ': ' + s.error : ''}</span>
@@ -203,7 +190,7 @@ export default function WhatsappSetupPage() {
                   ))}
                 </div>
               )}
-              {disconnectResult.success && <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>A página será recarregada automaticamente...</div>}
+              {disconnectResults[bot.id].success && <div style={{ fontSize: 11, color: '#64748b', marginTop: 8 }}>A página será recarregada automaticamente...</div>}
             </div>
           )}
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)', color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
@@ -213,81 +200,52 @@ export default function WhatsappSetupPage() {
             • <b>Recadastrar em outra conta de API</b> — até 24h (em casos raros, a Meta pode segurar até 30 dias)
           </div>
         </div>
-      )}
+      ))}
 
-      {activeBot && (
-        <div className="ark-card" style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
-            <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>📊 Saúde do número</h3>
-            <button onClick={async () => {
-              const { data: { session } } = await supabase.auth.getSession()
-              setHealthLoading(true)
-              try {
-                const r = await fetch('/api/whatsapp/number-status', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
-                  body: JSON.stringify({ bot_id: activeBot.id }),
-                })
-                const d = await r.json()
-                setHealth(r.ok ? { ...d, ok: true } : { ok: false, error: d.error })
-              } catch (_) { setHealth({ ok: false, error: 'Falha ao consultar a Meta' }) }
-              finally { setHealthLoading(false) }
-            }} disabled={healthLoading}
-              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-              {healthLoading ? '⏳' : '🔄 Atualizar'}
-            </button>
-          </div>
-          {healthLoading && !health && <div style={{ color: '#64748b', fontSize: 13 }}>Consultando a Meta…</div>}
-          {health?.ok === false && <div style={{ color: '#ef4444', fontSize: 13 }}>❌ {health.error || 'Não foi possível obter os dados agora.'}</div>}
-          {health?.ok && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
-              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
-                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NÚMERO</div>
-                <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{health.number || '—'}</div>
-                <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>{health.verified_name}</div>
-              </div>
-              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
-                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>QUALIDADE (META)</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: health.quality.code === 'GREEN' ? '#10b981' : health.quality.code === 'YELLOW' ? '#f59e0b' : '#ef4444' }}>
-                  {health.quality.emoji} {health.quality.label}
-                </div>
-                <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>{health.quality.desc}</div>
-              </div>
-              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
-                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>LIMITE DE ENVIO</div>
-                <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{health.messaging_limit}</div>
-                <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>conversas iniciadas por 24h</div>
-              </div>
-              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
-                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NOME VERIFICADO</div>
-                <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{health.name_status}</div>
-              </div>
-            </div>
-          )}
-          <div style={{ marginTop: 12, color: '#64748b', fontSize: 12 }}>
-            💡 Quer conferir que tá tudo certo? Manda um <b style={{ color: '#94a3b8' }}>Oi</b> pro seu próprio número no WhatsApp — o bot responde na hora.
-          </div>
-        </div>
-      )}
+      {/* ── Saúde de cada número conectado ── */}
+      {connectedBots.map(bot => <NumberHealthCard key={'h-' + bot.id} bot={bot} />)}
 
-
-      <MigrationWizard activeBot={activeBot} tenantId={tenant?.id}
+      <MigrationWizard activeBot={connectedBots[0]} tenantId={tenant?.id}
         step2={<>
-      {!activeBot && bots?.[0] && (
+
+      {/* ── Conectar novo número: usa a vaga livre ou cria uma nova ── */}
+      {freeBot && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.35)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática (recomendado — sem precisar de Facebook)<SectionHelp t='whatsapp-setup' s='automatica' /></h3>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Digite seu número, confirme o código que chega por SMS, e pronto — seu bot fica ativo na hora, sem precisar de conta Facebook.</p>
-          <WhatsAppSmsConnect botId={bots[0].id} businessName={tenant?.name} onConnected={() => window.location.reload()} />
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática do número do bot "{freeBot.name}" (recomendado — sem precisar de Facebook)<SectionHelp t='whatsapp-setup' s='automatica' /></h3>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Digite o número, confirme o código que chega por SMS, e pronto — o bot fica ativo na hora, sem precisar de conta Facebook.</p>
+          <WhatsAppSmsConnect botId={freeBot.id} businessName={tenant?.name} onConnected={() => window.location.reload()} />
         </div>
       )}
 
-      {!activeBot && bots?.[0] && (
+      {freeBot && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.25)' }}>
           <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📶 Prefere logar com o Facebook?<SectionHelp t='whatsapp-setup' s='facebook' /></h3>
           <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Se você já tem uma conta WhatsApp Business própria no Facebook, pode conectar direto por lá.</p>
-          <WhatsAppEmbeddedSignup botId={bots[0].id} onConnected={() => window.location.reload()} />
+          <WhatsAppEmbeddedSignup botId={freeBot.id} onConnected={() => window.location.reload()} />
         </div>
       )}
+
+      {/* Sem vaga livre: cria um novo bot (dentro do plano) ou faz upgrade */}
+      {!freeBot && canCreateBot && (
+        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(79,142,247,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>➕ Conectar outro número</div>
+            <div style={{ color: '#94a3b8', fontSize: 13 }}>Cada número é um bot com fluxo próprio. Crie uma nova vaga e conecte em seguida.</div>
+          </div>
+          <button onClick={createBotSlot} disabled={creatingBot} className="ark-btn">{creatingBot ? '⏳ Criando…' : '+ Adicionar número'}</button>
+        </div>
+      )}
+
+      {!freeBot && !canCreateBot && (
+        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(245,158,11,0.35)' }}>
+          <div style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🔒 Seu plano permite {plan.max_bots > 900 ? 'números ilimitados' : `${plan.max_bots} ${plan.max_bots > 1 ? 'números' : 'número'}`}</div>
+          <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>
+            Você já tem {connectedBots.length} {connectedBots.length === 1 ? 'número conectado' : 'números conectados'}. Pra adicionar mais, faça upgrade do plano.
+          </div>
+          <a href="/admin/upgrade" className="ark-btn" style={{ display: 'inline-block', textDecoration: 'none' }}>⬆️ Ver planos</a>
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: request ? '1fr 1fr' : '1fr', gap: 20, maxWidth: 900 }}>
         <div className="ark-card">
           <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 18, fontSize: 14 }}>📋 Ou preencha manualmente<SectionHelp t='whatsapp-setup' s='manual' /></h3>
@@ -308,8 +266,7 @@ export default function WhatsappSetupPage() {
             </div>
             <div style={{ marginBottom: 14 }}>
               <label style={label}>OBSERVAÇÕES (OPCIONAL)</label>
-              <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-                rows={3} placeholder="Volume estimado de mensagens, melhor horário de contato, etc."
+              <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3} placeholder="Volume estimado de mensagens, melhor horário de contato, etc."
                 style={{ width: '100%', background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 8, color: '#e2e8f0', padding: '10px 12px', fontSize: 13, fontFamily: 'Inter, sans-serif', outline: 'none', resize: 'vertical' }} />
             </div>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 18, cursor: 'pointer' }}>
