@@ -570,7 +570,8 @@ export default function FinanceiroPage() {
                   </div>
                 ) : (
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <div style={{ overflowX: 'auto' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
                       <thead>
                         <tr style={{ color: 'var(--text-muted)', fontSize: 11 }}>
                           <th style={{ textAlign: 'left', padding: '6px 8px', borderBottom: '1px solid var(--border-soft)' }}>Data</th>
@@ -592,6 +593,7 @@ export default function FinanceiroPage() {
                         ))}
                       </tbody>
                     </table>
+</div>
                   </div>
                 )}
               </div>

@@ -370,3 +370,23 @@ select.ark-input {
   50% { transform: scale(1.5); opacity: 0.6; }
   100% { transform: scale(1); opacity: 1; }
 }
+
+/* ── Mobile: passada geral de responsividade (12/10) ── */
+@media (max-width: 768px) {
+  /* iOS: input com fonte <16px dispara zoom automático ao focar — sobe pra 16px no toque */
+  input[type="text"], input[type="search"], input[type="email"], input[type="tel"],
+  input[type="password"], input[type="number"], select, textarea, .ark-input {
+    font-size: 16px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* Modais: card ocupa a largura da tela e rola verticalmente (overlay fixed inset 0) */
+  [style*="position:fixed"][style*="inset:0px"] > div {
+    max-width: 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-height: 92dvh !important;
+    overflow-y: auto !important;
+  }
+}

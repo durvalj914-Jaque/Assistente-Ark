@@ -1517,7 +1517,8 @@ export default function PainelAdminPage() {
           )}
 
           <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+            <div style={{ overflowX: 'auto' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)', whiteSpace: 'nowrap', position: 'sticky', left: 0, background: 'var(--bg-secondary)', zIndex: 2 }}>
@@ -1643,6 +1644,7 @@ export default function PainelAdminPage() {
                   )}
                 </tbody>
               </table>
+</div>
             </div>
 
           {/* Modal Nova Linha */}
@@ -2007,7 +2009,8 @@ export default function PainelAdminPage() {
             </div>
           ) : commissionFilter === 'summary' ? (
             <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: 'auto' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Tenant</th>
@@ -2041,10 +2044,12 @@ export default function PainelAdminPage() {
                   )}
                 </tbody>
               </table>
+</div>
             </div>
           ) : (
             <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid var(--border-soft)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div style={{ overflowX: 'auto' }}>
+<table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-secondary)' }}>
                     <th style={{ padding: '12px 14px', textAlign: 'left', fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '2px solid var(--border-medium)' }}>Data</th>
@@ -2080,6 +2085,7 @@ export default function PainelAdminPage() {
                   )}
                 </tbody>
               </table>
+</div>
             </div>
           )}
 

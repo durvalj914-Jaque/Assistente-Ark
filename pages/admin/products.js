@@ -378,7 +378,7 @@ export default function ProductsPage() {
         {tab === 'produtos' && (
         <>
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
           <div className="ark-card" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: 22 }}>📦</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#4f8ef7' }}>{products.length}</div>

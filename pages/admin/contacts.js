@@ -546,7 +546,8 @@ export default function ContactsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: selected ? '1fr 320px' : '1fr', gap: 16 }}>
         {/* Tabela */}
         <div className="ark-card" style={{ padding: 0, overflow: 'hidden' }}>
-          <table className="ark-table">
+          <div style={{ overflowX: 'auto' }}>
+<table className="ark-table">
             <thead>
               <tr>
                 {bulkMode && (
@@ -621,6 +622,7 @@ export default function ContactsPage() {
               })}
             </tbody>
           </table>
+</div>
           {hasMore && (
             <div style={{ padding: 16, textAlign: 'center' }}>
               <button onClick={() => { setPage(p => p + 1); loadContacts() }} className="ark-btn-ghost" disabled={loadingContacts}>
