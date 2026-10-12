@@ -245,12 +245,16 @@ export default function ProductsPage() {
 
   async function syncCatalog(productId, action) {
     try {
-      await fetch('/api/admin/sync-product', {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/products/sync-catalog', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ productId, tenantId: tenant.id, action }),
       })
-    } catch (_) { /* sincronização é best-effort — não bloqueia o CRUD local */ }
+      const d = await r.json().catch(() => ({}))
+      // best-effort: não bloqueia o CRUD local, mas deixa o motivo visível no console
+      if (!r.ok || d?.error) console.error('[sync-catalog]', r.status, d?.error || d)
+    } catch (err) { console.error('[sync-catalog]', err?.message) }
   }
 
   async function handleSave(form) {
