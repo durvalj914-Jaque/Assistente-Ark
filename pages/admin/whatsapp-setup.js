@@ -19,6 +19,33 @@ export default function WhatsappSetupPage() {
   const [savedAt, setSavedAt] = useState(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [disconnectResult, setDisconnectResult] = useState(null)
+  const [health, setHealth] = useState(null)
+  const [healthLoading, setHealthLoading] = useState(false)
+
+  // Busca a saúde do número (qualidade Meta, limite de envio) quando há bot conectado
+  useEffect(() => {
+    if (!activeBot) { setHealth(null); return }
+    let alive = true
+    async function loadHealth() {
+      setHealthLoading(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const r = await fetch('/api/whatsapp/number-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+          body: JSON.stringify({ bot_id: activeBot.id }),
+        })
+        const d = await r.json()
+        if (alive) setHealth(r.ok ? { ...d, ok: true } : { ok: false, error: d.error })
+      } catch (e) {
+        if (alive) setHealth({ ok: false, error: 'Falha ao consultar a Meta' })
+      } finally {
+        if (alive) setHealthLoading(false)
+      }
+    }
+    loadHealth()
+    return () => { alive = false }
+  }, [activeBot?.id])
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -184,6 +211,61 @@ export default function WhatsappSetupPage() {
             <b style={{ color: '#94a3b8' }}>Prazos para reutilizar:</b><br/>
             • <b>App oficial do WhatsApp</b> — geralmente em algumas horas<br/>
             • <b>Recadastrar em outra conta de API</b> — até 24h (em casos raros, a Meta pode segurar até 30 dias)
+          </div>
+        </div>
+      )}
+
+      {activeBot && (
+        <div className="ark-card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+            <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14 }}>📊 Saúde do número</h3>
+            <button onClick={async () => {
+              const { data: { session } } = await supabase.auth.getSession()
+              setHealthLoading(true)
+              try {
+                const r = await fetch('/api/whatsapp/number-status', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+                  body: JSON.stringify({ bot_id: activeBot.id }),
+                })
+                const d = await r.json()
+                setHealth(r.ok ? { ...d, ok: true } : { ok: false, error: d.error })
+              } catch (_) { setHealth({ ok: false, error: 'Falha ao consultar a Meta' }) }
+              finally { setHealthLoading(false) }
+            }} disabled={healthLoading}
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'transparent', color: '#4f8ef7', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+              {healthLoading ? '⏳' : '🔄 Atualizar'}
+            </button>
+          </div>
+          {healthLoading && !health && <div style={{ color: '#64748b', fontSize: 13 }}>Consultando a Meta…</div>}
+          {health?.ok === false && <div style={{ color: '#ef4444', fontSize: 13 }}>❌ {health.error || 'Não foi possível obter os dados agora.'}</div>}
+          {health?.ok && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
+                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NÚMERO</div>
+                <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{health.number || '—'}</div>
+                <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>{health.verified_name}</div>
+              </div>
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
+                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>QUALIDADE (META)</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: health.quality.code === 'GREEN' ? '#10b981' : health.quality.code === 'YELLOW' ? '#f59e0b' : '#ef4444' }}>
+                  {health.quality.emoji} {health.quality.label}
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>{health.quality.desc}</div>
+              </div>
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
+                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>LIMITE DE ENVIO</div>
+                <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{health.messaging_limit}</div>
+                <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>conversas iniciadas por 24h</div>
+              </div>
+              <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
+                <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NOME VERIFICADO</div>
+                <div style={{ color: 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{health.name_status}</div>
+              </div>
+            </div>
+          )}
+          <div style={{ marginTop: 12, color: '#64748b', fontSize: 12 }}>
+            💡 Quer conferir que tá tudo certo? Manda um <b style={{ color: '#94a3b8' }}>Oi</b> pro seu próprio número no WhatsApp — o bot responde na hora.
           </div>
         </div>
       )}
