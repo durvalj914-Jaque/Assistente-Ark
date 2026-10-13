@@ -276,7 +276,7 @@ function EditModal({ node, onSave, onClose }) {
               <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>
                 BOTÕES INTERATIVOS
               </label>
-              {form.buttons.filter(b => b.type === 'button').length < 3 && (
+              {form.buttons.filter(b => b.type === 'button').length < 10 && (
                 <button onClick={() => addButton('button')}
                   style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, color: '#10b981', cursor: 'pointer', fontSize: 11, padding: '5px 12px', fontWeight: 700 }}>
                   + Botão (toque)
@@ -290,7 +290,7 @@ function EditModal({ node, onSave, onClose }) {
               )}
             </div>
             <p style={{ color: '#334155', fontSize: 11, marginBottom: 10 }}>
-              Cada opção cria automaticamente um novo bloco abaixo. <b style={{ color: '#10b981' }}>Botão (toque)</b>: o cliente toca direto na mensagem (até 3, responde pelo clique). <b style={{ color: '#4f8ef7' }}>Número (digitada)</b>: aparece no menu em texto como 1️⃣ 2️⃣ 3️⃣ e o cliente digita o número.
+              Cada opção cria automaticamente um novo bloco abaixo. <b style={{ color: '#10b981' }}>Botão (toque)</b>: o cliente toca direto na mensagem — até 3 viram botões rápidos, de 4 a 10 viram uma lista expandível ("Ver opções ▾"). <b style={{ color: '#4f8ef7' }}>Número (digitada)</b>: aparece no menu em texto como 1️⃣ 2️⃣ 3️⃣ e o cliente digita o número.
             </p>
             {form.buttons.map((btn, i) => (
               <div key={btn.id || i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>

@@ -1496,7 +1496,24 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
         reply = `${reply}\n\n${menuText}`
       }
 
-      if (tapBtns.length > 0) {
+      if (tapBtns.length > 3) {
+        // Botões de toque (4-10): lista interativa expandível ("Ver opções ▾")
+        await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp', to: from, type: 'interactive',
+            interactive: {
+              type: 'list',
+              body: { text: (reply || 'Escolha uma opção:').substring(0, 1024) },
+              action: {
+                button: 'Ver opções',
+                sections: [{ title: 'Opções', rows: tapBtns.slice(0, 10).map(b => ({ id: b.id, title: String(b.label || 'Opção').slice(0, 24) })) }],
+              },
+            },
+          }),
+        })
+      } else if (tapBtns.length > 0) {
         // Mensagem interativa com botões de toque (WhatsApp aceita no máx 3)
         await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
           method: 'POST',
