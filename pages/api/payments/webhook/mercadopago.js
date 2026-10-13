@@ -110,7 +110,7 @@ export default async function handler(req, res) {
           if (payment) {
             // ── COMPRA DE CRÉDITOS: creditar e sair (não é transação de tenant) ──
             const payMeta = JSON.parse(payment.pix_qr_url || '{}')
-            if (payMeta.type !== 'credit_purchase') await trackEvent(db, { tenant_id: payment.tenant_id, event_type: 'payment_confirmed', payment_id: payment.id, value_brl: Number(payment.amount) || Number(payData.transaction_amount) || null })
+            if (!['credit_purchase', 'seasonal_flow_purchase'].includes(payMeta.type)) await trackEvent(db, { tenant_id: payment.tenant_id, event_type: 'payment_confirmed', payment_id: payment.id, value_brl: Number(payment.amount) || Number(payData.transaction_amount) || null })
             if (payMeta.type === 'credit_purchase') {
               try {
                 // Registrar a compra como paga
@@ -181,6 +181,34 @@ export default async function handler(req, res) {
                 console.error('[webhook-mp] Erro ao creditar compra de créditos:', e.message)
               }
               return res.status(200).json({ ok: true, credited: true })
+            }
+
+            // ── ADESÃO SAZONAL PAGA: PIX único confirmado → ativa a adesão ──
+            if (payMeta.type === 'seasonal_flow_purchase') {
+              try {
+                const { data: already } = await db.from('flow_subscriptions')
+                  .select('id').eq('bot_id', payMeta.bot_id).eq('seasonal_flow_id', payMeta.seasonal_flow_id).maybeSingle()
+                if (!already) {
+                  await db.from('flow_subscriptions').insert({
+                    tenant_id: payment.tenant_id, bot_id: payMeta.bot_id,
+                    seasonal_flow_id: payMeta.seasonal_flow_id,
+                    status: 'active', payment_status: 'paid',
+                  })
+                  console.log('[webhook-mp] Adesão sazonal ativada:', payMeta.flow_name, 'bot:', payMeta.bot_id)
+                }
+                try {
+                  const { sendPushToTenant } = await import('../../../../lib/webpush')
+                  await sendPushToTenant(payment.tenant_id, {
+                    title: `✅ Fluxo "${payMeta.flow_name}" ativado!`,
+                    body: 'Pagamento confirmado — seu fluxo sazonal já está disponível no editor de fluxos.',
+                    url: '/admin/flow',
+                    tag: `ark-seasonal-${payment.id}`,
+                  })
+                } catch (_) {}
+              } catch (e) {
+                console.error('[webhook-mp] Erro ao ativar adesão sazonal:', e.message)
+              }
+              return res.status(200).json({ ok: true, seasonal_activated: true })
             }
 
             // Comprovante automático

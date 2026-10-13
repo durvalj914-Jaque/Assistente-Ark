@@ -21,6 +21,7 @@ export default function FlowPage() {
   const [seasonalBusy, setSeasonalBusy] = useState(null)
   const [tenantProducts, setTenantProducts] = useState([])
   const [schedEdits, setSchedEdits] = useState({})    // { [flowId]: { start_md, end_md, featured: [ids] } }
+  const [pixInfo, setPixInfo] = useState(null)         // { flowId, amount, pix_code, pix_qr } enquanto aguarda pagamento
 
   async function loadSeasonal() {
     if (!tenant) return
@@ -61,14 +62,33 @@ export default function FlowPage() {
     setSeasonalBusy(flowId + action)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      await fetch('/api/seasonal/catalog', {
+      const r = await fetch('/api/seasonal/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({ action, bot_id: selectedBotId, seasonal_flow_id: flowId }),
       })
+      const d = await r.json().catch(() => ({}))
+      if (r.ok && d.requires_payment && d.pix_code) {
+        setPixInfo({ flowId, amount: d.amount, flow_name: d.flow_name, pix_code: d.pix_code, pix_qr: d.pix_qr, payment_id: d.payment_id })
+      } else {
+        setPixInfo(null)
+      }
+      if (!r.ok) alert(d.error || 'Erro na operação')
       await loadSeasonal()
     } catch (_) {} finally { setSeasonalBusy(null) }
   }
+
+  // Enquanto o PIX de adesão está aberto, polla o catálogo: quando o pagamento
+  // cai, o webhook do MP cria a adesão — o card reflete sozinho e o PIX fecha.
+  useEffect(() => {
+    if (!pixInfo) return
+    const t = setInterval(async () => {
+      await loadSeasonal()
+      const appeared = seasonal?.subscriptions?.some(s => s.seasonal_flow_id === pixInfo.flowId && s.bot_id === selectedBotId)
+      if (appeared) setPixInfo(null)
+    }, 5000)
+    return () => clearInterval(t)
+  }, [pixInfo?.payment_id, selectedBotId])
 
   useEffect(() => {
     if (!loading && !user) router.replace('/assistente-ark/entrar')
@@ -266,11 +286,18 @@ export default function FlowPage() {
                       })()}
                     </div>
                   ) : (
-                    <button onClick={() => seasonalAction('acquire', f.id)} disabled={seasonalBusy === f.id + 'acquire'}
-                      style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                        border: '1px solid rgba(79,142,247,0.4)', background: 'rgba(79,142,247,0.08)', color: '#4f8ef7' }}>
-                      ✨ Aderir ao fluxo{f.price > 0 ? ` (R$ ${Number(f.price).toFixed(2).replace('.', ',')})` : ''}
-                    </button>
+                    <div>
+                      {(seasonal?.subscriptions || []).length === 0 && (
+                        <div style={{ color: '#10b981', fontSize: 11, fontWeight: 700, marginBottom: 6 }}>🎁 Seu 1º fluxo sazonal é GRÁTIS</div>
+                      )}
+                      <button onClick={() => seasonalAction('acquire', f.id)} disabled={seasonalBusy === f.id + 'acquire'}
+                        style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                          border: '1px solid rgba(79,142,247,0.4)', background: 'rgba(79,142,247,0.08)', color: '#4f8ef7' }}>
+                        {seasonalBusy === f.id + 'acquire' ? '⏳ Aguarde…'
+                          : (seasonal?.subscriptions || []).length === 0 ? '✨ Aderir — incluso'
+                          : `✨ Aderir — R$ ${Number(f.price || 29.90).toFixed(2).replace('.', ',')} à vista`}
+                      </button>
+                    </div>
                   )}
                 </div>
               )
@@ -278,6 +305,23 @@ export default function FlowPage() {
           </div>
         ) : (
           <div style={{ color: '#64748b', fontSize: 13 }}>Nenhum fluxo sazonal disponível no momento.</div>
+        )}
+
+        {pixInfo && (
+          <div style={{ marginTop: 16, padding: 16, borderRadius: 12, border: '1px solid rgba(16,185,129,0.35)', background: 'rgba(16,185,129,0.05)', display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+            {pixInfo.pix_qr && <img src={pixInfo.pix_qr} alt="QR Code PIX" style={{ width: 160, height: 160, borderRadius: 8, background: '#fff' }} />}
+            <div style={{ flex: 1, minWidth: 220 }}>
+              <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>💳 Pagamento do fluxo "{pixInfo.flow_name}"</div>
+              <div style={{ color: '#10b981', fontWeight: 700, fontSize: 16, marginBottom: 8 }}>R$ {Number(pixInfo.amount).toFixed(2).replace('.', ',')} — PIX à vista</div>
+              <button onClick={() => { navigator.clipboard?.writeText(pixInfo.pix_code); alert('Código PIX copiado! Cole no app do seu banco.') }}
+                style={{ padding: '8px 14px', borderRadius: 8, border: '1px solid var(--border-soft)', background: 'var(--bg-secondary, transparent)', color: '#4f8ef7', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginBottom: 8 }}>
+                📋 Copiar código PIX
+              </button>
+              <div style={{ color: '#64748b', fontSize: 11 }}>
+                ⏳ Aguardando pagamento… assim que o PIX compensar, a adesão <b style={{ color: '#94a3b8' }}>ativa sozinha</b> (fica de olho, atualiza a cada 5s).
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
