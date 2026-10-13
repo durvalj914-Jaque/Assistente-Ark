@@ -455,7 +455,7 @@ async function processWebhook(body) {
   // Bot
   const { data: botArr, error: botErr } = await db
     .from('bots')
-    .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,flow,tenants(id,plan,status,max_messages_month,subscription,plan_expires_at)')
+    .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,persistent_message,flow,tenants(id,plan,status,max_messages_month,subscription,plan_expires_at)')
     .eq('phone_number_id', phoneNumberId)
     .eq('status', 'active')
     .limit(1)
@@ -1494,6 +1494,11 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
       if (numBtns.length > 0) {
         const menuText = numBtns.map((b, i) => `${i + 1}️⃣ ${b.label || b.title || ''}`).join('\n')
         reply = `${reply}\n\n${menuText}`
+      }
+
+      // ── Mensagem permanente do bot: rodapé de todo bloco (sem duplicar se já está no texto) ──
+      if (bot.persistent_message && String(reply || '').indexOf(bot.persistent_message) === -1) {
+        reply = `${reply}\n\n${bot.persistent_message}`
       }
 
       if (tapBtns.length > 3) {

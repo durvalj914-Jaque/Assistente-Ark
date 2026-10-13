@@ -17,6 +17,20 @@ export default function FlowPage() {
   const [saved, setSaved] = useState(false)
   const [showTutorial, setShowTutorial] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [persistentMsg, setPersistentMsg] = useState(null)   // rodapé de todo bloco
+  const [persistSaved, setPersistSaved] = useState(false)
+
+  // carrega o rodapé do bot selecionado
+  useEffect(() => {
+    const bot = bots?.find(b => b.id === selectedBotId)
+    setPersistentMsg(bot?.persistent_message || '')
+  }, [selectedBotId, bots])
+
+  async function savePersistent() {
+    if (!selectedBotId) return
+    await supabase.from('bots').update({ persistent_message: persistentMsg, updated_at: new Date().toISOString() }).eq('id', selectedBotId)
+    setPersistSaved(true); setTimeout(() => setPersistSaved(false), 2500)
+  }
   const [seasonal, setSeasonal] = useState(null)      // { catalog, subscriptions }
   const [seasonalBusy, setSeasonalBusy] = useState(null)
   const [tenantProducts, setTenantProducts] = useState([])
@@ -214,6 +228,26 @@ export default function FlowPage() {
           <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>Selecione um bot para editar o fluxo</div>
         )}
       </div>
+      {/* ── Mensagem permanente: rodapé automático em todos os blocos ── */}
+      <div className="ark-card" style={{ marginBottom: 20 }}>
+        <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>📌 Mensagem permanente</h3>
+        <p style={{ color: '#64748b', fontSize: 12, marginBottom: 12, lineHeight: 1.5 }}>
+          Aparece automaticamente no fim de <b>todo</b> bloco que o bot enviar (menu, mensagens, tudo). Ideal pro lembrete do <b>0 — voltar ao menu inicial</b>. Deixe vazio pra desativar.
+        </p>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          <textarea
+            value={persistentMsg || ''}
+            onChange={e => setPersistentMsg(e.target.value)}
+            rows={2}
+            placeholder={'Ex: Envie *0* pra voltar ao menu inicial 🏠'}
+            style={{ flex: 1, minWidth: 240, background: 'var(--bg-input)', border: '1px solid var(--border-strong)', borderRadius: 8, color: 'var(--text-primary)', padding: '10px 12px', fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'Inter, sans-serif' }}
+          />
+          <button onClick={savePersistent} className="ark-btn" style={{ whiteSpace: 'nowrap' }}>
+            {persistSaved ? '✅ Salvo!' : '💾 Salvar'}
+          </button>
+        </div>
+      </div>
+
       {/* ── Fluxos Sazonais: adesão por data comemorativa, ativação automática ── */}
       <div className="ark-card" style={{ marginTop: 24 }}>
         <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🗓️ Fluxos Sazonais {selectedBotId ? `· ${bots.find(b => b.id === selectedBotId)?.name}` : ''}</h3>
