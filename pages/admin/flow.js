@@ -123,6 +123,7 @@ export default function FlowPage() {
     }
   }
 
+  const meses = { 1: 'Jan', 2: 'Fev', 3: 'Mar', 4: 'Abr', 5: 'Mai', 6: 'Jun', 7: 'Jul', 8: 'Ago', 9: 'Set', 10: 'Out', 11: 'Nov', 12: 'Dez' }
   const mdToBR = (md) => { if (!md) return ''; const [m, d] = md.split('-'); return `${d}/${m}` }
   const brToMd = (br) => {
     const m = (br || '').match(/^(\d{1,2})\/(\d{1,2})$/)
