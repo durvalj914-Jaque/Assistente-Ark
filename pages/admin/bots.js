@@ -219,7 +219,6 @@ export default function BotsPage() {
   const [bots, setBots] = useState([])
   const [editingBot, setEditingBot] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState(null)
   const [deleteConfirm, setDeleteConfirm] = useState(null)  // bot object being confirmed for deletion
   const [deleteError, setDeleteError] = useState(null)
@@ -230,19 +229,6 @@ export default function BotsPage() {
   const plan = PLANS[tenant?.plan] || PLANS.free
   const canCreateBot = bots.length < plan.max_bots
 
-  async function handleCreate() {
-    if (!canCreateBot) return
-    setCreating(true)
-    const { data } = await supabase.from('bots')
-      .insert({ tenant_id: tenant.id, name: 'Novo Bot' })
-      .select('id, tenant_id, name, status, phone_number_id, waba_id, greeting, fallback_message, human_takeover_keyword, flow, total_messages, active_sessions, created_at, updated_at, human_takeover_timeout').single()
-    if (data) {
-      setBots(prev => [...prev, data])
-      setEditingBot(data)
-      setShowModal(true)
-    }
-    setCreating(false)
-  }
 
   async function handleSave(form) {
     const { data, error } = await supabase.from('bots')
@@ -321,10 +307,6 @@ export default function BotsPage() {
               {bots.length} / {plan.max_bots === 999 ? '∞' : plan.max_bots} bots no plano {plan.label}
             </p>
           </div>
-          <button onClick={handleCreate} className="ark-btn" disabled={creating || !canCreateBot}
-            title={!canCreateBot ? `Limite do plano ${plan.label} atingido` : ''}>
-            {creating ? 'Criando…' : '+ Novo Bot'}
-          </button>
         </div>
 
         {!canCreateBot && (
@@ -338,8 +320,8 @@ export default function BotsPage() {
           <div className="ark-card" style={{ textAlign: 'center', padding: '60px 40px' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
             <h3 style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: 8 }}>Nenhum bot ainda</h3>
-            <p style={{ color: '#475569', fontSize: 14, marginBottom: 24 }}>Crie seu primeiro bot e comece a automatizar o WhatsApp</p>
-            <button onClick={handleCreate} className="ark-btn" disabled={creating}>+ Criar primeiro bot</button>
+            <p style={{ color: '#475569', fontSize: 14, marginBottom: 24 }}>Cada bot nasce junto com um número de WhatsApp. Conecte o seu e o bot aparece aqui automaticamente.</p>
+            <button onClick={() => router.push('/admin/whatsapp-setup')} className="ark-btn">📲 Conectar número de WhatsApp</button>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
