@@ -217,6 +217,34 @@ async function sendText(phoneId, token, to, text) {
   return data
 }
 
+// ── Fluxo sazonal: assinatura ativa dentro da janela de datas substitui o fluxo padrão ──
+// O cliente adere ao fluxo (aba Fluxos Sazonais); ele liga sozinho no período
+// (ex: Dia das Mães) e volta ao fluxo normal depois, sem ninguém tocar.
+async function applySeasonalFlow(db, bot) {
+  try {
+    const { data: subs } = await db.from('flow_subscriptions')
+      .select('seasonal_flows(id, name, start_md, end_md, flow, is_active)')
+      .eq('bot_id', bot.id)
+      .eq('status', 'active')
+      .limit(10)
+    if (!subs?.length) return
+    const today = new Date()
+    const md = String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0')
+    for (const s of subs) {
+      const f = s.seasonal_flows
+      if (!f?.is_active || !f?.flow?.nodes?.length) continue
+      const inWindow = f.start_md <= f.end_md
+        ? (md >= f.start_md && md <= f.end_md)
+        : (md >= f.start_md || md <= f.end_md) // janela que cruza o ano (ex: Natal → Rei)
+      if (inWindow) {
+        bot.flow = f.flow
+        await savelog(db, 'seasonal_flow_active', null, { flow: f.name })
+        return
+      }
+    }
+  } catch (_) {}
+}
+
 async function processWebhook(body) {
   const db     = getDB()
   const change = body?.entry?.[0]?.changes?.[0]?.value
@@ -430,6 +458,7 @@ async function processWebhook(body) {
   const bot = botArr[0]
   if (bot.tenants?.status !== 'active') { await savelog(db, 'tenant_inactive', bot.tenants?.status); return }
   await savelog(db, 'bot_found', null, { bot_id: bot.id })
+  await applySeasonalFlow(db, bot)
 
   const tenantId = bot.tenant_id
   const tkn      = bot.access_token || WA_TOKEN
