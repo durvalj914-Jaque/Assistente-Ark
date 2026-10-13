@@ -223,7 +223,9 @@ export default function FlowPage() {
 
       <div className="ark-card" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {flow ? (
-          <FlowEditor flow={flow} onChange={setFlow} />
+          <FlowEditor
+        persistentMessage={persistentMsg || ''}
+        flow={flow} onChange={setFlow} />
         ) : (
           <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>Selecione um bot para editar o fluxo</div>
         )}

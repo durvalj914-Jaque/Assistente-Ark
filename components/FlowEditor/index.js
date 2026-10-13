@@ -44,7 +44,7 @@ class FlowErrorBoundary extends Component {
 }
 
 // ─── Card de um bloco ───
-function BlockCard({ node, onEdit, onDelete, isRoot, depth }) {
+function BlockCard({ node, onEdit, onDelete, isRoot, depth, persistent }) {
   const [hovered, setHovered] = useState(false)
   const buttons = node.buttons || []
   const action = BLOCK_ACTIONS[node.action] || BLOCK_ACTIONS.none
@@ -107,6 +107,16 @@ function BlockCard({ node, onEdit, onDelete, isRoot, depth }) {
           </div>
         )}
 
+        {/* Rodapé permanente (preview de onde a mensagem aparece) */}
+        {persistent && !String(node.text || '').includes(persistent) && (
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: '1px dashed rgba(148,163,184,0.25)' }}>
+            <div style={{ fontSize: 9, color: '#64748b', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 3 }}>📌 Rodapé automático</div>
+            <div style={{ fontSize: 10.5, color: '#94a3b8', fontStyle: 'italic', lineHeight: 1.4, wordBreak: 'break-word' }}>
+              {persistent.length > 90 ? persistent.substring(0, 90) + '…' : persistent}
+            </div>
+          </div>
+        )}
+
         {/* Delete */}
         {!isRoot && (
           <button
@@ -127,7 +137,7 @@ function BlockCard({ node, onEdit, onDelete, isRoot, depth }) {
 }
 
 // ─── Renderização recursiva ───
-function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited }) {
+function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited, persistent }) {
   if (!nodeIds?.length) return null
   if (depth > MAX_DEPTH) {
     return <div style={{ fontSize: 11, color: '#f59e0b', padding: 8 }}>⚠️ Profundidade máxima atingida</div>
@@ -147,7 +157,7 @@ function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited }) {
         return (
           <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {depth > 0 && <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />}
-            <BlockCard node={node} isRoot={depth === 0 && idx === 0} onEdit={onEdit} onDelete={onDelete} depth={depth} />
+            <BlockCard node={node} isRoot={depth === 0 && idx === 0} onEdit={onEdit} onDelete={onDelete} depth={depth} persistent={persistent} />
             {node.children?.length > 0 && (
               <>
                 <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />
@@ -161,6 +171,7 @@ function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited }) {
                   onDelete={onDelete}
                   depth={depth + 1}
                   visited={childVisited}
+                  persistent={persistent}
                 />
               </>
             )}
@@ -334,7 +345,7 @@ function EditModal({ node, onSave, onClose }) {
 }
 
 // ─── FlowEditor principal ───
-export default function FlowEditor({ flow, onChange }) {
+export default function FlowEditor({ flow, onChange, persistentMessage }) {
   const [editing, setEditing] = useState(null)
   const [renderKey, setRenderKey] = useState(0)
   const nodes = flow?.nodes || []
@@ -481,6 +492,7 @@ export default function FlowEditor({ flow, onChange }) {
             onDelete={deleteNode}
             depth={0}
             visited={new Set()}
+            persistent={persistentMessage}
           />
         </div>
       </div>
