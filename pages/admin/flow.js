@@ -19,6 +19,8 @@ export default function FlowPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [seasonal, setSeasonal] = useState(null)      // { catalog, subscriptions }
   const [seasonalBusy, setSeasonalBusy] = useState(null)
+  const [tenantProducts, setTenantProducts] = useState([])
+  const [schedEdits, setSchedEdits] = useState({})    // { [flowId]: { start_md, end_md, featured: [ids] } }
 
   async function loadSeasonal() {
     if (!tenant) return
@@ -30,6 +32,28 @@ export default function FlowPage() {
       const d = await r.json()
       if (r.ok) setSeasonal(d)
     } catch (_) {}
+  }
+
+  function editSched(flowId, patch) {
+    setSchedEdits(prev => {
+      const cur = prev[flowId] || initSched(flowId)
+      return { ...prev, [flowId]: { ...cur, ...patch } }
+    })
+  }
+
+  async function saveSched(flowId) {
+    const ed = schedEdits[flowId] || initSched(flowId)
+    setSeasonalBusy(flowId + 'update')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const r = await fetch('/api/seasonal/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ action: 'update', bot_id: selectedBotId, seasonal_flow_id: flowId, custom_start_md: ed.start_md, custom_end_md: ed.end_md, featured_product_ids: ed.featured }),
+      })
+      if (!r.ok) { const d = await r.json(); alert(d.error || 'Erro ao salvar') }
+      else await loadSeasonal()
+    } catch (_) {} finally { setSeasonalBusy(null) }
   }
 
   async function seasonalAction(action, flowId) {
@@ -53,6 +77,10 @@ export default function FlowPage() {
   useEffect(() => {
     if (bots.length && !selectedBotId) setSelectedBotId(bots[0].id)
     loadSeasonal()
+    if (tenant) {
+      supabase.from('products').select('id,name,is_active').eq('tenant_id', tenant.id).eq('is_active', true).limit(30)
+        .then(({ data }) => setTenantProducts(data || []))
+    }
   }, [bots])
 
   useEffect(() => {
@@ -83,6 +111,24 @@ export default function FlowPage() {
   }
 
   if (loading || !user || !tenant) return null
+
+  // estado inicial de edição da agenda de um fluxo (usa o que a adesão já tem)
+  function initSched(flowId) {
+    const f = seasonal?.catalog?.find(c => c.id === flowId)
+    const sub = seasonal?.subscriptions?.find(x => x.seasonal_flow_id === flowId && x.bot_id === selectedBotId)
+    return {
+      start_md: (schedEdits[flowId]?.start_md) || sub?.custom_start_md || f?.start_md || '',
+      end_md: (schedEdits[flowId]?.end_md) || sub?.custom_end_md || f?.end_md || '',
+      featured: (schedEdits[flowId]?.featured) || sub?.featured_product_ids || [],
+    }
+  }
+
+  const mdToBR = (md) => { if (!md) return ''; const [m, d] = md.split('-'); return `${d}/${m}` }
+  const brToMd = (br) => {
+    const m = (br || '').match(/^(\d{1,2})\/(\d{1,2})$/)
+    if (!m) return ''
+    return String(Number(m[2])).padStart(2, '0') + '-' + String(Number(m[1])).padStart(2, '0')
+  }
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
@@ -166,13 +212,58 @@ export default function FlowPage() {
                   <div style={{ color: '#64748b', fontSize: 11 }}>🗓️ Ativa de {mdLabel(f.start_md)} a {mdLabel(f.end_md)}</div>
                   <div style={{ color: '#94a3b8', fontSize: 12, flex: 1 }}>{f.description}</div>
                   {sub ? (
-                    <button onClick={() => seasonalAction('toggle', f.id)} disabled={seasonalBusy === f.id + 'toggle'}
-                      style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                        border: active ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(16,185,129,0.4)',
-                        background: active ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.08)',
-                        color: active ? '#ef4444' : '#10b981' }}>
-                      {active ? '⏸️ Desativar adesão' : '▶️ Ativar adesão'}
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(() => {
+                        const ed = schedEdits[f.id] || initSched(f.id)
+                        const toggleFeat = (pid) => editSched(f.id, { featured: ed.featured.includes(pid) ? ed.featured.filter(x => x !== pid) : [...ed.featured, pid] })
+                        return (
+                          <>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <span style={{ color: '#64748b', fontSize: 11, fontWeight: 700 }}>🗓️ ATIVA DE</span>
+                              <input value={mdToBR(ed.start_md)} onChange={e => editSched(f.id, { start_md: brToMd(e.target.value) })}
+                                placeholder="08/10" style={{ width: 64, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
+                              <span style={{ color: '#64748b', fontSize: 11, fontWeight: 700 }}>ATÉ</span>
+                              <input value={mdToBR(ed.end_md)} onChange={e => editSched(f.id, { end_md: brToMd(e.target.value) })}
+                                placeholder="13/10" style={{ width: 64, padding: '5px 6px', borderRadius: 6, border: '1px solid var(--border-soft)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 12, textAlign: 'center' }} />
+                              <span style={{ color: '#334155', fontSize: 10 }}>(dd/mm — todo ano)</span>
+                            </div>
+                            {tenantProducts.length > 0 && (
+                              <div>
+                                <span style={{ color: '#64748b', fontSize: 11, fontWeight: 700 }}>🌟 PRODUTOS EM DESTAQUE NO TOPO DO CATÁLOGO</span>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                                  {tenantProducts.map(pr => {
+                                    const on = ed.featured.includes(pr.id)
+                                    return (
+                                      <button key={pr.id} onClick={() => toggleFeat(pr.id)} type="button"
+                                        style={{ padding: '4px 10px', borderRadius: 999, fontSize: 11, cursor: 'pointer',
+                                          border: `1px solid ${on ? 'rgba(251,191,36,0.5)' : 'var(--border-soft)'}`,
+                                          background: on ? 'rgba(251,191,36,0.12)' : 'transparent',
+                                          color: on ? '#fbbf24' : '#94a3b8', fontWeight: on ? 700 : 400 }}>
+                                        {on ? '★ ' : ''}{pr.name}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                              <button onClick={() => saveSched(f.id)} disabled={seasonalBusy === f.id + 'update'}
+                                style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                                  border: '1px solid rgba(79,142,247,0.4)', background: 'rgba(79,142,247,0.08)', color: '#4f8ef7' }}>
+                                💾 Salvar agenda
+                              </button>
+                              <button onClick={() => seasonalAction('toggle', f.id)} disabled={seasonalBusy === f.id + 'toggle'}
+                                style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                                  border: active ? '1px solid rgba(239,68,68,0.3)' : '1px solid rgba(16,185,129,0.4)',
+                                  background: active ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.08)',
+                                  color: active ? '#ef4444' : '#10b981' }}>
+                                {active ? '⏸️ Desativar adesão' : '▶️ Ativar adesão'}
+                              </button>
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
                   ) : (
                     <button onClick={() => seasonalAction('acquire', f.id)} disabled={seasonalBusy === f.id + 'acquire'}
                       style={{ padding: '8px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,

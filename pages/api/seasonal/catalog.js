@@ -12,6 +12,8 @@ function getDB() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 }
 
+const MD_RE = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/
+
 export default async function handler(req, res) {
   const auth = await requireTenant(req, res)
   if (!auth) return
@@ -24,7 +26,7 @@ export default async function handler(req, res) {
       .eq('is_active', true)
       .order('start_md')
     const { data: subs } = await db.from('flow_subscriptions')
-      .select('id,bot_id,seasonal_flow_id,status,purchased_at')
+      .select('id,bot_id,seasonal_flow_id,status,purchased_at,custom_start_md,custom_end_md,featured_product_ids')
       .eq('tenant_id', auth.tenant_id)
     return res.json({ ok: true, catalog: catalog || [], subscriptions: subs || [] })
   }
@@ -47,6 +49,34 @@ export default async function handler(req, res) {
     })
     if (insErr) return res.status(500).json({ error: insErr.message })
     return res.json({ ok: true, status: 'active' })
+  }
+
+  if (action === 'update') {
+    const { custom_start_md, custom_end_md, featured_product_ids } = req.body || {}
+    const patch = {}
+    if (custom_start_md !== undefined) {
+      if (custom_start_md && !MD_RE.test(custom_start_md)) return res.status(400).json({ error: 'start deve ser MM-DD (ex: 10-08)' })
+      patch.custom_start_md = custom_start_md || null
+    }
+    if (custom_end_md !== undefined) {
+      if (custom_end_md && !MD_RE.test(custom_end_md)) return res.status(400).json({ error: 'end deve ser MM-DD (ex: 10-13)' })
+      patch.custom_end_md = custom_end_md || null
+    }
+    if (Array.isArray(featured_product_ids)) {
+      const ids = featured_product_ids.filter(Boolean)
+      if (ids.length) {
+        const { data: owned } = await db.from('products').select('id').eq('tenant_id', tenantId).in('id', ids)
+        if (owned?.length !== ids.length) return res.status(403).json({ error: 'Produto não pertence ao seu tenant' })
+      }
+      patch.featured_product_ids = ids
+    }
+    const { data: sub } = await db.from('flow_subscriptions')
+      .select('id').eq('bot_id', bot_id).eq('seasonal_flow_id', seasonal_flow_id)
+      .eq('tenant_id', tenantId).maybeSingle()
+    if (!sub) return res.status(404).json({ error: 'Adesão não encontrada' })
+    const { error: updErr } = await db.from('flow_subscriptions').update(patch).eq('id', sub.id)
+    if (updErr) return res.status(500).json({ error: updErr.message })
+    return res.json({ ok: true, updated: patch })
   }
 
   if (action === 'toggle') {

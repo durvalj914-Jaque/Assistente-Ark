@@ -223,7 +223,7 @@ async function sendText(phoneId, token, to, text) {
 async function applySeasonalFlow(db, bot) {
   try {
     const { data: subs } = await db.from('flow_subscriptions')
-      .select('seasonal_flows(id, name, start_md, end_md, flow, is_active)')
+      .select('seasonal_flows(id, name, start_md, end_md, flow, is_active), custom_start_md, custom_end_md, featured_product_ids')
       .eq('bot_id', bot.id)
       .eq('status', 'active')
       .limit(10)
@@ -233,12 +233,18 @@ async function applySeasonalFlow(db, bot) {
     for (const s of subs) {
       const f = s.seasonal_flows
       if (!f?.is_active || !f?.flow?.nodes?.length) continue
-      const inWindow = f.start_md <= f.end_md
-        ? (md >= f.start_md && md <= f.end_md)
-        : (md >= f.start_md || md <= f.end_md) // janela que cruza o ano (ex: Natal → Rei)
+      // Agenda própria da adesão (programável pelo B2B) sobrescreve a janela padrão do catálogo
+      const startMd = s.custom_start_md || f.start_md
+      const endMd = s.custom_end_md || f.end_md
+      const inWindow = startMd <= endMd
+        ? (md >= startMd && md <= endMd)
+        : (md >= startMd || md <= endMd) // janela que cruza o ano (ex: Natal → Reis)
       if (inWindow) {
         bot.flow = f.flow
-        await savelog(db, 'seasonal_flow_active', null, { flow: f.name })
+        // Produtos em destaque do evento sobem pro topo do catálogo enquanto o fluxo está ativo
+        bot._seasonalFeaturedIds = Array.isArray(s.featured_product_ids) && s.featured_product_ids.length
+          ? s.featured_product_ids : null
+        await savelog(db, 'seasonal_flow_active', null, { flow: f.name, janela: `${startMd}→${endMd}` })
         return
       }
     }
@@ -1361,15 +1367,22 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
       let q = db.from('products').select('*').eq('tenant_id', tenantId).eq('is_active', true)
       if (result.category) q = q.eq('category', result.category)
       const { data: catalogProducts } = await q.order('created_at', { ascending: false }).limit(30)
+      // Destaque sazonal: produtos marcados na adesão do fluxo ativo vêm primeiro
+      let orderedProducts = catalogProducts
+      if (bot._seasonalFeaturedIds?.length && catalogProducts?.length) {
+        const feat = bot._seasonalFeaturedIds.map(id => catalogProducts.find(p => p.id === id)).filter(Boolean)
+        const rest = catalogProducts.filter(p => !feat.includes(p))
+        orderedProducts = [...feat, ...rest]
+      }
 
-      if (catalogProducts?.length) {
+      if (orderedProducts?.length) {
         await sendProductList({
           phoneNumberId, token: tkn, to: from,
           headerText: bot.name || 'Catálogo',
           bodyText: reply || 'Dá uma olhada nos nossos produtos 👇',
-          products: catalogProducts, tenantId,
+          products: orderedProducts, tenantId,
         })
-        reply = `[catálogo enviado — ${catalogProducts.length} produto(s)]`
+        reply = `[catálogo enviado — ${orderedProducts.length} produto(s)]`
       } else {
         await sendText(phoneNumberId, tkn, from, reply || 'No momento não temos produtos disponíveis no catálogo. Digite *0* para voltar ao menu.')
       }
