@@ -4,10 +4,11 @@
  * a Arkiel adiciona esse número na WABA compartilhada (usando o token
  * permanente de Usuário do Sistema, que nunca sai do servidor) e pede um
  * código de verificação por SMS pro próprio número do cliente.
- * Body: { bot_id, cc, phone_number, verified_name }
+ * Body: { cc, phone_number, verified_name, bot_id? } — sem bot_id, um bot novo é criado junto com o número (1 número = 1 bot)
  * Header: Authorization: Bearer <supabase_session_token>
  */
 import { supabaseAdmin } from '../../../lib/supabase'
+import { checkLimit, PLANS } from '../../../lib/plans'
 import { addPhoneNumberToWaba, requestVerificationCode, listWabaPhoneNumbers } from '../../../lib/meta'
 
 const SHARED_WABA_ID = process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798'
@@ -16,8 +17,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { bot_id, cc, phone_number, verified_name } = req.body || {}
-  if (!bot_id || !cc || !phone_number || !verified_name) {
-    return res.status(400).json({ error: 'bot_id, cc, phone_number e verified_name são obrigatórios' })
+  if (!cc || !phone_number || !verified_name) {
+    return res.status(400).json({ error: 'cc, phone_number e verified_name são obrigatórios' })
   }
 
   const authHeader = req.headers.authorization || ''
@@ -27,8 +28,29 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await db.auth.getUser(userToken)
   if (authError || !user) return res.status(401).json({ error: 'Não autorizado' })
 
-  const { data: bot, error: botErr } = await db.from('bots').select('id, tenant_id').eq('id', bot_id).single()
-  if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado' })
+  let bot, botErr = null
+  if (bot_id) {
+    const r = await db.from('bots').select('id, tenant_id, phone_number_id').eq('id', bot_id).single()
+    bot = r.data; botErr = r.error
+    if (bot?.phone_number_id) return res.status(400).json({ error: 'Esse bot já tem um número conectado' })
+  } else {
+    // 1 número = 1 bot: sem vaga, cria o bot junto com o número (respeitando o plano)
+    const { data: tm } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).limit(1)
+    if (!tm?.length) return res.status(403).json({ error: 'Acesso negado' })
+    const tid = tm[0].tenant_id
+    const { data: tenant } = await db.from('tenants').select('id, plan, subscription').eq('id', tid).single()
+    const { count } = await db.from('bots').select('id', { count: 'exact', head: true }).eq('tenant_id', tid)
+    if (!checkLimit(tenant, null, count || 0, 'bots')) {
+      const plan = PLANS[tenant?.plan] || PLANS.free
+      return res.status(403).json({ error: `Seu plano permite ${plan.max_bots > 900 ? 'números ilimitados' : plan.max_bots + ' número(s)'}. Faça upgrade pra conectar mais.`, upsell: true })
+    }
+    const cr = await db.from('bots').insert({
+      tenant_id: tid,
+      name: (verified_name || '').slice(0, 60) || `WhatsApp ${phone_number}`,
+    }).select('id, tenant_id').single()
+    bot = cr.data; botErr = cr.error
+  }
+  if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado ou não pôde ser criado' })
 
   const { data: member } = await db
     .from('tenant_members').select('role')

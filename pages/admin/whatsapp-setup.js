@@ -21,7 +21,6 @@ export default function WhatsappSetupPage() {
   const [savedAt, setSavedAt] = useState(null)
   const [disconnectingId, setDisconnectingId] = useState(null)
   const [disconnectResults, setDisconnectResults] = useState({})
-  const [creatingBot, setCreatingBot] = useState(false)
 
   useEffect(() => { if (!loading && !user) router.replace('/assistente-ark/entrar') }, [user, loading])
 
@@ -38,9 +37,10 @@ export default function WhatsappSetupPage() {
   // ── Multi-número: cada bot é um número de WhatsApp com seu próprio fluxo ──
   const allBots = bots || []
   const connectedBots = allBots.filter(b => b.status === 'active' && b.phone_number_id)
-  const freeBot = allBots.find(b => !b.phone_number_id)
   const plan = PLANS[tenant?.plan] || PLANS.free
-  const canCreateBot = allBots.length < plan.max_bots
+  const subLimits = (() => { try { const sub = JSON.parse(tenant?.subscription || '{}'); return sub?.status === 'active' ? (sub.limits || {}) : {} } catch (_) { return {} } })()
+  const maxNumbers = subLimits.max_bots || plan.max_bots
+  const canAddNumber = connectedBots.length < maxNumbers
 
   async function submitRequest(e) {
     e.preventDefault()
@@ -107,15 +107,6 @@ export default function WhatsappSetupPage() {
   }
 
   // Cria um novo bot (vaga de número) dentro do limite do plano
-  async function createBotSlot() {
-    if (!canCreateBot) return
-    setCreatingBot(true)
-    const { error: insErr } = await supabase.from('bots')
-      .insert({ tenant_id: tenant.id, name: `Bot ${allBots.length + 1}` })
-    if (!insErr) window.location.reload()
-    else setError(insErr.message)
-    setCreatingBot(false)
-  }
 
   if (loading || !user || !tenant || checkingRequest) return null
 
@@ -131,7 +122,7 @@ export default function WhatsappSetupPage() {
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
       <h1 style={{ color: 'var(--text-primary)', fontWeight: 800, fontSize: 20, marginBottom: 8 }}>📱 Conectar WhatsApp</h1>
       <p style={{ color: '#64748b', fontSize: 13, marginBottom: 24, maxWidth: 640 }}>
-        Cada número de WhatsApp é um bot com seu próprio fluxo de atendimento. Você pode conectar mais de um número — o limite do seu plano é <b style={{ color: '#4f8ef7' }}>{plan.max_bots > 900 ? 'ilimitado' : plan.max_bots}</b>.
+        Cada número de WhatsApp é um bot com seu próprio fluxo de atendimento. Você pode conectar mais de um número — o limite do seu plano é <b style={{ color: '#4f8ef7' }}>{maxNumbers > 900 ? 'ilimitado' : maxNumbers}</b>.
       </p>
 
       <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(251,191,36,0.35)', background: 'rgba(251,191,36,0.05)' }}>
@@ -208,37 +199,26 @@ export default function WhatsappSetupPage() {
       <MigrationWizard activeBot={connectedBots[0]} tenantId={tenant?.id}
         step2={<>
 
-      {/* ── Conectar novo número: usa a vaga livre ou cria uma nova ── */}
-      {freeBot && (
+      {/* ── Conectar novo número: o bot nasce junto com o número (1 número = 1 bot) ── */}
+      {canAddNumber && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(16,185,129,0.35)' }}>
-          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conexão automática do número do bot "{freeBot.name}" (recomendado — sem precisar de Facebook)<SectionHelp t='whatsapp-setup' s='automatica' /></h3>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Digite o número, confirme o código que chega por SMS, e pronto — o bot fica ativo na hora, sem precisar de conta Facebook.</p>
-          <WhatsAppSmsConnect botId={freeBot.id} businessName={tenant?.name} onConnected={() => window.location.reload()} />
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>⚡ Conectar novo número (recomendado — sem precisar de Facebook)<SectionHelp t='whatsapp-setup' s='automatica' /></h3>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Digite o número, confirme o código que chega por SMS, e pronto — o bot é criado automaticamente junto com o número e fica ativo na hora.</p>
+          <WhatsAppSmsConnect botId={null} businessName={tenant?.name} onConnected={() => window.location.reload()} />
         </div>
       )}
 
-      {freeBot && (
+      {canAddNumber && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.25)' }}>
           <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📶 Prefere logar com o Facebook?<SectionHelp t='whatsapp-setup' s='facebook' /></h3>
-          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Se você já tem uma conta WhatsApp Business própria no Facebook, pode conectar direto por lá.</p>
-          <WhatsAppEmbeddedSignup botId={freeBot.id} onConnected={() => window.location.reload()} />
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Se você já tem uma conta WhatsApp Business própria no Facebook, pode conectar direto por lá — o bot é criado junto com o número.</p>
+          <WhatsAppEmbeddedSignup botId={null} onConnected={() => window.location.reload()} />
         </div>
       )}
 
-      {/* Sem vaga livre: cria um novo bot (dentro do plano) ou faz upgrade */}
-      {!freeBot && canCreateBot && (
-        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(79,142,247,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 4 }}>➕ Conectar outro número</div>
-            <div style={{ color: '#94a3b8', fontSize: 13 }}>Cada número é um bot com fluxo próprio. Crie uma nova vaga e conecte em seguida.</div>
-          </div>
-          <button onClick={createBotSlot} disabled={creatingBot} className="ark-btn">{creatingBot ? '⏳ Criando…' : '+ Adicionar número'}</button>
-        </div>
-      )}
-
-      {!freeBot && !canCreateBot && (
+      {!canAddNumber && (
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(245,158,11,0.35)' }}>
-          <div style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🔒 Seu plano permite {plan.max_bots > 900 ? 'números ilimitados' : `${plan.max_bots} ${plan.max_bots > 1 ? 'números' : 'número'}`}</div>
+          <div style={{ color: '#f59e0b', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🔒 Seu plano permite {maxNumbers > 900 ? 'números ilimitados' : `${maxNumbers} ${maxNumbers > 1 ? 'números' : 'número'}`}</div>
           <div style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>
             Você já tem {connectedBots.length} {connectedBots.length === 1 ? 'número conectado' : 'números conectados'}. Pra adicionar mais, faça upgrade do plano.
           </div>

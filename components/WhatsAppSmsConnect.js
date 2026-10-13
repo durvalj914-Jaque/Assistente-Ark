@@ -29,7 +29,7 @@ export default function WhatsAppSmsConnect({ botId, businessName, onConnected })
     try {
       const res = await fetch('/api/whatsapp/add-number', {
         method: 'POST', headers: await authHeader(),
-        body: JSON.stringify({ bot_id: botId, cc, phone_number: phone.replace(/\D/g, ''), verified_name: verifiedName })
+        body: JSON.stringify({ ...(botId ? { bot_id: botId } : {}), cc, phone_number: phone.replace(/\D/g, ''), verified_name: verifiedName })
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Falha ao adicionar o número')

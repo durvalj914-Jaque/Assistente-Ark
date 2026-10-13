@@ -17,8 +17,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
   const { bot_id, code, waba_id, phone_number_id } = req.body || {}
-  if (!bot_id || !code || !waba_id || !phone_number_id) {
-    return res.status(400).json({ error: 'bot_id, code, waba_id e phone_number_id são obrigatórios' })
+  if (!code || !waba_id || !phone_number_id) {
+    return res.status(400).json({ error: 'code, waba_id e phone_number_id são obrigatórios' })
   }
 
   const authHeader = req.headers.authorization || ''
@@ -28,8 +28,18 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await db.auth.getUser(userToken)
   if (authError || !user) return res.status(401).json({ error: 'Não autorizado' })
 
-  const { data: bot, error: botErr } = await db.from('bots').select('id, tenant_id').eq('id', bot_id).single()
-  if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado' })
+  let bot, botErr = null
+  if (bot_id) {
+    const r = await db.from('bots').select('id, tenant_id').eq('id', bot_id).single()
+    bot = r.data; botErr = r.error
+  } else {
+    // 1 número = 1 bot: cria o bot junto com o número
+    const { data: tm } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).limit(1)
+    if (!tm?.length) return res.status(403).json({ error: 'Acesso negado' })
+    const cr = await db.from('bots').insert({ tenant_id: tm[0].tenant_id, name: 'WhatsApp via Facebook' }).select('id, tenant_id').single()
+    bot = cr.data; botErr = cr.error
+  }
+  if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado ou não pôde ser criado' })
 
   const { data: member } = await db
     .from('tenant_members').select('role')
