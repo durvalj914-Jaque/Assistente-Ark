@@ -29,6 +29,7 @@ const NAME_STATUS = {
   PENDING: '⏳ Nome em revisão',
   NONE: 'Sem nome verificado',
   REJECTED: '❌ Nome rejeitado — fale com o suporte',
+  DECLINED: '⚠️ Nome recusado pela Meta — o número segue funcionando; fale com o suporte pra reabrir',
 }
 
 export default async function handler(req, res) {
