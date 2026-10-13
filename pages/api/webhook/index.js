@@ -1485,16 +1485,34 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
       await schedSendServiceMenu()
       reply = '[agendamento iniciado]'
     } else {
-      // ── Menu numerado em texto plano ──
+      // ── Menu numerado em texto plano + botões interativos de toque ──
       const targetNode = result.node
-      const buttons = targetNode ? getNodeButtons(targetNode) : []
+      const allBtns = targetNode?.buttons || []
+      const numBtns = allBtns.filter(b => b.type !== 'button')   // opções numeradas (digitadas)
+      const tapBtns = allBtns.filter(b => b.type === 'button')    // botões de toque (interativos)
 
-      if (buttons.length > 0) {
-        // Monta menu numerado: texto do nó + opções numeradas
-        const menuText = buttons.map((b, i) => `${i + 1}️⃣ ${b.label || b.title || ''}`).join('\n')
+      if (numBtns.length > 0) {
+        const menuText = numBtns.map((b, i) => `${i + 1}️⃣ ${b.label || b.title || ''}`).join('\n')
         reply = `${reply}\n\n${menuText}`
       }
-      await sendText(phoneNumberId, tkn, from, reply)
+
+      if (tapBtns.length > 0) {
+        // Mensagem interativa com botões de toque (WhatsApp aceita no máx 3)
+        await fetch(`https://graph.facebook.com/v25.0/${phoneNumberId}/messages`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tkn}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp', to: from, type: 'interactive',
+            interactive: {
+              type: 'button',
+              body: { text: (reply || 'Escolha uma opção:').substring(0, 1024) },
+              action: { buttons: tapBtns.slice(0, 3).map(b => ({ type: 'reply', reply: { id: b.id, title: String(b.label || 'Opção').slice(0, 20) } })) },
+            },
+          }),
+        })
+      } else {
+        await sendText(phoneNumberId, tkn, from, reply)
+      }
     }
     await savelog(db, 'send_ok', null, { to: from })
   } catch(e) {

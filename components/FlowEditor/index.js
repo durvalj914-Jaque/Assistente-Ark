@@ -8,7 +8,6 @@ const BLOCK_ACTIONS = {
   catalog:   { label: 'Mostrar catálogo',    icon: '📦' },
   payment:   { label: 'Cobrar pagamento',     icon: '💰' },
   scheduling:{ label: 'Agendar serviço',        icon: '📅' },
-  end:       { label: 'Encerrar conversa',   icon: '🔚' },
 }
 
 // Guarda de profundidade
@@ -183,9 +182,16 @@ function EditModal({ node, onSave, onClose }) {
     payMethod: node.payMethod || 'pix',
   })
 
-  function addButton() {
-    const newBtn = { id: uuidv4(), label: '' }
+  function addButton(type) {
+    const newBtn = { id: uuidv4(), label: '', type: type || 'number' }
     setForm(f => ({ ...f, buttons: [...f.buttons, newBtn] }))
+  }
+
+  // número de exibição de uma opção numerada (posição entre as numeradas)
+  function numOf(idx) {
+    let n = 0
+    for (let i = 0; i <= idx; i++) if (form.buttons[i].type !== 'button') n++
+    return n
   }
 
   function updateButton(i, label) {
@@ -270,25 +276,31 @@ function EditModal({ node, onSave, onClose }) {
               <label style={{ color: '#64748b', fontSize: 11, fontWeight: 700, letterSpacing: 1 }}>
                 BOTÕES INTERATIVOS
               </label>
+              {form.buttons.filter(b => b.type === 'button').length < 3 && (
+                <button onClick={() => addButton('button')}
+                  style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 6, color: '#10b981', cursor: 'pointer', fontSize: 11, padding: '5px 12px', fontWeight: 700 }}>
+                  + Botão (toque)
+                </button>
+              )}
               {form.buttons.length < 10 && (
-                <button onClick={addButton}
+                <button onClick={() => addButton('number')}
                   style={{ background: 'rgba(79,142,247,0.12)', border: '1px solid rgba(79,142,247,0.3)', borderRadius: 6, color: '#4f8ef7', cursor: 'pointer', fontSize: 11, padding: '5px 12px', fontWeight: 700 }}>
-                  + botão
+                  + Número (digitada)
                 </button>
               )}
             </div>
             <p style={{ color: '#334155', fontSize: 11, marginBottom: 10 }}>
-              Cada botão cria automaticamente um novo bloco abaixo. O cliente toca no botão (sem digitar números).
-              {form.buttons.length > 3 && form.buttons.length <= 10 && ' (será enviado como lista)'}
-              {form.buttons.length > 3 && ' WhatsApp aceita no máximo 10 botões.'}
+              Cada opção cria automaticamente um novo bloco abaixo. <b style={{ color: '#10b981' }}>Botão (toque)</b>: o cliente toca direto na mensagem (até 3, responde pelo clique). <b style={{ color: '#4f8ef7' }}>Número (digitada)</b>: aparece no menu em texto como 1️⃣ 2️⃣ 3️⃣ e o cliente digita o número.
             </p>
             {form.buttons.map((btn, i) => (
               <div key={btn.id || i} style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
-                <span style={{ color: '#475569', fontSize: 14, minWidth: 20 }}>▸</span>
+                <span style={{ color: btn.type === 'button' ? '#10b981' : '#4f8ef7', fontSize: 13, minWidth: 34 }}>
+                  {btn.type === 'button' ? '🔘' : `${numOf(i)}️⃣`}
+                </span>
                 <input
                   value={btn.label}
                   onChange={e => updateButton(i, e.target.value)}
-                  placeholder={`Texto do botão ${i + 1}`}
+                  placeholder={btn.type === 'button' ? `Botão de toque ${i + 1} (até 20 caracteres)` : `Texto da opção ${i + 1}`}
                   maxLength={20}
                   style={{ flex: 1, background: '#12121f', border: '1px solid rgba(79,142,247,0.15)', borderRadius: 7, color: '#fff', padding: '8px 10px', fontSize: 13, outline: 'none' }}
                 />
