@@ -20,15 +20,47 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
   return (
     <>
       <Head>
-        <title>Assistente Ark — Automação Inteligente para WhatsApp Business</title>
-        <meta name="description" content="Plataforma SaaS para criar e gerenciar chatbots de WhatsApp com IA, catálogo de produtos, pagamentos integrados e painel administrativo." />
+        <title>Assistente Ark — Bot de Atendimento Automático para WhatsApp Business</title>
+        <meta name="description" content="Crie um bot de atendimento no WhatsApp em minutos: menu automático, IA que responde clientes, catálogo de produtos, agendamento e cobrança por PIX. Conecte seu número e comece a vender mais." />
         <link rel="icon" href="/assistente-ark-mascot.png" />
+        <link rel="canonical" href="https://www.assistente-ark.com.br/" />
+        <meta name="keywords" content="bot para whatsapp, chatbot whatsapp business, atendimento automático whatsapp, automação whatsapp, assistente virtual whatsapp, bot de vendas whatsapp, plataforma de chatbot" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Assistente Ark" />
+        <meta property="og:title" content="Assistente Ark — Bot de Atendimento Automático para WhatsApp" />
+        <meta property="og:description" content="Seu atendimento no WhatsApp no piloto automático: menu, IA, catálogo, agendamentos e PIX. Conecte seu número em minutos." />
+        <meta property="og:url" content="https://www.assistente-ark.com.br/" />
+        <meta property="og:image" content="https://www.assistente-ark.com.br/assistente-ark-logo.png" />
+        <meta property="og:locale" content="pt_BR" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Assistente Ark — Bot de Atendimento para WhatsApp Business" />
+        <meta name="twitter:description" content="Atendimento automático no WhatsApp com IA, catálogo, agendamento e cobrança. Conecte seu número em minutos." />
+        <meta name="twitter:image" content="https://www.assistente-ark.com.br/assistente-ark-logo.png" />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'SoftwareApplication',
+          name: 'Assistente Ark',
+          applicationCategory: 'BusinessApplication',
+          operatingSystem: 'Web, WhatsApp',
+          description: 'Plataforma para criar e gerenciar bots de atendimento automático no WhatsApp Business, com IA, catálogo de produtos, agendamento de serviços e cobrança por PIX.',
+          offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL', description: 'Plano gratuito disponível' },
+        }) }} />
       </Head>
 
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0a; color: #fff; }
 
+        .seo-section { padding: 90px 40px; max-width: 1080px; margin: 0 auto; }
+        .seo-section h2 { font-size: 30px; font-weight: 700; text-align: center; margin-bottom: 28px; letter-spacing: -0.5px; }
+        .seo-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+        .seo-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 24px; }
+        .seo-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; color: #25D366; }
+        .seo-card p, .seo-card li { font-size: 14px; line-height: 1.65; color: rgba(255,255,255,0.65); }
+        .seo-card ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+        .seo-card li::before { content: '✓ '; color: #25D366; font-weight: 700; }
+        .seo-cta { text-align: center; margin-top: 36px; }
+        .seo-cta a { display: inline-block; padding: 13px 34px; border-radius: 10px; background: #25D366; color: #0a0a0a; font-weight: 700; text-decoration: none; font-size: 15px; }
         .nav {
           position: fixed; top: 0; left: 0; right: 0; z-index: 200;
           background: rgba(10,10,10,0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
@@ -132,6 +164,61 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
             <h3>📊 Painel completo</h3>
             <p>Dashboard, conversas, contatos, logs e métricas em tempo real. Importação de contatos via VCF/CSV.</p>
           </div>
+        </div>
+      </section>
+
+      <section className="seo-section">
+        <h2>O que é o Assistente Ark?</h2>
+        <div className="seo-grid">
+          <div className="seo-card">
+            <h3>🤖 Bot de atendimento no WhatsApp</h3>
+            <p>O Assistente Ark é uma plataforma para criar um <b>chatbot de WhatsApp Business</b> que atende seus clientes 24 horas por dia: responde perguntas no menu ou com IA, mostra o catálogo de produtos, agenda serviços e envia cobranças por PIX — tudo dentro da conversa.</p>
+          </div>
+          <div className="seo-card">
+            <h3>📲 Conecte seu próprio número</h3>
+            <p>Você conecta o número de WhatsApp do seu negócio por SMS, em minutos, sem precisar de conta no Meta for Developers. O bot nasce junto com o número e passa a responder automaticamente enquanto você foca no trabalho.</p>
+          </div>
+          <div className="seo-card">
+            <h3>🧠 Inteligência artificial opcional</h3>
+            <p>Conecte sua chave de IA (OpenAI, Gemini, Claude e mais) e o bot passa a responder perguntas fora do menu com base nos seus produtos, serviços e horários de atendimento.</p>
+          </div>
+          <div className="seo-card">
+            <h3>💰 Vendas e pagamentos na conversa</h3>
+            <p>Catálogo de produtos sincronizado com o WhatsApp, cobrança por PIX enviada pelo bot, agendamento de serviços com lembrete automático e handoff para atendente humano quando necessário.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="seo-section" style={{ paddingTop: 0 }}>
+        <h2>Para quem é?</h2>
+        <div className="seo-grid">
+          <div className="seo-card">
+            <h3>🛍️ Lojas e e-commerce</h3>
+            <ul>
+              <li>Catálogo de produtos dentro do WhatsApp</li>
+              <li>Pedidos com PIX na conversa</li>
+              <li>Fluxos especiais por data (Mães, Namorados, Natal…)</li>
+            </ul>
+          </div>
+          <div className="seo-card">
+            <h3>🏥 Clínicas e prestadores</h3>
+            <ul>
+              <li>Agendamento automático com horários configuráveis</li>
+              <li>Lembretes por WhatsApp pra reduzir faltas</li>
+              <li>Google Agenda integrada</li>
+            </ul>
+          </div>
+          <div className="seo-card">
+            <h3>🚀 Negócios de qualquer tamanho</h3>
+            <ul>
+              <li>Do free ao enterprise, sem mensalidade obrigatória</li>
+              <li>Você só paga comissão sobre o que o bot vende</li>
+              <li>Suporte humano direto da Arkiel</li>
+            </ul>
+          </div>
+        </div>
+        <div className="seo-cta">
+          <a href="/admin">Começar grátis agora</a>
         </div>
       </section>
 

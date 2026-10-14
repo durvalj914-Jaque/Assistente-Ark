@@ -1,7 +1,7 @@
 User-agent: *
 Allow: /
-Disallow: /admin/
-Disallow: /client/
 Disallow: /api/
+Disallow: /admin/
 
+Sitemap: https://www.assistente-ark.com.br/sitemap.xml
 Sitemap: https://arkiel.com.br/sitemap.xml
