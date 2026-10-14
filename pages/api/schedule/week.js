@@ -3,7 +3,7 @@
 // agendamentos, bloqueios manuais e horários livres.
 import { supabaseAdmin } from '../../../lib/supabase'
 import { requireTenant } from '../../../lib/serverAuth'
-import { buildFreeSlots, getDayWindow, isDateBlocked } from '../../../lib/scheduleEngine'
+import { buildFreeSlots, getDayWindows, isDateBlocked } from '../../../lib/scheduleEngine'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
@@ -46,7 +46,7 @@ export default async function handler(req, res) {
   const out = []
   for (const iso of days) {
     const dow = new Date(iso + 'T12:00:00').getDay()
-    const win = getDayWindow(cfg, dow)
+    const wins = getDayWindows(cfg, dow)
     const blocked = isDateBlocked(cfg, iso)
     const dayAppts = (appts || []).filter(a => a.date === iso && a.status !== 'draft')
     const dayBlocks = (blocks || []).filter(b => b.date === iso)
@@ -56,8 +56,9 @@ export default async function handler(req, res) {
     }
     out.push({
       date: iso, dow,
-      open: win ? win.open : null,
-      close: win ? win.close : null,
+      open: wins.length ? wins[0].open : null,
+      close: wins.length ? wins[wins.length - 1].close : null,
+      windows: wins,
       breakStart: win?.breakStart ?? null,
       breakEnd: win?.breakEnd ?? null,
       closed: !win, blocked,

@@ -331,6 +331,7 @@ export default function AgendamentosPage() {
 
   // Horários por dia (editor)
   const [dayRows, setDayRows] = useState(null) // modo personalizado
+  const [hourSpaces, setHourSpaces] = useState(null) // espaços de horários de atendimento
   const [blockedDateInput, setBlockedDateInput] = useState('')
   const [calendars, setCalendars] = useState(null)
 
@@ -371,8 +372,18 @@ export default function AgendamentosPage() {
       .then(({ data }) => {
         const b = data || { tenant_id: tenant.id, days_of_week: '1,2,3,4,5', open_time: '09:00', close_time: '18:00', slot_min: 60, max_days_ahead: 14, blocked_dates: [], min_lead_minutes: 30, buffer_min: 0, capacity: 1, reminders_enabled: true, reminder_hours: 1 }
         setBooking(b)
-        // Editor por dia: parte do day_hours salvo, senão do legado
+        // Espaços de horários: agrupa day_hours por janela igual; senão parte do global
         const dh = Array.isArray(b.day_hours) && b.day_hours.length ? b.day_hours : null
+        if (dh) {
+          const groups = {}
+          for (const r of dh) {
+            const key = `${r.open}|${r.close}|${r.breakStart || ''}|${r.breakEnd || ''}`
+            ;(groups[key] = groups[key] || { open: r.open, close: r.close, breakStart: r.breakStart || '', breakEnd: r.breakEnd || '', days: [] }).days.push(Number(r.idx))
+          }
+          setHourSpaces(Object.values(groups).map(g => ({ ...g, days: g.days.sort((a, b) => a - b) })))
+        } else {
+          setHourSpaces([{ days: (b.days_of_week || '1,2,3,4,5').split(',').map(Number), open: b.open_time || '09:00', close: b.close_time || '18:00', breakStart: b.break_start || '', breakEnd: b.break_end || '' }])
+        }
         const globalDays = (b.days_of_week || '1,2,3,4,5').split(',').map(Number)
         setDayRows(SCHED_DAYS.map(d => {
           const row = dh?.find(x => Number(x.idx) === d.idx)
@@ -423,16 +434,17 @@ export default function AgendamentosPage() {
     if (!booking) return
     setSavingConfig(true)
     const perDay = dayRows?.some(r => r.on) && perDayMode()
+    const spaces = (hourSpaces || []).filter(sp => sp.days.length && sp.open && sp.close)
     const payload = {
       tenant_id: booking.tenant_id,
       days_of_week: perDay
         ? dayRows.filter(r => r.on).map(r => r.idx).sort((a, b) => a - b).join(',') || booking.days_of_week
-        : booking.days_of_week,
+        : [...new Set(spaces.flatMap(sp => sp.days))].sort((a, b) => a - b).join(',') || booking.days_of_week,
       open_time: booking.open_time, close_time: booking.close_time,
       break_start: booking.break_start || null, break_end: booking.break_end || null,
       day_hours: perDay
-        ? dayRows.filter(r => r.on).map(r => ({ idx: r.idx, open: r.open, close: r.close, breakStart: r.breakStart || null, breakEnd: r.breakEnd || null }))
-        : [],
+        ? dayRows.filter(r => r.on).map(r => ({ idx: r.idx, open: r.open, close: r.close, breakStart: r.breakStart || null, breakEnd: r.breakEnd || null, per: true }))
+        : spaces.flatMap(sp => sp.days.map(d => ({ idx: d, open: sp.open, close: sp.close, breakStart: sp.breakStart || null, breakEnd: sp.breakEnd || null }))),
       blocked_dates: booking.blocked_dates || [],
       min_lead_minutes: parseInt(booking.min_lead_minutes ?? 30, 10) || 0,
       buffer_min: parseInt(booking.buffer_min ?? 0, 10) || 0,
@@ -450,13 +462,13 @@ export default function AgendamentosPage() {
   }
 
   function perDayMode() {
-    return Array.isArray(booking?.day_hours) && booking.day_hours.length > 0
+    return Array.isArray(booking?.day_hours) && booking.day_hours.some(r => r && r.per)
   }
 
   function enablePerDay() {
     // Congela os valores atuais como base dos 7 dias
     setDayRows(rows => rows.map(r => ({ ...r, on: true })))
-    setBooking(b => ({ ...b, day_hours: [{ idx: 1 }] })) // marca modo personalizado; valores reais salvos no Salvar
+    setBooking(b => ({ ...b, day_hours: [{ idx: 1, per: true }] })) // marca modo personalizado; valores reais salvos no Salvar
   }
 
   function disablePerDay() {
@@ -465,6 +477,27 @@ export default function AgendamentosPage() {
 
   function updDayRow(idx, patch) {
     setDayRows(rows => rows.map(r => r.idx === idx ? { ...r, ...patch } : r))
+  }
+
+  function updSpace(si, patch) {
+    setHourSpaces(list => list.map((sp, i) => i === si ? { ...sp, ...patch } : sp))
+  }
+
+  function toggleSpaceDay(si, dayIdx) {
+    setHourSpaces(list => list.map((sp, i) => {
+      if (i !== si) return sp
+      const days = sp.days.includes(dayIdx) ? sp.days.filter(d => d !== dayIdx) : [...sp.days, dayIdx]
+      return { ...sp, days }
+    }))
+  }
+
+  function addSpace() {
+    setHourSpaces(list => [...list, { days: [], open: '09:00', close: '18:00', breakStart: '', breakEnd: '' }])
+  }
+
+  function removeSpace(si) {
+    if (hourSpaces.length <= 1) return
+    setHourSpaces(list => list.filter((_, i) => i !== si))
   }
 
   function toggleSchedDay(idx) {
@@ -752,26 +785,39 @@ export default function AgendamentosPage() {
 
             {!perDayMode() ? (
               <>
-                <label style={labelStyle}>DIAS QUE ATENDE</label>
-                <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-                  {SCHED_DAYS.map(d => {
-                    const on = (booking.days_of_week || '').split(',').map(Number).includes(d.idx)
-                    return (
-                      <button key={d.idx} type="button" onClick={() => toggleSchedDay(d.idx)}
-                        style={{ width: 44, padding: '8px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, background: on ? 'var(--accent, #22c55e)' : 'rgba(255,255,255,0.05)', color: on ? '#0d0d1a' : '#94a3b8' }}>{d.label}</button>
-                    )
-                  })}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Field label="ABRE ÀS" name="open_time" value={booking.open_time} onChange={(n, v) => setBooking(b => ({ ...b, open_time: v }))} type="time" />
-                  <Field label="FECHA ÀS" name="close_time" value={booking.close_time} onChange={(n, v) => setBooking(b => ({ ...b, close_time: v }))} type="time" />
-                </div>
-                <label style={{ ...labelStyle, marginTop: 8 }}>INTERVALO / PAUSA (opcional)</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <Field label="PAUSA COMEÇA" name="break_start" value={booking.break_start || ''} onChange={(n, v) => setBooking(b => ({ ...b, break_start: v }))} type="time" />
-                  <Field label="PAUSA TERMINA" name="break_end" value={booking.break_end || ''} onChange={(n, v) => setBooking(b => ({ ...b, break_end: v }))} type="time" />
-                </div>
-                <button onClick={enablePerDay} style={{ ...btnGhost, width: '100%', marginTop: 4, fontSize: 12 }}>⚙️ Personalizar por dia (horários diferentes)</button>
+                {(hourSpaces || []).map((sp, si) => (
+                  <div key={si} style={{ padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)', marginBottom: 12, background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                      <span style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700 }}>🕒 Espaço {si + 1}</span>
+                      {(hourSpaces.length > 1) && (
+                        <button type="button" onClick={() => removeSpace(si)}
+                          style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 15 }}>×</button>
+                      )}
+                    </div>
+                    <label style={{ ...labelStyle, marginBottom: 6 }}>DIAS DESSE ESPAÇO</label>
+                    <div style={{ display: 'flex', gap: 5, marginBottom: 12, flexWrap: 'wrap' }}>
+                      {SCHED_DAYS.map(d => {
+                        const on = sp.days.includes(d.idx)
+                        return (
+                          <button key={d.idx} type="button" onClick={() => toggleSpaceDay(si, d.idx)}
+                            style={{ width: 40, padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, background: on ? 'var(--accent, #22c55e)' : 'rgba(255,255,255,0.05)', color: on ? '#0d0d1a' : '#94a3b8' }}>{d.label}</button>
+                        )
+                      })}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <Field label="ABRE ÀS" name={`sp${si}_open`} value={sp.open} onChange={(n, v) => updSpace(si, { open: v })} type="time" />
+                      <Field label="FECHA ÀS" name={`sp${si}_close`} value={sp.close} onChange={(n, v) => updSpace(si, { close: v })} type="time" />
+                    </div>
+                    <label style={{ ...labelStyle, marginTop: 8 }}>PAUSA (opcional)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <Field label="COMEÇA" name={`sp${si}_bs`} value={sp.breakStart || ''} onChange={(n, v) => updSpace(si, { breakStart: v })} type="time" />
+                      <Field label="TERMINA" name={`sp${si}_be`} value={sp.breakEnd || ''} onChange={(n, v) => updSpace(si, { breakEnd: v })} type="time" />
+                    </div>
+                  </div>
+                ))}
+                <button type="button" onClick={addSpace}
+                  style={{ ...btnGhost, width: '100%', marginBottom: 10, fontSize: 12 }}>➕ Criar mais um espaço de horários</button>
+                <button onClick={enablePerDay} style={{ ...btnGhost, width: '100%', marginTop: 0, fontSize: 12 }}>⚙️ Personalizar por dia (horários diferentes)</button>
               </>
             ) : (
               <>
