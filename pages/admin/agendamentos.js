@@ -371,25 +371,19 @@ export default function AgendamentosPage() {
       .then(({ data }) => {
         const b = data || { tenant_id: tenant.id, days_of_week: '1,2,3,4,5', open_time: '09:00', close_time: '18:00', slot_min: 60, max_days_ahead: 14, blocked_dates: [], min_lead_minutes: 30, buffer_min: 0, capacity: 1, reminders_enabled: true, reminder_hours: 1 }
         setBooking(b)
-        // Editor por dia: monta janelas (formato novo), converte legado ou usa global
+        // Editor por dia: parte do day_hours salvo, senão do legado
         const dh = Array.isArray(b.day_hours) && b.day_hours.length ? b.day_hours : null
         const globalDays = (b.days_of_week || '1,2,3,4,5').split(',').map(Number)
-        const globalWins = (b.break_start && b.break_end)
-          ? [{ open: b.open_time || '09:00', close: b.break_start }, { open: b.break_end, close: b.close_time || '18:00' }]
-          : [{ open: b.open_time || '09:00', close: b.close_time || '18:00' }]
         setDayRows(SCHED_DAYS.map(d => {
           const row = dh?.find(x => Number(x.idx) === d.idx)
-          let windows
-          if (Array.isArray(row?.windows) && row.windows.length) {
-            windows = row.windows
-          } else if (row?.open) {
-            windows = (row.breakStart && row.breakEnd)
-              ? [{ open: row.open, close: row.breakStart }, { open: row.breakEnd, close: row.close }]
-              : [{ open: row.open, close: row.close }]
-          } else {
-            windows = globalWins.map(w => ({ ...w }))
+          return {
+            idx: d.idx,
+            on: row ? true : (dh ? false : globalDays.includes(d.idx)),
+            open: row?.open || b.open_time || '09:00',
+            close: row?.close || b.close_time || '18:00',
+            breakStart: row?.breakStart || b.break_start || '',
+            breakEnd: row?.breakEnd || b.break_end || '',
           }
-          return { idx: d.idx, on: row ? true : (dh ? false : globalDays.includes(d.idx)), windows }
         }))
       })
   }
@@ -437,10 +431,7 @@ export default function AgendamentosPage() {
       open_time: booking.open_time, close_time: booking.close_time,
       break_start: booking.break_start || null, break_end: booking.break_end || null,
       day_hours: perDay
-        ? dayRows.filter(r => r.on).map(r => ({
-            idx: r.idx,
-            windows: r.windows.filter(w => w.open && w.close).map(w => ({ open: w.open, close: w.close })),
-          })).filter(r => r.windows.length)
+        ? dayRows.filter(r => r.on).map(r => ({ idx: r.idx, open: r.open, close: r.close, breakStart: r.breakStart || null, breakEnd: r.breakEnd || null }))
         : [],
       blocked_dates: booking.blocked_dates || [],
       min_lead_minutes: parseInt(booking.min_lead_minutes ?? 30, 10) || 0,
@@ -474,29 +465,6 @@ export default function AgendamentosPage() {
 
   function updDayRow(idx, patch) {
     setDayRows(rows => rows.map(r => r.idx === idx ? { ...r, ...patch } : r))
-  }
-
-  function updWindow(idx, wi, patch) {
-    setDayRows(rows => rows.map(r => {
-      if (r.idx !== idx) return r
-      return { ...r, windows: r.windows.map((w, i) => i === wi ? { ...w, ...patch } : w) }
-    }))
-  }
-
-  function addWindow(idx) {
-    setDayRows(rows => rows.map(r => {
-      if (r.idx !== idx) return r
-      if (r.windows.length >= 5) return r
-      const last = r.windows[r.windows.length - 1]
-      return { ...r, windows: [...r.windows, { open: last?.close || '14:00', close: '', }] }
-    }))
-  }
-
-  function removeWindow(idx, wi) {
-    setDayRows(rows => rows.map(r => {
-      if (r.idx !== idx || r.windows.length <= 1) return r
-      return { ...r, windows: r.windows.filter((_, i) => i !== wi) }
-    }))
   }
 
   function toggleSchedDay(idx) {
@@ -812,35 +780,30 @@ export default function AgendamentosPage() {
                   <button onClick={disablePerDay} style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 11, cursor: 'pointer', textDecoration: 'underline' }}>usar o mesmo horário pra todos</button>
                 </div>
                 {dayRows?.map(row => (
-                  <div key={row.idx} style={{ display: 'grid', gridTemplateColumns: '64px 1fr', gap: 10, alignItems: 'start', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <div key={row.idx} style={{ display: 'grid', gridTemplateColumns: '64px 1fr 1fr 1fr', gap: 8, alignItems: 'end', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <button type="button" onClick={() => updDayRow(row.idx, { on: !row.on })}
                       style={{ padding: '7px 0', borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 11, fontWeight: 700, background: row.on ? 'var(--accent, #22c55e)' : 'rgba(255,255,255,0.05)', color: row.on ? '#0d0d1a' : '#64748b' }}>
                       {SCHED_DAYS[row.idx].label}
                     </button>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {row.windows.map((w, wi) => (
-                        <div key={wi} style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 10, color: '#64748b', fontWeight: 700, minWidth: 20 }}>{String.fromCharCode(9398 + wi)}</span>
-                          <input type="time" value={w.open} disabled={!row.on} className="ark-input" style={{ padding: '6px 8px', width: 92 }}
-                            onChange={e => updWindow(row.idx, wi, { open: e.target.value })} />
-                          <span style={{ color: '#64748b', fontSize: 11 }}>até</span>
-                          <input type="time" value={w.close} disabled={!row.on} className="ark-input" style={{ padding: '6px 8px', width: 92 }}
-                            onChange={e => updWindow(row.idx, wi, { close: e.target.value })} />
-                          {row.windows.length > 1 && (
-                            <button type="button" onClick={() => removeWindow(row.idx, wi)} disabled={!row.on}
-                              style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 16, padding: '0 2px' }}>×</button>
-                          )}
-                        </div>
-                      ))}
-                      {row.on && row.windows.length < 5 && (
-                        <button type="button" onClick={() => addWindow(row.idx)}
-                          style={{ alignSelf: 'flex-start', background: 'rgba(79,142,247,0.1)', border: '1px solid rgba(79,142,247,0.3)', borderRadius: 6, color: '#4f8ef7', cursor: 'pointer', fontSize: 11, padding: '4px 10px', fontWeight: 700 }}>
-                          + horário
-                        </button>
-                      )}
-                      {row.windows.length > 1 && (
-                        <span style={{ color: '#475569', fontSize: 10 }}>O espaço entre horários vira pausa automática na agenda.</span>
-                      )}
+                    <div>
+                      <label style={{ ...labelStyle, marginBottom: 3 }}>Abre</label>
+                      <input type="time" value={row.open} disabled={!row.on} className="ark-input" style={{ padding: '6px 8px' }}
+                        onChange={e => updDayRow(row.idx, { open: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, marginBottom: 3 }}>Fecha</label>
+                      <input type="time" value={row.close} disabled={!row.on} className="ark-input" style={{ padding: '6px 8px' }}
+                        onChange={e => updDayRow(row.idx, { close: e.target.value })} />
+                    </div>
+                    <div>
+                      <label style={{ ...labelStyle, marginBottom: 3 }}>Pausa</label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input type="time" value={row.breakStart || ''} disabled={!row.on} className="ark-input" style={{ padding: '6px 4px', minWidth: 0, flex: 1 }}
+                          onChange={e => updDayRow(row.idx, { breakStart: e.target.value })} />
+                        <span style={{ color: '#64748b', fontSize: 10 }}>–</span>
+                        <input type="time" value={row.breakEnd || ''} disabled={!row.on} className="ark-input" style={{ padding: '6px 4px', minWidth: 0, flex: 1 }}
+                          onChange={e => updDayRow(row.idx, { breakEnd: e.target.value })} />
+                      </div>
                     </div>
                   </div>
                 ))}
