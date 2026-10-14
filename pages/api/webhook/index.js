@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import { processFlow, getNodeButtons } from '../../../lib/flowEngine'
+import { processFlow, getNodeButtons, menuLine } from '../../../lib/flowEngine'
 import { tryAIResponse } from '../../../lib/aiBot'
 import { sendPushToTenant } from '../../../lib/webpush'
 import { sendFcmToTenant } from '../../../lib/fcm'
@@ -455,7 +455,7 @@ async function processWebhook(body) {
   // Bot
   const { data: botArr, error: botErr } = await db
     .from('bots')
-    .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,persistent_message,flow,tenants(id,plan,status,max_messages_month,subscription,plan_expires_at)')
+    .select('id,name,status,phone_number_id,tenant_id,access_token,greeting,fallback_message,human_takeover_keyword,persistent_message,menu_style,flow,tenants(id,plan,status,max_messages_month,subscription,plan_expires_at)')
     .eq('phone_number_id', phoneNumberId)
     .eq('status', 'active')
     .limit(1)
@@ -1492,7 +1492,7 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
       const tapBtns = allBtns.filter(b => b.type === 'button')    // botões de toque (interativos)
 
       if (numBtns.length > 0) {
-        const menuText = numBtns.map((b, i) => `${i + 1}️⃣ ${b.label || b.title || ''}`).join('\n')
+        const menuText = numBtns.map((b, i) => menuLine(bot.menu_style, i + 1, b.label || b.title || '')).join('\n')
         reply = `${reply}\n\n${menuText}`
       }
 

@@ -7,6 +7,7 @@ import AIGenerateButton from '../../components/FlowEditor/AIGenerate'
 import JsonTools from '../../components/FlowEditor/JsonTools'
 import { useTenant } from '../../hooks/useTenant'
 import { supabase } from '../../lib/supabase'
+import { MENU_STYLES } from '../../lib/flowEngine'
 
 export default function FlowPage() {
   const router = useRouter()
@@ -18,13 +19,21 @@ export default function FlowPage() {
   const [showTutorial, setShowTutorial] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [persistentMsg, setPersistentMsg] = useState(null)   // rodapé de todo bloco
+  const [menuStyle, setMenuStyle] = useState('classic')       // aparência do menu numerado
   const [persistSaved, setPersistSaved] = useState(false)
 
   // carrega o rodapé do bot selecionado
   useEffect(() => {
     const bot = bots?.find(b => b.id === selectedBotId)
     setPersistentMsg(bot?.persistent_message || '')
+    setMenuStyle(bot?.menu_style || 'classic')
   }, [selectedBotId, bots])
+
+  async function saveMenuStyle(style) {
+    if (!selectedBotId) return
+    setMenuStyle(style)
+    await supabase.from('bots').update({ menu_style: style, updated_at: new Date().toISOString() }).eq('id', selectedBotId)
+  }
 
   async function savePersistent() {
     if (!selectedBotId) return
@@ -225,11 +234,35 @@ export default function FlowPage() {
         {flow ? (
           <FlowEditor
         persistentMessage={persistentMsg || ''}
+        menuStyle={menuStyle}
         flow={flow} onChange={setFlow} />
         ) : (
           <div style={{ padding: 40, textAlign: 'center', color: '#475569' }}>Selecione um bot para editar o fluxo</div>
         )}
       </div>
+      {/* ── Estilo do menu: aparência das opções numeradas ── */}
+      <div className="ark-card" style={{ marginBottom: 20 }}>
+        <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>🎨 Estilo do menu</h3>
+        <p style={{ color: '#64748b', fontSize: 12, marginBottom: 12 }}>
+          Como as opções numeradas aparecem pro seu cliente. Botões de toque seguem o padrão visual do WhatsApp (a Meta não permite customizar).
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>
+          {Object.entries(MENU_STYLES).map(([key, st]) => (
+            <button key={key} onClick={() => saveMenuStyle(key)}
+              style={{ textAlign: 'left', padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
+                border: menuStyle === key ? '2px solid #4f8ef7' : '1px solid var(--border-soft)',
+                background: menuStyle === key ? 'rgba(79,142,247,0.08)' : 'transparent', transition: 'all .15s' }}>
+              <div style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+                {menuStyle === key ? '🔵 ' : ''}{st.label}
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', lineHeight: 1.7, fontFamily: 'monospace' }}>
+                {st.sample(1, 'Ver produtos')}<br/>{st.sample(2, 'Falar com atendente')}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Mensagem permanente: rodapé automático em todos os blocos ── */}
       <div className="ark-card" style={{ marginBottom: 20 }}>
         <h3 style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>📌 Mensagem permanente</h3>

@@ -1,5 +1,6 @@
 import { useState, Component } from 'react'
 import { v4 as uuidv4 } from 'uuid'
+import { MENU_STYLES } from '../../lib/flowEngine'
 
 // Ações especiais que um bloco pode ter (além de texto + botões)
 const BLOCK_ACTIONS = {
@@ -44,7 +45,7 @@ class FlowErrorBoundary extends Component {
 }
 
 // ─── Card de um bloco ───
-function BlockCard({ node, onEdit, onDelete, isRoot, depth, persistent }) {
+function BlockCard({ node, onEdit, onDelete, isRoot, depth, persistent, menuStyle }) {
   const [hovered, setHovered] = useState(false)
   const buttons = node.buttons || []
   const action = BLOCK_ACTIONS[node.action] || BLOCK_ACTIONS.none
@@ -94,16 +95,24 @@ function BlockCard({ node, onEdit, onDelete, isRoot, depth, persistent }) {
         {/* Botões do bloco */}
         {buttons.length > 0 && (
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {buttons.map((b, i) => (
-              <div key={b.id || i} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 11, background: 'rgba(79,142,247,0.08)',
-                borderRadius: 6, padding: '4px 8px', color: '#4f8ef7', fontWeight: 500,
-              }}>
-                <span style={{ fontSize: 9, color: '#334155' }}>▸</span>
-                {b.label || '...'}
-              </div>
-            ))}
+            {buttons.map((b, i) => {
+              // número de exibição: só as opções numeradas contam
+              let n = 0
+              for (let j = 0; j <= i; j++) if (buttons[j].type !== 'button') n++
+              const isTap = b.type === 'button'
+              return (
+                <div key={b.id || i} style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontSize: 11, background: isTap ? 'rgba(16,185,129,0.08)' : 'rgba(79,142,247,0.08)',
+                  borderRadius: 6, padding: '4px 8px', color: isTap ? '#10b981' : '#4f8ef7', fontWeight: 500,
+                }}>
+                  <span style={{ fontSize: 10, color: isTap ? '#10b981' : '#334155' }}>
+                    {isTap ? '🔘' : ((MENU_STYLES[menuStyle] || MENU_STYLES.classic).sample(n, ''))}
+                  </span>
+                  {b.label || '...'}
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -137,7 +146,7 @@ function BlockCard({ node, onEdit, onDelete, isRoot, depth, persistent }) {
 }
 
 // ─── Renderização recursiva ───
-function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited, persistent }) {
+function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited, persistent, menuStyle }) {
   if (!nodeIds?.length) return null
   if (depth > MAX_DEPTH) {
     return <div style={{ fontSize: 11, color: '#f59e0b', padding: 8 }}>⚠️ Profundidade máxima atingida</div>
@@ -157,7 +166,7 @@ function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited, persi
         return (
           <div key={node.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             {depth > 0 && <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />}
-            <BlockCard node={node} isRoot={depth === 0 && idx === 0} onEdit={onEdit} onDelete={onDelete} depth={depth} persistent={persistent} />
+            <BlockCard node={node} isRoot={depth === 0 && idx === 0} onEdit={onEdit} onDelete={onDelete} depth={depth} persistent={persistent} menuStyle={menuStyle} />
             {node.children?.length > 0 && (
               <>
                 <div style={{ width: 2, height: 24, background: 'rgba(79,142,247,0.25)' }} />
@@ -172,6 +181,7 @@ function BlockLevel({ nodeIds, allNodes, onEdit, onDelete, depth, visited, persi
                   depth={depth + 1}
                   visited={childVisited}
                   persistent={persistent}
+                  menuStyle={menuStyle}
                 />
               </>
             )}
@@ -345,7 +355,7 @@ function EditModal({ node, onSave, onClose }) {
 }
 
 // ─── FlowEditor principal ───
-export default function FlowEditor({ flow, onChange, persistentMessage }) {
+export default function FlowEditor({ flow, onChange, persistentMessage, menuStyle }) {
   const [editing, setEditing] = useState(null)
   const [renderKey, setRenderKey] = useState(0)
   const nodes = flow?.nodes || []
@@ -493,6 +503,7 @@ export default function FlowEditor({ flow, onChange, persistentMessage }) {
             depth={0}
             visited={new Set()}
             persistent={persistentMessage}
+            menuStyle={menuStyle}
           />
         </div>
       </div>
