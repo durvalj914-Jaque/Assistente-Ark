@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     const dayAppts = (appts || []).filter(a => a.date === iso && a.status !== 'draft')
     const dayBlocks = (blocks || []).filter(b => b.date === iso)
     let freeSlots = []
-    if (win && !blocked && svcId) {
+    if (wins.length && !blocked && svcId) {
       freeSlots = await buildFreeSlots(db, tenantId, iso, svcId, cfg, dur)
     }
     out.push({
@@ -59,9 +59,8 @@ export default async function handler(req, res) {
       open: wins.length ? wins[0].open : null,
       close: wins.length ? wins[wins.length - 1].close : null,
       windows: wins,
-      breakStart: win?.breakStart ?? null,
-      breakEnd: win?.breakEnd ?? null,
-      closed: !win, blocked,
+      gaps: wins.slice(0, -1).map((w, i) => [w.close, wins[i + 1].open]).filter(([a, b]) => b > a),
+      closed: !wins.length, blocked,
       appointments: dayAppts.map(a => ({
         id: a.id, service_id: a.service_id, start_time: a.start_time, end_time: a.end_time, status: a.status,
         customer_name: a.customer_name, customer_phone: a.customer_phone,

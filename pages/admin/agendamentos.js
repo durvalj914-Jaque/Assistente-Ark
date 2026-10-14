@@ -656,8 +656,11 @@ export default function AgendamentosPage() {
                       {hourLines.map(m => (
                         <div key={m} style={{ position: 'absolute', left: 0, right: 0, top: (m - gridStart) * PX_PER_MIN, borderTop: '1px dashed rgba(255,255,255,0.05)' }} />
                       ))}
-                      {/* pausa do almoço */}
-                      {day.breakStart != null && day.breakEnd != null && (
+                      {/* pausas: gaps entre os espaços de horários (ou pausa legada) */}
+                      {(day.gaps || []).map(([gs, ge], i) => (
+                        <div key={'g' + i} style={{ position: 'absolute', left: 0, right: 0, top: (gs - gridStart) * PX_PER_MIN, height: (ge - gs) * PX_PER_MIN, background: 'rgba(100,116,139,0.15)' }} />
+                      ))}
+                      {!(day.gaps || []).length && day.breakStart != null && day.breakEnd != null && (
                         <div style={{ position: 'absolute', left: 0, right: 0, top: (day.breakStart - gridStart) * PX_PER_MIN, height: (day.breakEnd - day.breakStart) * PX_PER_MIN, background: 'rgba(100,116,139,0.15)' }} />
                       )}
                       {/* agendamentos */}
