@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import TutorialModal from '../Tutorial/TutorialModal'
+import ConsentModal from '../ConsentModal'
 import { TUTORIALS } from '../../lib/tutorials'
 
 /**
@@ -13,6 +14,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
   const router = useRouter()
   const barRef = useRef(null)
   const [tutOpen, setTutOpen] = useState(false)
+  const [consentOk, setConsentOk] = useState(false)
   const [tutUnseen, setTutUnseen] = useState(false)
 
   const NAV_ITEMS = [
@@ -54,7 +56,7 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
   }
 
   if (hideTopBar) {
-    return <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}><div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>{children}</div></div>
+    return <div className="ark-layout-main" style={{ height: '100dvh', overflow: 'hidden', background: 'var(--bg-main)', display: 'flex', flexDirection: 'column' }}><div style={{ flex: 1, overflowY: 'auto', minHeight: 0, WebkitOverflowScrolling: 'touch' }}>{children}</div><ConsentModal profile={profile} user={user} onAccept={() => setConsentOk(true)} /></div>
   }
 
   return (
@@ -157,6 +159,9 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
 
       {/* Tutorial contextual da aba */}
       {tutOpen && <TutorialModal tutorial={TUTORIALS[activeTutKey]} onClose={() => setTutOpen(false)} />}
+
+      {/* LGPD: consentimento explícito no primeiro acesso */}
+      <ConsentModal profile={profile} user={user} onAccept={() => setConsentOk(true)} />
     </div>
   )
 }

@@ -238,8 +238,8 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
         <div className="footer-links">
           <Link href={siteUrl}>Arkiel</Link>
           <Link href="/admin">Entrar</Link>
-          <a href="https://www.arkiel.com.br/termos">Termos</a>
-          <a href="https://www.arkiel.com.br/privacidade">Privacidade</a>
+          <Link href="/termos">Termos</Link>
+          <Link href="/privacidade">Privacidade</Link>
         </div>
         <div className="footer-copy">© {new Date().getFullYear()} Arkiel Tecnologia.</div>
       </footer>

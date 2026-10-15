@@ -251,6 +251,10 @@ async function applySeasonalFlow(db, bot) {
   } catch (_) {}
 }
 
+// ── LGPD (Lei 13.709/2018): aviso de tratamento de dados enviado uma única vez,
+// na primeira resposta do bot de cada conversa nova. ──
+const LGPD_NOTICE = '🔒 Aviso: ao conversar com este atendimento, seu telefone e as mensagens são tratados conforme a LGPD — https://www.assistente-ark.com.br/privacidade'
+
 async function processWebhook(body) {
   const db     = getDB()
   const change = body?.entry?.[0]?.changes?.[0]?.value
@@ -599,6 +603,7 @@ async function processWebhook(body) {
     .neq('status', 'closed')
     .order('last_message_at', { ascending: false }).limit(1).maybeSingle()
 
+  const isNewConversation = !conv
   if (!conv) {
     const { data: newConv, error: convErr } = await db
       .from('conversations').insert({ tenant_id: tenantId, bot_id: bot.id, contact_id: contact.id, status: 'bot' }).select('*').single()
@@ -1340,11 +1345,12 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
     try {
       const ai = await tryAIResponse({ db, tenantId, bot, conv, contact, userText })
       if (ai?.handled) {
-        await sendText(phoneNumberId, tkn, from, ai.reply)
+        const aiReply = isNewConversation ? `${LGPD_NOTICE}\n\n${ai.reply}` : ai.reply
+        await sendText(phoneNumberId, tkn, from, aiReply)
         await db.from('conversations').update({
-          last_message: ai.reply, last_message_at: new Date().toISOString(),
+          last_message: aiReply, last_message_at: new Date().toISOString(),
         }).eq('id', conv.id)
-        await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: ai.reply, sent_by: 'ai' })
+        await safeInsert(db, 'messages', { tenant_id: tenantId, conversation_id: conv.id, bot_id: bot.id, contact_id: contact.id, direction: 'outbound', content: aiReply, sent_by: 'ai' })
         await savelog(db, 'ai_response', null, { provider: ai.provider, model: ai.model, reply: ai.reply.substring(0, 60) })
         return res.status(200).json({ ok: true })
       }
@@ -1352,6 +1358,7 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
   }
 
   let reply = result.reply || bot.fallback_message || 'Não entendi. Digite *0* para voltar ao menu.'
+  if (isNewConversation) reply = `${LGPD_NOTICE}\n\n${reply}`
   let nodeId = result.nodeId
   let convUpdate = { last_message: reply, last_message_at: new Date().toISOString(), current_node_id: nodeId }
 
