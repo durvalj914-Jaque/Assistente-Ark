@@ -20,9 +20,27 @@ function getDB() {
   return createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
 }
 
+// ── LGPD minimização: logs técnicos nunca guardam telefone completo
+// nem conteúdo extenso de mensagens. Redação centralizada aqui: qualquer
+// sequência de 10-14 dígitos vira ****NNNN (só os 4 últimos) e textos
+// longos (ex.: userText) são truncados em 80 caracteres. ──
+function redactLogValue(v) {
+  if (typeof v === 'string') {
+    return v.replace(/\+?\d{10,14}/g, (m) => '*'.repeat(Math.max(m.length - 4, 0)) + m.slice(-4)).slice(0, 80)
+  }
+  if (Array.isArray(v)) return v.map(redactLogValue)
+  if (v && typeof v === 'object') {
+    const o = {}
+    for (const k of Object.keys(v)) o[k] = redactLogValue(v[k])
+    return o
+  }
+  return v
+}
+
 async function savelog(db, step, error, payload) {
   try {
-    await db.from('webhook_logs').insert({ step, error: error ? String(error) : '', payload: payload || null })
+    const clean = payload == null ? null : redactLogValue(payload)
+    await db.from('webhook_logs').insert({ step, error: error ? String(error) : '', payload: clean })
   } catch(_) {}
 }
 

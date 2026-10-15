@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/router'
 import TutorialModal from '../Tutorial/TutorialModal'
 import ConsentModal from '../ConsentModal'
+import TotpGate from '../TotpGate'
 import { TUTORIALS } from '../../lib/tutorials'
 
 /**
@@ -32,7 +33,10 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
     { href: '/admin/upgrade', label: 'Upgrades', icon: '⬆️', tut: 'upgrade' },
     { href: '/admin/api', label: 'API', icon: '🔌', tut: 'api' },
   ]
-  if (profile?.is_platform_admin) NAV_ITEMS.push({ href: '/painel', label: 'Painel Arkiel', icon: '⚡' })
+  if (profile?.is_platform_admin) {
+    NAV_ITEMS.push({ href: '/painel', label: 'Painel Arkiel', icon: '⚡' })
+    NAV_ITEMS.push({ href: '/admin/2fa', label: 'Segurança 2FA', icon: '🔐', tut: null })
+  }
 
   const isActive = (item) => item.href === '/admin/conversations'
     ? router.pathname === '/admin' || router.pathname.startsWith(item.href + '/') || router.pathname === item.href
@@ -162,6 +166,9 @@ export default function AdminLayout({ children, tenant, user, role, profile, hid
 
       {/* LGPD: consentimento explícito no primeiro acesso */}
       <ConsentModal profile={profile} user={user} onAccept={() => setConsentOk(true)} />
+
+      {/* LGPD art. 46: console Arkiel exige 2FA quando ativo */}
+      <TotpGate profile={profile} pathname={router.pathname} />
     </div>
   )
 }
