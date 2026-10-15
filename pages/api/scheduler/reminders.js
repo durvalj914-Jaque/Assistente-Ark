@@ -16,6 +16,16 @@ export default async function handler(req, res) {
   }
 
   const db = supabaseAdmin()
+
+  // ── LGPD: retenção de logs técnicos — webhook_logs com mais de 30 dias são eliminados ──
+  let retentionLogs = 0
+  try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    const { data: deleted, error: delErr } = await db.from('webhook_logs').delete().lt('created_at', cutoff).select('id')
+    if (delErr) console.error('[cron] retenção webhook_logs:', delErr.message)
+    else retentionLogs = deleted?.length || 0
+  } catch (e) { console.error('[cron] retenção webhook_logs:', e.message) }
+
   const now = nowSP()
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
@@ -25,7 +35,7 @@ export default async function handler(req, res) {
     .in('status', ['confirmed', 'pending_payment'])
     .is('reminder_sent_at', null)
   const tenants = [...new Set((due || []).map(a => a.tenant_id))]
-  if (!tenants.length) return res.status(200).json({ ok: true, sent: 0 })
+  if (!tenants.length) return res.status(200).json({ ok: true, sent: 0, retentionLogs })
 
   // Bots ativos desses tenants (um por tenant)
   const { data: bots } = await db.from('bots')
@@ -40,5 +50,5 @@ export default async function handler(req, res) {
     if (!bot) continue
     total += await sendDueReminders(db, bot)
   }
-  return res.status(200).json({ ok: true, tenants: tenants.length, sent: total })
+  return res.status(200).json({ ok: true, tenants: tenants.length, sent: total, retentionLogs })
 }
