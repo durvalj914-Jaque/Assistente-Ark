@@ -63,8 +63,9 @@ export default async function handler(req, res) {
   if (uploadErr) return res.status(500).json({ error: 'Erro no upload', detail: uploadErr.message })
 
   // Obter URL pública
-  const { data: urlData } = db.storage.from('product-images').getPublicUrl(fileName)
-  const imageUrl = urlData.publicUrl
+  const { data: urlData, error: urlErr } = await db.storage.from('product-images').createSignedUrl(fileName, 31536000)
+  if (urlErr || !urlData?.signedUrl) return res.status(500).json({ error: 'Erro ao gerar URL assinada' })
+  const imageUrl = urlData.signedUrl
 
   // Se productId foi informado, atualizar o produto e re-sincronizar com Meta
   const productId = fields.productId?.[0] || fields.productId

@@ -14,14 +14,14 @@ const SUPA_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' })
 
+  const auth = req.headers.authorization || ''
+  const apiKey = auth.startsWith('Bearer ') ? auth.slice(7) : req.headers['x-api-key']
+  if (!apiKey) return res.status(401).json({ error: 'missing_api_key' })
+
   const { conversation_id, mode } = req.body || {}
   if (!conversation_id || !['auto', 'human'].includes(mode)) {
     return res.status(400).json({ error: 'conversation_id e mode (auto|human) são obrigatórios' })
   }
-
-  const auth = req.headers.authorization || ''
-  const apiKey = auth.startsWith('Bearer ') ? auth.slice(7) : req.headers['x-api-key']
-  if (!apiKey) return res.status(401).json({ error: 'missing_api_key' })
 
   const db = createClient(SUPA_URL, SUPA_KEY, { auth: { persistSession: false } })
 

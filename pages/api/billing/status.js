@@ -17,6 +17,10 @@ export default async function handler(req, res) {
   const { data: { user } } = await supabase.auth.getUser(token)
   if (!user) return res.status(401).json({ error: 'Não autorizado' })
 
+  // IDOR guard: usuário só consulta billing do próprio tenant
+  const { data: member } = await supabaseAdmin().from('tenant_members').select('tenant_id').eq('tenant_id', tenantId).eq('user_id', user.id).maybeSingle()
+  if (!member) return res.status(403).json({ error: 'Sem acesso a este tenant' })
+
   // Usar admin para buscar dados do tenant
   const db = supabaseAdmin()
 

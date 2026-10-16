@@ -16,10 +16,6 @@ const SHARED_WABA_ID = process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { bot_id, cc, phone_number, verified_name } = req.body || {}
-  if (!cc || !phone_number || !verified_name) {
-    return res.status(400).json({ error: 'cc, phone_number e verified_name são obrigatórios' })
-  }
 
   const authHeader = req.headers.authorization || ''
   const userToken = authHeader.replace('Bearer ', '')
@@ -27,6 +23,11 @@ export default async function handler(req, res) {
 
   const { data: { user }, error: authError } = await db.auth.getUser(userToken)
   if (authError || !user) return res.status(401).json({ error: 'Não autorizado' })
+
+  const { bot_id, cc, phone_number, verified_name } = req.body || {}
+  if (!cc || !phone_number || !verified_name) {
+    return res.status(400).json({ error: 'cc, phone_number e verified_name são obrigatórios' })
+  }
 
   let bot, botErr = null
   if (bot_id) {

@@ -738,8 +738,8 @@ async function processWebhook(body) {
         const { error: upErr } = await db.storage.from('payment-receipts').upload(fileName, buffer, { contentType: mimeType })
         let fileUrl = null
         if (!upErr) {
-          const { data: urlData } = db.storage.from('payment-receipts').getPublicUrl(fileName)
-          fileUrl = urlData.publicUrl
+          const { data: urlData } = await db.storage.from('payment-receipts').createSignedUrl(fileName, 31536000)
+          fileUrl = urlData?.signedUrl || null
         }
 
         // 2) Verificar se há pagamento pendente nesta conversa
