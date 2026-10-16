@@ -1372,6 +1372,9 @@ Taxa de agendamento: R$ ${taxa.toFixed(2)}.
         await savelog(db, 'ai_response', null, { provider: ai.provider, model: ai.model, reply: ai.reply.substring(0, 60) })
         return res.status(200).json({ ok: true })
       }
+      if (ai?.rateLimited) {
+        await savelog(db, 'ai_rate_limited', null, { contact_id: contact?.id || null })
+      }
     } catch (_) {} // IA falhou → segue o comportamento normal do menu
   }
 
