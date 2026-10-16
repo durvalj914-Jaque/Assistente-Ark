@@ -26,6 +26,8 @@ export default function ConsentModal({ profile, user, onAccept }) {
   }
 
   return (
+    <>
+      <style>{`.ark-2fa-err{color:#ff6b6b}[data-theme="light"] .ark-2fa-err{color:#dc2626}`}</style>
     <div style={{
       position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.72)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px',
@@ -36,8 +38,8 @@ export default function ConsentModal({ profile, user, onAccept }) {
         maxHeight: '90dvh', overflowY: 'auto',
       }}>
         <div style={{ fontSize: '26px', marginBottom: '10px' }}>🔐</div>
-        <h2 style={{ fontSize: '19px', fontWeight: 700, margin: '0 0 10px' }}>Bem-vindo(a) ao Assistente Ark!</h2>
-        <p style={{ fontSize: '14px', lineHeight: 1.6, color: 'rgba(255,255,255,0.6)', margin: '0 0 16px' }}>
+        <h2 style={{ fontSize: '19px', fontWeight: 700, margin: '0 0 10px', color: 'var(--text-primary)' }}>Bem-vindo(a) ao Assistente Ark!</h2>
+        <p style={{ fontSize: '14px', lineHeight: 1.6, color: 'var(--text-muted)', margin: '0 0 16px' }}>
           Antes de começar, você precisa conhecer e concordar com os termos que regem o uso da plataforma
           e com a forma como tratamos dados pessoais (seus e dos contatos que conversam com seus bots),
           conforme a Lei Geral de Proteção de Dados (LGPD).
@@ -46,22 +48,23 @@ export default function ConsentModal({ profile, user, onAccept }) {
           <a href="/termos" target="_blank" rel="noopener noreferrer" style={{ color: '#25D366', fontSize: '14px', textDecoration: 'none' }}>📄 Termos de Uso — abrir</a>
           <a href="/privacidade" target="_blank" rel="noopener noreferrer" style={{ color: '#25D366', fontSize: '14px', textDecoration: 'none' }}>🔒 Política de Privacidade — abrir</a>
         </div>
-        <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', margin: '0 0 18px', fontSize: '13.5px', lineHeight: 1.5, color: 'rgba(255,255,255,0.75)' }}>
+        <label style={{ display: 'flex', gap: '10px', alignItems: 'flex-start', cursor: 'pointer', margin: '0 0 18px', fontSize: '13.5px', lineHeight: 1.5, color: 'var(--text-secondary)' }}>
           <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} style={{ marginTop: '2px', accentColor: '#25D366', width: '17px', height: '17px' }} />
           <span>Li e concordo com os <strong>Termos de Uso</strong> e a <strong>Política de Privacidade</strong>, incluindo o tratamento de dados conforme a LGPD.</span>
         </label>
-        {error && <p style={{ color: '#ff6b6b', fontSize: '13px', margin: '0 0 12px' }}>{error}</p>}
+        {error && <p className='ark-2fa-err' style={{ fontSize: '13px', margin: '0 0 12px' }}>{error}</p>}
         <button onClick={accept} disabled={!checked || saving} style={{
           width: '100%', padding: '12px', borderRadius: '10px', border: 'none', cursor: !checked || saving ? 'not-allowed' : 'pointer',
-          background: checked ? '#25D366' : 'rgba(255,255,255,0.12)', color: checked ? '#0a0a0a' : 'rgba(255,255,255,0.4)',
+          background: checked ? '#25D366' : 'var(--bg-hover)', color: checked ? '#0a0a0a' : 'var(--text-muted)',
           fontSize: '14px', fontWeight: 700, transition: 'all .15s',
         }}>
           {saving ? 'Registrando...' : 'Aceitar e continuar'}
         </button>
-        <p style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', margin: '12px 0 0', textAlign: 'center' }}>
+        <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: '12px 0 0', textAlign: 'center' }}>
           Seu aceite fica registrado com data e hora. Você pode solicitar a exclusão a qualquer momento via arkieltech@gmail.com.
         </p>
       </div>
     </div>
+    </>
   )
 }

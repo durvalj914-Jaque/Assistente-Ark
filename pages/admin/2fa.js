@@ -65,41 +65,42 @@ export default function TwoFactorPage() {
 
   return (
     <AdminLayout tenant={tenant} user={user} role={role} profile={profile}>
+      <style>{`.ark-2fa-ok{color:#25D366}[data-theme="light"] .ark-2fa-ok{color:#15803d}.ark-2fa-err{color:#ff6b6b}[data-theme="light"] .ark-2fa-err{color:#dc2626}`}</style>
       <div style={{ padding: '32px 24px', maxWidth: 640, margin: '0 auto' }}>
-        <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>🔐 Segurança 2FA</h1>
-        <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.55)', marginBottom: 24, lineHeight: 1.6 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 800, marginBottom: 6, color: 'var(--text-primary)' }}>🔐 Segurança 2FA</h1>
+        <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 24, lineHeight: 1.6 }}>
           Segunda etapa de autenticação para o console Arkiel. Protege o acesso aos dados de todos os clientes
           da plataforma, exigindo um código do seu celular em cada sessão. Recomendado pela LGPD (art. 46).
         </p>
 
-        {err && <div style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', color: '#ff6b6b', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16 }}>{err}</div>}
-        {msg && <div style={{ background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', color: '#25D366', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>{msg}</div>}
+        {err && <div className='ark-2fa-err' style={{ background: 'rgba(255,107,107,0.1)', border: '1px solid rgba(255,107,107,0.3)', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>{err}</div>}
+        {msg && <div className='ark-2fa-ok' style={{ background: 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)', padding: '10px 14px', borderRadius: 10, fontSize: 13, marginBottom: 16, lineHeight: 1.5 }}>{msg}</div>}
 
-        {enabled === null ? <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 14 }}>Carregando...</p> : enabled ? (
-          <div style={{ border: '1px solid rgba(37,211,102,0.3)', background: 'rgba(37,211,102,0.05)', borderRadius: 14, padding: 22 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6, color: '#25D366' }}>✅ 2FA ativo</div>
-            <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.5 }}>
+        {enabled === null ? <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>Carregando...</p> : enabled ? (
+          <div style={{ border: '1px solid rgba(37,211,102,0.3)', background: 'var(--bg-card)', borderRadius: 14, padding: 22 }}>
+            <div className='ark-2fa-ok' style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>✅ 2FA ativo</div>
+            <p style={{ fontSize: 13.5, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
               O console Arkiel pede seu código de 6 dígitos uma vez por sessão do navegador.
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input value={disableCode} onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Código para desativar" inputMode="numeric" style={{ flex: 1, minWidth: 160, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 15, letterSpacing: 2 }} />
-              <button onClick={disable} disabled={busy || disableCode.length !== 6} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'rgba(255,107,107,0.15)', color: '#ff6b6b', fontSize: 13.5, fontWeight: 700 }}>Desativar</button>
+              <input value={disableCode} onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="Código para desativar" inputMode="numeric" style={{ flex: 1, minWidth: 160, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 15, letterSpacing: 2 }} />
+              <button onClick={disable} disabled={busy || disableCode.length !== 6} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', cursor: 'pointer', background: 'rgba(255,107,107,0.15)', color: 'var(--ark-red)', fontSize: 13.5, fontWeight: 700 }}>Desativar</button>
             </div>
           </div>
         ) : secret ? (
-          <div style={{ border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: 22, background: 'rgba(255,255,255,0.03)' }}>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginBottom: 14, lineHeight: 1.5 }}>
+          <div style={{ border: '1px solid var(--border-medium)', borderRadius: 14, padding: 22, background: 'var(--bg-card)' }}>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
               1️⃣ Adicione no app autenticador escaneando o QR ou digitando o código:
             </p>
-            <div style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 2, background: 'rgba(0,0,0,0.4)', padding: '12px 14px', borderRadius: 10, marginBottom: 8, wordBreak: 'break-all', border: '1px solid rgba(255,255,255,0.1)' }}>{secret}</div>
-            <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.4)', marginBottom: 18, lineHeight: 1.5 }}>
-              No app: <strong style={{ color: 'rgba(255,255,255,0.7)' }}>+ Adicionar conta → Entrar com chave de configuração</strong> — conta "Assistente Ark", provedor "Baseada em tempo (TOTP)", cole o código acima.
+            <div style={{ fontFamily: 'monospace', fontSize: 15, letterSpacing: 2, background: 'var(--bg-input)', color: 'var(--text-primary)', padding: '12px 14px', borderRadius: 10, marginBottom: 8, wordBreak: 'break-all', border: '1px solid var(--border-medium)' }}>{secret}</div>
+            <p style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 18, lineHeight: 1.5 }}>
+              No app: <strong style={{ color: 'var(--text-primary)' }}>+ Adicionar conta → Entrar com chave de configuração</strong> — conta "Assistente Ark", provedor "Baseada em tempo (TOTP)", cole o código acima.
               O segredo é gerado no seu navegador-servidor e não sai da plataforma.
             </p>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>2️⃣ Digite o código de 6 dígitos do app para confirmar:</p>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 8 }}>2️⃣ Digite o código de 6 dígitos do app para confirmar:</p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" inputMode="numeric" style={{ flex: 1, minWidth: 140, padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 20, letterSpacing: 4, textAlign: 'center' }} />
-              <button onClick={confirm} disabled={busy || code.length !== 6} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: 'pointer', background: code.length === 6 ? '#25D366' : 'rgba(255,255,255,0.12)', color: code.length === 6 ? '#0a0a0a' : 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: 700 }}>Ativar 2FA</button>
+              <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="000000" inputMode="numeric" style={{ flex: 1, minWidth: 140, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 20, letterSpacing: 4, textAlign: 'center' }} />
+              <button onClick={confirm} disabled={busy || code.length !== 6} style={{ padding: '10px 22px', borderRadius: 10, border: 'none', cursor: 'pointer', background: code.length === 6 ? '#25D366' : 'var(--bg-hover)', color: code.length === 6 ? '#0a0a0a' : 'var(--text-muted)', fontSize: 14, fontWeight: 700 }}>Ativar 2FA</button>
             </div>
           </div>
         ) : (

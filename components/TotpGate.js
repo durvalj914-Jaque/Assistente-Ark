@@ -37,28 +37,31 @@ export default function TotpGate({ profile, pathname }) {
   }
 
   return (
+    <>
+      <style>{`.ark-2fa-err{color:#ff6b6b}[data-theme="light"] .ark-2fa-err{color:#dc2626}`}</style>
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div style={{ background: '#141414', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: 28, maxWidth: 380, width: '100%', textAlign: 'center' }}>
+      <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border-medium)', borderRadius: 16, padding: 28, maxWidth: 380, width: '100%', textAlign: 'center' }}>
         <div style={{ fontSize: 28, marginBottom: 8 }}>🔐</div>
-        <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px' }}>Verificação em 2 etapas</h2>
-        <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.55)', margin: '0 0 18px', lineHeight: 1.5 }}>
+        <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 8px', color: 'var(--text-primary)' }}>Verificação em 2 etapas</h2>
+        <p style={{ fontSize: 13.5, color: 'var(--text-muted)', margin: '0 0 18px', lineHeight: 1.5 }}>
           O console Arkiel exige seu código de 6 dígitos do app autenticador.
         </p>
         <input
           value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
           onKeyDown={(e) => e.key === 'Enter' && verify()}
           placeholder="000000" inputMode="numeric" autoFocus
-          style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(255,255,255,0.05)', color: '#fff', fontSize: 22, letterSpacing: 6, textAlign: 'center', marginBottom: 14, outline: 'none' }}
+          style={{ width: '100%', padding: '12px', borderRadius: 10, border: '1px solid var(--border-medium)', background: 'var(--bg-input)', color: 'var(--text-primary)', fontSize: 22, letterSpacing: 6, textAlign: 'center', marginBottom: 14, outline: 'none' }}
         />
-        {err && <p style={{ color: '#ff6b6b', fontSize: 13, margin: '0 0 10px' }}>{err}</p>}
+        {err && <p className='ark-2fa-err' style={{ fontSize: 13, margin: '0 0 10px' }}>{err}</p>}
         <button onClick={verify} disabled={code.length !== 6 || checking} style={{
           width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer',
-          background: code.length === 6 ? '#25D366' : 'rgba(255,255,255,0.12)',
-          color: code.length === 6 ? '#0a0a0a' : 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: 700,
+          background: code.length === 6 ? '#25D366' : 'var(--bg-hover)',
+          color: code.length === 6 ? '#0a0a0a' : 'var(--text-muted)', fontSize: 14, fontWeight: 700,
         }}>
           {checking ? 'Verificando...' : 'Entrar no console'}
         </button>
       </div>
     </div>
+    </>
   )
 }
