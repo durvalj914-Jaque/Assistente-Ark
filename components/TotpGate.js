@@ -14,7 +14,22 @@ export default function TotpGate({ profile, pathname }) {
 
   useEffect(() => {
     if (profile?.is_platform_admin && profile?.totp_enabled && isConsole) {
-      try { setNeed(sessionStorage.getItem('ark-2fa-ok') !== '1') } catch (_) { setNeed(true) }
+      ;(async () => {
+        let localOk = false
+        try { localOk = sessionStorage.getItem('ark-2fa-ok') === '1' } catch (_) {}
+        if (!localOk) { setNeed(true); return }
+        // Enforcement server-side: o sessionStorage NÃO é mais suficiente —
+        // pergunta ao servidor se a verificação 2FA ainda vale (janela de 8h).
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          const r = await fetch('/api/admin/2fa', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+            body: JSON.stringify({ action: 'check' }),
+          })
+          const j = await r.json().catch(() => ({}))
+          if (!j.ok) { try { sessionStorage.removeItem('ark-2fa-ok') } catch (_) {} setNeed(true) }
+        } catch (_) { setNeed(true) }
+      })()
     }
   }, [profile?.is_platform_admin, profile?.totp_enabled, pathname])
 

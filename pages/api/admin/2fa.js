@@ -18,14 +18,21 @@ import { encryptSecret, decryptSecret } from '../../../lib/aiSecret'
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const user = await requirePlatformAdmin(req, res)
+  const user = await requirePlatformAdmin(req, res, { skip2fa: true })
   if (!user) return
   const db = supabaseAdmin()
-  const { data: profile } = await db.from('profiles').select('id,email,totp_secret,totp_enabled').eq('id', user.id).maybeSingle()
+  const { data: profile } = await db.from('profiles').select('id,email,totp_secret,totp_enabled,totp_last_ok').eq('id', user.id).maybeSingle()
   if (!profile) return res.status(404).json({ error: 'Perfil não encontrado' })
 
   const action = req.body?.action
   const code = String(req.body?.code || '').trim()
+
+  // check → o portão do /painel pergunta ao servidor se a sessão 2FA ainda vale
+  if (action === 'check') {
+    if (!profile.totp_enabled) return res.status(200).json({ ok: true })
+    const last = profile.totp_last_ok ? new Date(profile.totp_last_ok).getTime() : 0
+    return res.status(200).json({ ok: !!last && Date.now() - last <= 8 * 3600 * 1000 })
+  }
 
   if (action === 'setup') {
     if (profile.totp_enabled) return res.status(400).json({ error: '2FA já está ativo. Para trocar o segredo, desative primeiro.' })
@@ -40,7 +47,7 @@ export default async function handler(req, res) {
     const secret = decryptSecret(profile.totp_secret)
     if (!secret) return res.status(400).json({ error: 'Gere o segredo primeiro (action: setup)' })
     if (!verifyTotp(secret, code)) return res.status(400).json({ error: 'Código inválido. Confira a hora do celular e tente de novo.' })
-    const { error } = await db.from('profiles').update({ totp_enabled: true, updated_at: new Date().toISOString() }).eq('id', user.id)
+    const { error } = await db.from('profiles').update({ totp_enabled: true, totp_last_ok: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', user.id)
     if (error) return res.status(500).json({ error: error.message })
     return res.status(200).json({ ok: true, enabled: true })
   }
@@ -50,6 +57,7 @@ export default async function handler(req, res) {
     if (!rateLimit('2fa-verify-' + user.id, 6, 5 * 60 * 1000)) return res.status(429).json({ error: 'Muitas tentativas. Aguarde 5 minutos.' })
     const secret = decryptSecret(profile.totp_secret)
     if (!secret || !verifyTotp(secret, code)) return res.status(401).json({ error: 'Código inválido' })
+    await db.from('profiles').update({ totp_last_ok: new Date().toISOString() }).eq('id', user.id)
     return res.status(200).json({ ok: true })
   }
 
@@ -57,7 +65,7 @@ export default async function handler(req, res) {
     if (!profile.totp_enabled) return res.status(400).json({ error: '2FA não está ativo' })
     const secret = decryptSecret(profile.totp_secret)
     if (!verifyTotp(secret, code)) return res.status(400).json({ error: 'Código inválido — não é possível desativar sem um código válido' })
-    await db.from('profiles').update({ totp_secret: null, totp_enabled: false, updated_at: new Date().toISOString() }).eq('id', user.id)
+    await db.from('profiles').update({ totp_secret: null, totp_enabled: false, totp_last_ok: null, updated_at: new Date().toISOString() }).eq('id', user.id)
     return res.status(200).json({ ok: true, enabled: false })
   }
 
