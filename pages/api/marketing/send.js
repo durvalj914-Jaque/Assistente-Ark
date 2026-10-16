@@ -24,9 +24,10 @@ export default async function handler(req, res) {
   if (req.query && !req.query.tenantId) req.query.tenantId = auth.tenant_id
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { tenant_id, message, contacts, image_url } = req.body
+  const { tenant_id, message, contacts: contactsIn, image_url } = req.body
+  let contacts = Array.isArray(contactsIn) ? contactsIn.filter(p => typeof p === 'string' && p.trim()) : []
 
-  if (!tenant_id || !message || !Array.isArray(contacts) || contacts.length === 0) {
+  if (!tenant_id || !message || !contacts.length) {
     return res.status(400).json({ error: 'tenant_id, message e contacts são obrigatórios' })
   }
 
@@ -53,6 +54,19 @@ export default async function handler(req, res) {
       ;(inboundRows || []).forEach(r => { if (phoneById[r.contact_id]) warmIds.add(phoneById[r.contact_id]) })
     }
   } catch (e) { console.error('[marketing/send] erro ao buscar contatos quentes:', e.message) }
+
+  // LGPD: respeita a revogação de consentimento — contatos com opt_in = false nunca recebem disparo
+  try {
+    const { data: optRows } = await db.from('contacts')
+      .select('phone, opt_in')
+      .eq('tenant_id', tenant_id)
+      .in('phone', contacts)
+    const blocked = new Set((optRows || []).filter(c => c.opt_in === false).map(c => c.phone))
+    if (blocked.size) {
+      contacts = contacts.filter(p => !blocked.has(p))
+      if (!contacts.length) return res.status(403).json({ error: 'Nenhum contato com consentimento ativo (opt_in) para receber marketing.' })
+    }
+  } catch (_) {}
 
   // 1. Verificar saldo de créditos de marketing (só contatos frios consomem)
   const { data: creditRow } = await db.from('conversation_credits')
