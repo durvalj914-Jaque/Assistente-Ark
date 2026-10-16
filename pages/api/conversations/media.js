@@ -16,13 +16,14 @@ export default async function handler(req, res) {
   const conversationId = req.query.conversation_id
   if (!conversationId) return res.status(400).json({ error: 'conversation_id é obrigatório' })
 
+  const db = supabaseAdmin()
+
   // IDOR guard: conversa precisa pertencer a um tenant do usuário
   const { data: conv } = await db.from('conversations').select('tenant_id').eq('id', conversationId).maybeSingle()
   if (!conv) return res.status(404).json({ error: 'Conversa não encontrada' })
   const { data: member } = await db.from('tenant_members').select('tenant_id').eq('tenant_id', conv.tenant_id).eq('user_id', user.id).maybeSingle()
   if (!member) return res.status(403).json({ error: 'Sem acesso a este tenant' })
 
-  const db = supabaseAdmin()
 
   // Buscar mensagens que contêm mídia (formato __media__:{type}:{media_id}__)
   const { data: messages, error } = await db.from('messages')
