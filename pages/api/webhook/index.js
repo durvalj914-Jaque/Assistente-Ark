@@ -668,6 +668,9 @@ async function processWebhook(body) {
     content: displayContent, meta_message_id: wamId
   })
 
+  // Preserva a janela 24h no contato: sobrevive se o B2B apagar a conversa
+  try { await db.from('contacts').update({ last_inbound_at: new Date().toISOString() }).eq('id', contact.id) } catch (e) { console.error('last_inbound_at update falhou', e.message) }
+
   // ── CHECK PIX PENDENTE: se há cobrança pendente, enviar PIX agora (janela 24h aberta) ──
   const { data: pendingCharge } = await db.from('messages')
     .select('id, content, created_at')
