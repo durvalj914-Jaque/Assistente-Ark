@@ -17,7 +17,7 @@ export default function ConsentModal({ profile, user, onAccept }) {
     setSaving(true); setError('')
     const { error: err } = await supabase
       .from('profiles')
-      .update({ consent_accepted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ consent_accepted_at: new Date().toISOString() })
       .eq('id', user.id)
     if (err) { setError('Não foi possível registrar o aceite. Verifique sua conexão e tente de novo.'); setSaving(false); return }
     setSaving(false)
