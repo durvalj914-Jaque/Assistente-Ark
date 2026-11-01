@@ -42,6 +42,8 @@ export default function AssistenteArkLanding({ siteUrl = '/' }) {
           name: 'Assistente Ark',
           applicationCategory: 'BusinessApplication',
           operatingSystem: 'Web, WhatsApp',
+          image: 'https://www.assistente-ark.com.br/assistente-ark-logo.png',
+          logo: 'https://www.assistente-ark.com.br/assistente-ark-logo.png',
           description: 'Plataforma para criar e gerenciar bots de atendimento automático no WhatsApp Business, com IA, catálogo de produtos, agendamento de serviços e cobrança por PIX.',
           offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL', description: 'Plano gratuito disponível' },
         }) }} />
