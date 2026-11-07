@@ -273,6 +273,73 @@ async function applySeasonalFlow(db, bot) {
 // na primeira resposta do bot de cada conversa nova. ──
 const LGPD_NOTICE = '🔒 Aviso: ao conversar com este atendimento, seu telefone e as mensagens são tratados conforme a LGPD — https://www.assistente-ark.com.br/privacidade'
 
+/**
+ * COEXISTÊNCIA — mensagens que o B2B digita no WhatsApp Business App chegam
+ * aqui como `smb_message_echoes`. Gravamos como outbound (sent_by 'human') e
+ * colocamos a conversa em modo manual, para o bot não responder por cima do
+ * atendente. O app do cliente é a fonte da verdade; aqui é só espelho.
+ */
+async function handleMessageEchoes(db, change, echoes) {
+  const phoneNumberId = change?.metadata?.phone_number_id || PHONE_ID
+  const { data: botArr } = await db.from('bots')
+    .select('id,tenant_id,status').eq('phone_number_id', phoneNumberId).limit(1)
+  const bot = botArr?.[0]
+  if (!bot) { await savelog(db, 'echo_no_bot', phoneNumberId); return }
+
+  let saved = 0
+  for (const echo of echoes) {
+    const toRaw = echo.to || ''
+    const to = (toRaw.startsWith('55') && toRaw.length === 12)
+      ? toRaw.slice(0, 4) + '9' + toRaw.slice(4) : toRaw
+    if (!to) continue
+
+    // Dedupe por wamid (a Meta re-entrega webhooks)
+    if (echo.id) {
+      const { data: dup } = await db.from('messages').select('id').eq('meta_message_id', echo.id).limit(1)
+      if (dup?.length) continue
+    }
+
+    let content = ''
+    if (echo.type === 'text') content = echo.text?.body || ''
+    else if (['image', 'video', 'audio', 'document', 'sticker'].includes(echo.type)) {
+      const m = echo[echo.type] || {}
+      content = `__media__:${echo.type}:${m.id || ''}__${m.caption ? ' ' + m.caption : ''}`
+    } else content = `[${echo.type || 'mensagem'} enviada pelo app]`
+
+    // Contato: o número que RECEBEU a mensagem do B2B
+    let { data: contact } = await db.from('contacts')
+      .select('id').eq('tenant_id', bot.tenant_id).eq('phone', to).maybeSingle()
+    if (!contact) {
+      const c = await db.from('contacts').insert({ tenant_id: bot.tenant_id, phone: to }).select('id').single()
+      contact = c.data
+    }
+    if (!contact) continue
+
+    // Conversa: cria se não existir, já pausada (atendimento humano)
+    let { data: conv } = await db.from('conversations')
+      .select('id').eq('bot_id', bot.id).eq('contact_id', contact.id).maybeSingle()
+    if (!conv) {
+      const cv = await db.from('conversations').insert({
+        tenant_id: bot.tenant_id, bot_id: bot.id, contact_id: contact.id,
+        status: 'no_bot', last_message: content.slice(0, 120), last_message_at: new Date().toISOString(),
+      }).select('id').single()
+      conv = cv.data
+    }
+    if (!conv) continue
+
+    await safeInsert(db, 'messages', {
+      tenant_id: bot.tenant_id, conversation_id: conv.id, bot_id: bot.id,
+      contact_id: contact.id, direction: 'outbound', type: echo.type || 'text',
+      content, meta_message_id: echo.id, sent_by: 'human',
+    })
+    await db.from('conversations')
+      .update({ status: 'no_bot', last_message: content.slice(0, 120), last_message_at: new Date().toISOString() })
+      .eq('id', conv.id)
+    saved++
+  }
+  await savelog(db, 'smb_echoes', null, { recebidos: echoes.length, salvos: saved })
+}
+
 async function processWebhook(body) {
   const db     = getDB()
   const change = body?.entry?.[0]?.changes?.[0]?.value
@@ -380,6 +447,16 @@ async function processWebhook(body) {
     }
     return
   }
+  // ── COEXISTÊNCIA: espelho de mensagens do WhatsApp Business App ──
+  const echoes = change?.message_echoes
+  if (echoes?.length) { await handleMessageEchoes(db, change, echoes); return }
+
+  // Sync de contatos/histórico do app durante o onboarding: registrado e ignorado
+  if (change?.state_sync || change?.history) {
+    await savelog(db, 'coex_sync_event', null, { state_sync: !!change?.state_sync, history: !!change?.history })
+    return
+  }
+
   const msgs = change?.messages
   if (!msgs?.length) { await savelog(db, 'no_messages', 'empty'); return }
 

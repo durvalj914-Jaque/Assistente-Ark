@@ -148,6 +148,11 @@ export default function WhatsappSetupPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div>
               <div style={{ color: '#10b981', fontWeight: 700, fontSize: 14, marginBottom: 6 }}>✅ WhatsApp conectado</div>
+              {bot.coexistence && (
+                <div style={{ display: 'inline-block', marginBottom: 6, padding: '3px 10px', borderRadius: 999, background: 'rgba(37,211,102,0.12)', border: '1px solid rgba(37,211,102,0.35)', color: '#25D366', fontSize: 11, fontWeight: 700 }}>
+                  📱 Coexistência — app e API no mesmo número
+                </div>
+              )}
               <div style={{ color: '#94a3b8', fontSize: 13 }}>Bot <b style={{ color: '#e2e8f0' }}>{bot.name}</b> ativo no número configurado.</div>
             </div>
             <button
@@ -212,6 +217,23 @@ export default function WhatsappSetupPage() {
         <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(24,119,242,0.25)' }}>
           <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📶 Prefere logar com o Facebook?<SectionHelp t='whatsapp-setup' s='facebook' /></h3>
           <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 16 }}>Se você já tem uma conta WhatsApp Business própria no Facebook, pode conectar direto por lá — o bot é criado junto com o número.</p>
+          <WhatsAppEmbeddedSignup botId={null} onConnected={() => window.location.reload()} />
+        </div>
+      )}
+
+      {canAddNumber && (
+        <div className="ark-card" style={{ marginBottom: 20, borderColor: 'rgba(37,211,102,0.35)' }}>
+          <h3 style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 10, fontSize: 14 }}>📱 Quero manter o WhatsApp Business App no celular (coexistência)</h3>
+          <p style={{ color: '#94a3b8', fontSize: 13, marginBottom: 12 }}>
+            Se você já usa o <b style={{ color: '#e2e8f0' }}>WhatsApp Business App</b> nesse número, pode conectar a automação sem perder nada:
+            o bot atende, e você continua conversando pelo app normalmente — catálogo, etiquetas, grupos e chamadas seguem no celular.
+          </p>
+          <ul style={{ color: '#94a3b8', fontSize: 12.5, lineHeight: 1.7, margin: '0 0 14px', paddingLeft: 18 }}>
+            <li>✅ Histórico de até 6 meses e contatos podem ser importados na conexão</li>
+            <li>✅ Mensagens do app aparecem no painel e <b style={{ color: '#e2e8f0' }}>pausam o bot</b> naquela conversa (você assume o atendimento)</li>
+            <li>⚠️ Abra o WhatsApp Business App no celular pelo menos uma vez a cada 13 dias</li>
+            <li>⚠️ Sem selo de verificação (OBA) e sem chamadas pela API nesse modo; envio limitado a 20 msg/s</li>
+          </ul>
           <WhatsAppEmbeddedSignup botId={null} onConnected={() => window.location.reload()} />
         </div>
       )}

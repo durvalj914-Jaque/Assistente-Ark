@@ -11,7 +11,7 @@
  * Header: Authorization: Bearer <supabase_session_token>
  */
 import { supabaseAdmin } from '../../../lib/supabase'
-import { exchangeCodeForLongLivedToken, registerPhoneNumber, subscribeAppToWaba } from '../../../lib/meta'
+import { exchangeCodeForLongLivedToken, registerPhoneNumber, subscribeAppToWaba, getPhoneNumberInfo } from '../../../lib/meta'
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -53,13 +53,22 @@ export default async function handler(req, res) {
   try {
     const accessToken = await exchangeCodeForLongLivedToken(code, appId, appSecret)
 
-    // Registro do número pode falhar com "already registered" se o cliente já
-    // tinha feito isso antes (ex.: reconexão) — nesse caso seguimos em frente.
+    // COEXISTÊNCIA: se o número já vive no WhatsApp Business App, a Meta trata
+    // como registrado — registrar de novo quebraria o app do cliente.
+    let isCoex = false
     try {
-      await registerPhoneNumber(phone_number_id, accessToken)
-    } catch (regErr) {
-      const msg = regErr?.response?.data?.error?.message || ''
-      if (!/already|registered/i.test(msg)) throw regErr
+      const info = await getPhoneNumberInfo(phone_number_id, accessToken)
+      isCoex = info?.is_on_biz_app === true
+    } catch (_) {}
+
+    if (!isCoex) {
+      // Registro pode falhar com "already registered" em reconexões — seguimos.
+      try {
+        await registerPhoneNumber(phone_number_id, accessToken)
+      } catch (regErr) {
+        const msg = regErr?.response?.data?.error?.message || ''
+        if (!/already|registered/i.test(msg)) throw regErr
+      }
     }
 
     await subscribeAppToWaba(waba_id, accessToken)
@@ -68,7 +77,8 @@ export default async function handler(req, res) {
       phone_number_id,
       waba_id,
       access_token: accessToken,
-      status: 'active'
+      status: 'active',
+      coexistence: isCoex
     }).eq('id', bot_id)
     if (updateErr) throw updateErr
 
