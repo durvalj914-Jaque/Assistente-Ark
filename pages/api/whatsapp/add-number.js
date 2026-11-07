@@ -126,7 +126,7 @@ export default async function handler(req, res) {
         updated_at: new Date().toISOString(),
       }).eq('id', bot.id)
 
-      return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, already_verified: true })
+      return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, bot_id: bot.id, already_verified: true })
     }
 
     await requestVerificationCode(phoneNumberId, systemToken, 'SMS')
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
       pending_display_number: `+${cc} ${phone_number}`
     }).eq('id', bot.id)
 
-    return res.status(200).json({ ok: true, phone_number_id: phoneNumberId })
+    return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, bot_id: bot.id })
   } catch (err) {
     console.error('[add-number] erro:', err?.response?.data || err.message)
     const metaMsg = err?.response?.data?.error?.error_user_msg || err?.response?.data?.error?.message
