@@ -15,6 +15,7 @@ export default function WhatsAppSmsConnect({ botId, businessName, onConnected })
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [resolvedBotId, setResolvedBotId] = useState(botId || null)
 
   async function authHeader() {
     const { data: { session } } = await supabase.auth.getSession()
@@ -33,6 +34,7 @@ export default function WhatsAppSmsConnect({ botId, businessName, onConnected })
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Falha ao adicionar o número')
+      setResolvedBotId(json.bot_id || botId || null)
       setStep('code')
     } catch (err) {
       setError(err.message)
@@ -49,7 +51,7 @@ export default function WhatsAppSmsConnect({ botId, businessName, onConnected })
     try {
       const res = await fetch('/api/whatsapp/confirm-number', {
         method: 'POST', headers: await authHeader(),
-        body: JSON.stringify({ bot_id: botId, code: code.trim() })
+        body: JSON.stringify({ bot_id: resolvedBotId || botId, code: code.trim() })
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Falha ao confirmar o código')
