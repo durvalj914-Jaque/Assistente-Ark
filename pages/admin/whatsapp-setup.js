@@ -234,7 +234,13 @@ export default function WhatsappSetupPage() {
             <li>⚠️ Abra o WhatsApp Business App no celular pelo menos uma vez a cada 13 dias</li>
             <li>⚠️ Sem selo de verificação (OBA) e sem chamadas pela API nesse modo; envio limitado a 20 msg/s</li>
           </ul>
-          <WhatsAppEmbeddedSignup botId={null} onConnected={() => window.location.reload()} />
+          <WhatsAppEmbeddedSignup
+            botId={null}
+            variant="coexistence"
+            label="📱 Conectar WhatsApp Business App por coexistência"
+            hint="Vai abrir um popup do Facebook: escolha o número que você já usa no WhatsApp Business App (versão 2.24.17 ou mais nova) e conclua a verificação no celular. O bot e o app passam a funcionar juntos no mesmo número."
+            onConnected={() => window.location.reload()}
+          />
         </div>
       )}
 

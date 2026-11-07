@@ -11,7 +11,8 @@ const CONFIG_ID = process.env.NEXT_PUBLIC_WHATSAPP_CONFIG_ID
  * waba_id + phone_number_id, mandamos pro backend, e pronto — sem token
  * manual, sem espera pela equipe Arkiel.
  */
-export default function WhatsAppEmbeddedSignup({ botId, onConnected }) {
+export default function WhatsAppEmbeddedSignup({ botId, onConnected, label, hint, variant = 'facebook' }) {
+  const isCoex = variant === 'coexistence'
   const [sdkReady, setSdkReady] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [error, setError] = useState('')
@@ -92,11 +93,11 @@ export default function WhatsAppEmbeddedSignup({ botId, onConnected }) {
   return (
     <div>
       <button type="button" onClick={handleConnect} disabled={connecting} className="ark-btn"
-        style={{ background: '#1877F2', display: 'flex', alignItems: 'center', gap: 8 }}>
-        {connecting ? 'Conectando...' : '📶 Conectar com Facebook'}
+        style={{ background: isCoex ? '#25D366' : '#1877F2', color: isCoex ? '#07240f' : '#fff', display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+        {connecting ? 'Conectando...' : (label || '📶 Conectar com Facebook')}
       </button>
       <p style={{ color: '#334155', fontSize: 11, marginTop: 8 }}>
-        Vai abrir um popup do Facebook — escolha ou crie sua conta WhatsApp Business e sua conexão fica pronta na hora.
+        {hint || 'Vai abrir um popup do Facebook — escolha ou crie sua conta WhatsApp Business e sua conexão fica pronta na hora.'}
       </p>
       {error && <p style={{ color: '#ef4444', fontSize: 12, marginTop: 8 }}>{error}</p>}
     </div>
