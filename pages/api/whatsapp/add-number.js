@@ -39,17 +39,29 @@ export default async function handler(req, res) {
     const { data: tm } = await db.from('tenant_members').select('tenant_id').eq('user_id', user.id).limit(1)
     if (!tm?.length) return res.status(403).json({ error: 'Acesso negado' })
     const tid = tm[0].tenant_id
-    const { data: tenant } = await db.from('tenants').select('id, plan, subscription').eq('id', tid).single()
-    const { count } = await db.from('bots').select('id', { count: 'exact', head: true }).eq('tenant_id', tid)
-    if (!checkLimit(tenant, null, count || 0, 'bots')) {
-      const plan = PLANS[tenant?.plan] || PLANS.free
-      return res.status(403).json({ error: `Seu plano permite ${plan.max_bots > 900 ? 'números ilimitados' : plan.max_bots + ' número(s)'}. Faça upgrade pra conectar mais.`, upsell: true })
+    // Reaproveita um bot do tenant que ainda está sem número (inclusive os legados,
+    // criados antes da regra "bot nasce com o número"). Só cria um novo se todos já tiverem número.
+    const { data: freeBot } = await db
+      .from('bots').select('id, tenant_id')
+      .eq('tenant_id', tid).is('phone_number_id', null)
+      .order('created_at', { ascending: true }).limit(1)
+    if (freeBot?.length) {
+      bot = freeBot[0]
+    } else {
+      const { data: tenant } = await db.from('tenants').select('id, plan, subscription').eq('id', tid).single()
+      // A cota do plano conta números CONECTADOS, não bots vazios.
+      const { count } = await db.from('bots').select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tid).not('phone_number_id', 'is', null)
+      if (!checkLimit(tenant, null, count || 0, 'bots')) {
+        const plan = PLANS[tenant?.plan] || PLANS.free
+        return res.status(403).json({ error: `Seu plano permite ${plan.max_bots > 900 ? 'números ilimitados' : plan.max_bots + ' número(s)'}. Faça upgrade pra conectar mais.`, upsell: true })
+      }
+      const cr = await db.from('bots').insert({
+        tenant_id: tid,
+        name: (verified_name || '').slice(0, 60) || `WhatsApp ${phone_number}`,
+      }).select('id, tenant_id').single()
+      bot = cr.data; botErr = cr.error
     }
-    const cr = await db.from('bots').insert({
-      tenant_id: tid,
-      name: (verified_name || '').slice(0, 60) || `WhatsApp ${phone_number}`,
-    }).select('id, tenant_id').single()
-    bot = cr.data; botErr = cr.error
   }
   if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado ou não pôde ser criado' })
 
@@ -110,9 +122,9 @@ export default async function handler(req, res) {
         pending_phone_number_id: null,
         pending_display_number: null,
         updated_at: new Date().toISOString(),
-      }).eq('id', bot_id)
+      }).eq('id', bot.id)
 
-      return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, already_verified: true })
+      return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, bot_id: bot.id, already_verified: true })
     }
 
     await requestVerificationCode(phoneNumberId, systemToken, 'SMS')
@@ -120,9 +132,9 @@ export default async function handler(req, res) {
     await db.from('bots').update({
       pending_phone_number_id: phoneNumberId,
       pending_display_number: `+${cc} ${phone_number}`
-    }).eq('id', bot_id)
+    }).eq('id', bot.id)
 
-    return res.status(200).json({ ok: true, phone_number_id: phoneNumberId })
+    return res.status(200).json({ ok: true, phone_number_id: phoneNumberId, bot_id: bot.id })
   } catch (err) {
     console.error('[add-number] erro:', err?.response?.data || err.message)
     const metaMsg = err?.response?.data?.error?.error_user_msg || err?.response?.data?.error?.message
