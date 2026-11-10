@@ -126,6 +126,10 @@ export default async function handler(req, res) {
       phone_number_id: null,
       waba_id: null,
       access_token: null,
+      // Limpa qualquer verificação pendente: sem isso, um SMS antigo podia
+      // reativar o bot com um número já desconectado.
+      pending_phone_number_id: null,
+      pending_display_number: null,
       updated_at: new Date().toISOString(),
     })
     .eq('id', bot_id)
