@@ -64,12 +64,25 @@ export default async function handler(req, res) {
   if (!accessToken) return res.status(500).json({ error: 'Token de acesso indisponível' })
 
   try {
-    const fields = 'verified_name,display_phone_number,quality_rating,name_status,new_name_status,messaging_limit_tier,account_membership_status,account_mode,platform_type'
-    const r = await fetch(`${GRAPH}/${bot.phone_number_id}?fields=${fields}`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    const d = await r.json()
-    if (!r.ok) throw new Error(d?.error?.message || `Erro ${r.status} na Graph API`)
+    // Campos validos na Graph v25. O antigo account_membership_status nao existe mais
+    // e derrubava a chamada inteira (erro 100), deixando o cartao de saude sem resposta.
+    const SAFE_FIELDS = 'verified_name,display_phone_number,quality_rating,name_status,account_mode'
+    const FULL_FIELDS = `${SAFE_FIELDS},new_name_status,messaging_limit_tier,platform_type`
+
+    const getNumber = async (fields) => {
+      const r = await fetch(`${GRAPH}/${bot.phone_number_id}?fields=${fields}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      const d = await r.json()
+      return { ok: r.ok, status: r.status, d }
+    }
+
+    let { ok, status, d } = await getNumber(FULL_FIELDS)
+    if (!ok) {
+      const retry = await getNumber(SAFE_FIELDS)
+      if (!retry.ok) throw new Error(retry.d?.error?.message || `Erro ${retry.status} na Graph API`)
+      ok = retry.ok; status = retry.status; d = retry.d
+    }
 
     const q = QUALITY[d.quality_rating] || QUALITY.UNKNOWN
     return res.json({
