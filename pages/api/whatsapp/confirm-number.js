@@ -25,17 +25,25 @@ export default async function handler(req, res) {
   const { data: { user }, error: authError } = await db.auth.getUser(userToken)
   if (authError || !user) return res.status(401).json({ error: 'Não autorizado' })
 
-  const { data: bot, error: botErr } = await db.from('bots').select('id, tenant_id, pending_phone_number_id').eq('id', bot_id).single()
+  const { data: bot, error: botErr } = await db.from('bots').select('id, tenant_id, status, phone_number_id, pending_phone_number_id').eq('id', bot_id).single()
   if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado' })
-  if (!bot.pending_phone_number_id) return res.status(400).json({ error: 'Nenhum número aguardando confirmação pra esse bot' })
+  if (!bot.pending_phone_number_id) {
+    // Idempotente: se o número desse bot já está conectado e ativo, repetir a
+    // confirmação não é erro (acontece quando o cliente clica duas vezes ou
+    // recarrega a página no meio do fluxo).
+    if (bot.phone_number_id && bot.status === 'active') {
+      return res.status(200).json({ ok: true, already_connected: true, phone_number_id: bot.phone_number_id, bot_id: bot.id })
+    }
+    return res.status(400).json({ error: 'Nenhum número aguardando confirmação pra esse bot' })
+  }
 
   const { data: member } = await db
     .from('tenant_members').select('role')
     .eq('tenant_id', bot.tenant_id).eq('user_id', user.id).maybeSingle()
   if (!member) return res.status(403).json({ error: 'Acesso negado a este bot' })
 
-  const systemToken = process.env.META_SYSTEM_USER_TOKEN
-  if (!systemToken) return res.status(500).json({ error: 'META_SYSTEM_USER_TOKEN não configurado no servidor' })
+  const systemToken = process.env.META_SYSTEM_USER_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
+  if (!systemToken || systemToken === '[SENSITIVE]') return res.status(500).json({ error: 'Token da Meta não configurado no servidor' })
 
   const phoneNumberId = bot.pending_phone_number_id
 
