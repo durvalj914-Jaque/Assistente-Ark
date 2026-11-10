@@ -166,8 +166,11 @@ export default async function handler(req, res) {
   // fluxo inicial — senão conecta o número e o bot fica sem responder nada.
   try {
     const { data: full } = await db.from('bots').select('id, flow').eq('id', bot.id).single()
-    const nodes = full?.flow?.nodes
-    const hasMenu = Array.isArray(nodes) && nodes.some(n => (n.buttons?.length || 0) > 0 || n.type === 'menu')
+    const nodes = Array.isArray(full?.flow?.nodes) ? full.flow.nodes : []
+    // "Tem menu" = pelo menos um botão de verdade. Fluxo com nós mas sem nenhum
+    // botão deixa o cliente sem opção nenhuma pra clicar (aconteceu com 3 tenants).
+    const totalButtons = nodes.reduce((acc, n) => acc + ((n?.buttons?.length) || 0), 0)
+    const hasMenu = totalButtons > 0
     if (!hasMenu) {
       await db.from('bots').update({
         flow: DEFAULT_FLOW,
