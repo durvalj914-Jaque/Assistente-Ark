@@ -84,7 +84,7 @@ export default function WhatsappSetupPage() {
   }
 
   async function disconnectWhatsApp(bot) {
-    if (!confirm(`⚠️ Desconectar o WhatsApp do bot "${bot.name}"?\n\nO número será desvinculado da plataforma e liberado. Você poderá:\n• Voltar para o app oficial do WhatsApp\n• Recadastrar em outra conta\n\nConversas existentes serão encerradas (não deletadas).\n\nDeseja continuar?`)) return
+    if (!confirm(`⚠️ Desconectar o WhatsApp do bot "${bot.name}"?\n\nO número será desvinculado da plataforma e liberado. Você poderá:\n• Voltar para o app oficial do WhatsApp\n• Recadastrar em outra conta\n\nO bot vinculado a este número será EXCLUÍDO junto (com o fluxo e a configuração). O histórico de conversas e pagamentos continua na sua conta.\n\nDeseja continuar?`)) return
     setDisconnectingId(bot.id)
     setDisconnectResults(prev => ({ ...prev, [bot.id]: null }))
     try {
@@ -190,7 +190,7 @@ export default function WhatsappSetupPage() {
             </div>
           )}
           <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border-soft)', color: '#64748b', fontSize: 12, lineHeight: 1.6 }}>
-            💡 Ao desconectar, o número é liberado da plataforma Arkiel e pode ser usado novamente.<br/>
+            💡 Ao desconectar, o número é liberado da plataforma Arkiel e o bot vinculado a ele é excluído (o histórico de conversas fica na sua conta).<br/>
             <b style={{ color: '#94a3b8' }}>Prazos para reutilizar:</b><br/>
             • <b>App oficial do WhatsApp</b> — geralmente em algumas horas<br/>
             • <b>Recadastrar em outra conta de API</b> — até 24h (em casos raros, a Meta pode segurar até 30 dias)
