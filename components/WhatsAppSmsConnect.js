@@ -35,6 +35,8 @@ export default function WhatsAppSmsConnect({ botId, businessName, onConnected })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Falha ao adicionar o número')
       setResolvedBotId(json.bot_id || botId || null)
+      // Número já conectado e ativo: nada a confirmar, só atualiza a tela.
+      if (json.already_connected) { onConnected && onConnected(); return }
       setStep('code')
     } catch (err) {
       setError(err.message)
