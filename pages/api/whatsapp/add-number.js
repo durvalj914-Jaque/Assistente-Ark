@@ -21,6 +21,43 @@ const SHARED_WABA_ID = process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798'
 
 const digitsOnly = (s) => (s || '').replace(/\D/g, '')
 
+// Fluxo inicial de todo bot novo: sem isso o bot nasce sem menu e fica mudo.
+const DEFAULT_FLOW = {
+  name: 'Fluxo Principal',
+  nodes: [
+    {
+      id: 'root',
+      type: 'menu',
+      text: 'Olá! 👋 Como podemos ajudar?\n\nEscolha uma opção:',
+      action: 'none',
+      buttons: [
+        { id: 'b_humano', label: '👤 Falar com um atendente' },
+        { id: 'b_produtos', label: '📋 Ver produtos' },
+      ],
+      children: ['humano', 'produtos'],
+      parentId: null,
+    },
+    {
+      id: 'humano',
+      type: 'transfer',
+      text: 'Beleza! Já chamei alguém da nossa equipe. Em instantes te respondemos por aqui. 🙂',
+      action: 'transfer',
+      buttons: [],
+      children: [],
+      parentId: 'root',
+    },
+    {
+      id: 'produtos',
+      type: 'message',
+      text: 'Aqui está nosso catálogo. Toque em um item pra ver detalhes.',
+      action: 'catalog',
+      buttons: [],
+      children: [],
+      parentId: 'root',
+    },
+  ],
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -116,11 +153,29 @@ export default async function handler(req, res) {
       const cr = await db.from('bots').insert({
         tenant_id: tenantId,
         name: (verified_name || '').slice(0, 60) || `WhatsApp ${phone_number}`,
+        greeting: 'Olá! 👋 Como podemos ajudar?',
+        fallback_message: 'Não entendi. 😅 Digite o número da opção desejada ou *0* para voltar ao menu.',
+        flow: DEFAULT_FLOW,
       }).select('id, tenant_id').single()
       bot = cr.data; botErr = cr.error
     }
   }
   if (botErr || !bot) return res.status(404).json({ error: 'Bot não encontrado ou não pôde ser criado' })
+
+  // Bot reaproveitado que nunca teve fluxo (ou ficou com um nó vazio) ganha o
+  // fluxo inicial — senão conecta o número e o bot fica sem responder nada.
+  try {
+    const { data: full } = await db.from('bots').select('id, flow').eq('id', bot.id).single()
+    const nodes = full?.flow?.nodes
+    const hasMenu = Array.isArray(nodes) && nodes.some(n => (n.buttons?.length || 0) > 0 || n.type === 'menu')
+    if (!hasMenu) {
+      await db.from('bots').update({
+        flow: DEFAULT_FLOW,
+        greeting: 'Olá! 👋 Como podemos ajudar?',
+        fallback_message: 'Não entendi. 😅 Digite o número da opção desejada ou *0* para voltar ao menu.',
+      }).eq('id', bot.id)
+    }
+  } catch (_) { /* se falhar, não bloqueia a conexão */ }
 
   const { data: member } = await db
     .from('tenant_members').select('role')
