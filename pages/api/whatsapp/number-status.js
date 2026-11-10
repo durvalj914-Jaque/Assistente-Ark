@@ -29,7 +29,8 @@ const NAME_STATUS = {
   PENDING: '⏳ Nome em revisão',
   NONE: 'Sem nome verificado',
   REJECTED: '❌ Nome rejeitado — fale com o suporte',
-  DECLINED: '⚠️ Nome recusado pela Meta — o número segue funcionando; fale com o suporte pra reabrir',
+  DECLINED: '⚠️ Nome recusado pela Meta — o número segue funcionando; envie um novo nome pra reanálise',
+  PENDING_REVIEW: '⏳ Novo nome em revisão pela Meta — o número segue funcionando normalmente',
 }
 
 export default async function handler(req, res) {
@@ -63,7 +64,7 @@ export default async function handler(req, res) {
   if (!accessToken) return res.status(500).json({ error: 'Token de acesso indisponível' })
 
   try {
-    const fields = 'verified_name,display_phone_number,quality_rating,name_status,messaging_limit_tier,account_membership_status,account_mode,platform_type'
+    const fields = 'verified_name,display_phone_number,quality_rating,name_status,new_name_status,messaging_limit_tier,account_membership_status,account_mode,platform_type'
     const r = await fetch(`${GRAPH}/${bot.phone_number_id}?fields=${fields}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
@@ -77,7 +78,11 @@ export default async function handler(req, res) {
       verified_name: d.verified_name || bot.name,
       quality: { code: d.quality_rating || 'UNKNOWN', ...q },
       messaging_limit: TIER[d.messaging_limit_tier] || (d.messaging_limit_tier || 'Não informado'),
-      name_status: NAME_STATUS[d.name_status] || (d.name_status || 'Não informado'),
+      name_status: (d.new_name_status && d.new_name_status !== 'NONE'
+        ? (NAME_STATUS[d.new_name_status] || `⏳ Nome em análise (${d.new_name_status})`)
+        : (NAME_STATUS[d.name_status] || (d.name_status || 'Não informado'))),
+      name_status_code: d.name_status || null,
+      new_name_status: d.new_name_status || null,
       account_mode: d.account_mode || null,
     })
   } catch (e) {
