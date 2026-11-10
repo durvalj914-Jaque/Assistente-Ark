@@ -95,18 +95,43 @@ export default async function handler(req, res) {
       phone_number_id,
       waba_id: process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798',
       status: 'active',
-      flow: { nodes: [{ id: 'root', type: 'menu', text: 'Olá! Como posso ajudar?', options: [] }] },
+      greeting: 'Olá! 👋 Como podemos ajudar?',
+      fallback_message: 'Não entendi. 😅 Digite o número da opção desejada ou *0* para voltar ao menu.',
+      flow: {
+        name: 'Fluxo Principal',
+        nodes: [
+          {
+            id: 'root', type: 'menu', action: 'none',
+            text: 'Olá! 👋 Como podemos ajudar?\n\nEscolha uma opção:',
+            buttons: [ { id: 'b_humano', label: '👤 Falar com um atendente' }, { id: 'b_produtos', label: '📋 Ver produtos' } ],
+            children: [ 'n_humano', 'n_produtos' ], parentId: null,
+          },
+          { id: 'n_humano', type: 'transfer', action: 'transfer', text: 'Perfeito! Vou chamar um atendente humano. 💬', buttons: [], children: [], parentId: 'root' },
+          { id: 'n_produtos', type: 'message', action: 'catalog', text: '📋 Aqui estão nossos produtos:', buttons: [], children: [], parentId: 'root' },
+        ],
+      },
     }).select('id')
 
     if (createErr) return res.status(500).json({ error: 'Erro ao criar bot', detail: createErr.message })
     botId = newBotId
   }
 
-  // Desvincular o número de qualquer outro bot que o tenha
-  const { error: unlinkErr } = await db.from('bots')
-    .update({ phone_number_id: null, status: 'inactive' })
-    .neq('id', botId)
+  // Desvincular o número de qualquer outro bot que o tenha e EXCLUIR esse bot:
+  // bot é consequência do número, então quem perdeu o número sai junto.
+  const { data: previousBots } = await db.from('bots')
+    .select('id')
     .eq('phone_number_id', phone_number_id)
+    .neq('id', botId)
+
+  for (const prev of previousBots || []) {
+    // Histórico continua com o tenant (evita o CASCADE apagar mensagens/pagamentos).
+    for (const table of ['messages', 'conversations', 'payments', 'appointments', 'analytics_events', 'whatsapp_orders', 'conversation_windows']) {
+      await db.from(table).update({ bot_id: null }).eq('bot_id', prev.id)
+    }
+    await db.from('bots').delete().eq('id', prev.id)
+  }
+
+  const unlinkErr = null
 
   return res.status(200).json({
     ok: true,
