@@ -118,25 +118,7 @@ export default async function handler(req, res) {
     }
   }
 
-  // 3. Limpar dados do WhatsApp no bot
-  const { error: updateErr } = await db
-    .from('bots')
-    .update({
-      status: 'inactive',
-      phone_number_id: null,
-      waba_id: null,
-      access_token: null,
-      // Limpa qualquer verificação pendente: sem isso, um SMS antigo podia
-      // reativar o bot com um número já desconectado.
-      pending_phone_number_id: null,
-      pending_display_number: null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', bot_id)
-
-  results.steps.push({ step: 'update_bot', success: !updateErr, error: updateErr?.message })
-
-  // 4. Fechar conversas abertas
+  // 3. Fechar conversas abertas
   const { error: convErr } = await db
     .from('conversations')
     .update({ status: 'closed' })
@@ -145,13 +127,35 @@ export default async function handler(req, res) {
 
   results.steps.push({ step: 'close_conversations', success: !convErr, error: convErr?.message })
 
+  // 4. Desanexar o histórico do bot (fica com o tenant) — evita que o CASCADE
+  //    apague mensagens, conversas e pedidos quando o bot for excluído.
+  const detachTables = ['messages', 'conversations', 'payments', 'appointments', 'analytics_events', 'whatsapp_orders', 'conversation_windows']
+  for (const table of detachTables) {
+    const { error } = await db.from(table).update({ bot_id: null }).eq('bot_id', bot_id)
+    results.steps.push({ step: `detach_${table}`, success: !error, error: error?.message })
+  }
+
+  // 5. Excluir o bot — o número sai da plataforma, então o bot vinculado a ele
+  //    sai junto (regra do produto: bot é consequência do número).
+  const { error: delErr } = await db.from('bots').delete().eq('id', bot_id)
+  results.steps.push({ step: 'delete_bot', success: !delErr, error: delErr?.message })
+
+  if (delErr) {
+    // Não deixa o bot preso em estado meio-desconectado se a exclusão falhar.
+    await db.from('bots').update({
+      status: 'inactive', phone_number_id: null, waba_id: null, access_token: null,
+      pending_phone_number_id: null, pending_display_number: null, updated_at: new Date().toISOString(),
+    }).eq('id', bot_id)
+  }
+
   // Resumo final
   const allSuccess = results.steps.every(s => s.success !== false)
   return res.status(200).json({
     ok: true,
-    message: metaDeregistered
-      ? 'WhatsApp desconectado e número liberado da Meta com sucesso.'
-      : 'WhatsApp desconectado localmente. Verifique os detalhes do deregister na Meta.',
+    message: (metaDeregistered
+      ? 'WhatsApp desconectado e número liberado da Meta.'
+      : 'WhatsApp desconectado localmente. Verifique os detalhes do deregister na Meta.')
+      + (delErr ? '' : ' O bot vinculado ao número foi excluído.'),
     bot_name: bot.name,
     meta_deregistered: metaDeregistered,
     results,
