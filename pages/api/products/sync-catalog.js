@@ -8,6 +8,20 @@ import { createClient } from '@supabase/supabase-js'
 import { upsertCatalogProduct, removeCatalogProduct } from '../../../lib/metaCatalog'
 import { requireTenant } from '../../../lib/serverAuth'
 
+// Reavalia a vitrine do perfil (best-effort, nunca quebra o salvamento do produto).
+async function refreshShowcaseVisibility(db, tenantId) {
+  try {
+    const { resolveCatalogId, reconcileShowcaseVisibility } = await import('../../../lib/showcase')
+    const token = process.env.META_SYSTEM_USER_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN_2
+    if (!token) return
+    const catalog = await resolveCatalogId(token, { create: false })
+    if (!catalog?.id) return
+    await reconcileShowcaseVisibility({ db, token, catalogId: catalog.id })
+  } catch (err) {
+    console.error('[sync-catalog] vitrine:', err.message)
+  }
+}
+
 function getDB() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -74,6 +88,8 @@ export default async function handler(req, res) {
         meta_sync_error: null,
       }).eq('id', productId)
 
+      await refreshShowcaseVisibility(db, tenantId)
+
       return res.status(200).json({ ok: true, result })
     }
 
@@ -92,6 +108,10 @@ export default async function handler(req, res) {
       meta_sync_status: result.ok ? 'synced' : 'error',
       meta_sync_error: result.ok ? null : result.error,
     }).eq('id', productId)
+
+    // Vitrine coerente: liga/desliga o catálogo no perfil conforme o catálogo
+    // compartilhado passa a ter (ou não) só os produtos deste cliente.
+    await refreshShowcaseVisibility(db, tenantId)
 
     return res.status(200).json({ ok: true, result })
   } catch (err) {

@@ -117,7 +117,7 @@ export default function ShowcaseCard({ tenantId }) {
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
                   {visible === false
-                    ? 'Catálogo compartilhado com outros clientes — o catálogo segue no chat'
+                    ? 'Aparece quando o catálogo tiver só os seus produtos — no chat o catálogo já funciona'
                     : 'Botão de catálogo no perfil do número'}
                 </div>
               </div>
