@@ -89,7 +89,18 @@ export default async function handler(req, res) {
       .eq('tenant_id', bot.tenant_id)
       .in('status', ['pending', 'in_progress'])
 
-    return res.status(200).json({ ok: true })
+    // Vitrine oficial junto com o número (perfil + catálogo + produtos).
+    let showcase = null
+    try {
+      const { ensureShowcase } = await import('../../../lib/showcase')
+      showcase = await ensureShowcase({
+        db, tenantId: bot.tenant_id, phoneNumberId: phone_number_id, token: accessToken, productLimit: 25,
+      })
+    } catch (err) {
+      console.error('[embedded-signup] vitrine:', err.message)
+    }
+
+    return res.status(200).json({ ok: true, showcase })
   } catch (err) {
     console.error('[embedded-signup] erro:', err?.response?.data || err.message)
     const metaMsg = err?.response?.data?.error?.message

@@ -9,6 +9,7 @@ import WhatsAppSmsConnect from '../../components/WhatsAppSmsConnect'
 import SectionHelp from '../../components/Tutorial/SectionHelp'
 import MigrationWizard from '../../components/MigrationWizard'
 import NumberHealthCard from '../../components/NumberHealthCard'
+import ShowcaseCard from '../../components/ShowcaseCard'
 
 export default function WhatsappSetupPage() {
   const router = useRouter()
@@ -200,6 +201,9 @@ export default function WhatsappSetupPage() {
 
       {/* ── Saúde de cada número conectado ── */}
       {connectedBots.map(bot => <NumberHealthCard key={'h-' + bot.id} bot={bot} />)}
+
+      {/* ── Vitrine oficial (catálogo + perfil) do número ── */}
+      {connectedBots.length > 0 && <ShowcaseCard tenantId={tenant?.id} />}
 
       <MigrationWizard activeBot={connectedBots[0]} tenantId={tenant?.id}
         step2={<>

@@ -86,7 +86,20 @@ export default async function handler(req, res) {
       .eq('tenant_id', bot.tenant_id)
       .in('status', ['pending', 'in_progress'])
 
-    return res.status(200).json({ ok: true })
+    // 6. Vitrine oficial: o número nasce com perfil preenchido, catálogo
+    //    ligado e os produtos do painel já publicados (igual ao WhatsApp
+    //    Business App). Falha aqui NUNCA derruba a conexão.
+    let showcase = null
+    try {
+      const { ensureShowcase } = await import('../../../lib/showcase')
+      showcase = await ensureShowcase({
+        db, tenantId: bot.tenant_id, phoneNumberId, token: systemToken, productLimit: 25,
+      })
+    } catch (err) {
+      console.error('[confirm-number] vitrine:', err.message)
+    }
+
+    return res.status(200).json({ ok: true, showcase })
   } catch (err) {
     console.error('[confirm-number] erro:', err?.response?.data || err.message)
     const metaMsg = err?.response?.data?.error?.error_user_msg || err?.response?.data?.error?.message

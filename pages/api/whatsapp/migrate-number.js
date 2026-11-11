@@ -131,6 +131,17 @@ export default async function handler(req, res) {
     await db.from('bots').delete().eq('id', prev.id)
   }
 
+  // Vitrine oficial do número no tenant de destino (perfil + catálogo + produtos).
+  let showcase = null
+  try {
+    const { ensureShowcase } = await import('../../../lib/showcase')
+    showcase = await ensureShowcase({
+      db, tenantId: target_tenant_id, phoneNumberId: phone_number_id, token: metaToken, productLimit: 25,
+    })
+  } catch (err) {
+    console.error('[migrate-number] vitrine:', err.message)
+  }
+
   const unlinkErr = null
 
   return res.status(200).json({
@@ -140,5 +151,6 @@ export default async function handler(req, res) {
     tenant: tenant.name,
     meta_info: metaInfo,
     existing_bot: !!existingBot,
+    showcase,
   })
 }

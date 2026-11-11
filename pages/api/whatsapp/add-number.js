@@ -21,6 +21,18 @@ const SHARED_WABA_ID = process.env.ARKIEL_SHARED_WABA_ID || '1867398900635798'
 
 const digitsOnly = (s) => (s || '').replace(/\D/g, '')
 
+// Vitrine oficial (perfil + catálogo + produtos) reaplicada em reconexões.
+// Best-effort: nunca bloqueia nem falha a conexão do número.
+async function refreshShowcase(db, tenantId, phoneNumberId, token) {
+  try {
+    const { ensureShowcase } = await import('../../../lib/showcase')
+    return await ensureShowcase({ db, tenantId, phoneNumberId, token, productLimit: 25 })
+  } catch (err) {
+    console.error('[add-number] vitrine:', err.message)
+    return null
+  }
+}
+
 // Fluxo inicial de todo bot novo: sem isso o bot nasce sem menu e fica mudo.
 const DEFAULT_FLOW = {
   name: 'Fluxo Principal',
@@ -103,6 +115,9 @@ export default async function handler(req, res) {
     }
     const mineActive = (claims || []).find(c => c.tenant_id === tenantId && c.status === 'active')
     if (mineActive) {
+      // Reconectar um número já ativo também reaplica a vitrine (perfil,
+      // catálogo e produtos) — o cliente nunca fica com número "pelado".
+      await refreshShowcase(db, tenantId, existingPhoneNumberId, systemToken)
       return res.status(200).json({
         ok: true,
         already_connected: true,
@@ -120,6 +135,7 @@ export default async function handler(req, res) {
     bot = r.data; botErr = r.error
     if (!botErr && bot?.phone_number_id) {
       if (existingPhoneNumberId && bot.phone_number_id === existingPhoneNumberId) {
+        await refreshShowcase(db, tenantId, existingPhoneNumberId, systemToken)
         return res.status(200).json({
           ok: true,
           already_connected: bot.status === 'active',
