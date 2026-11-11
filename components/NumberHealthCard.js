@@ -45,8 +45,14 @@ export default function NumberHealthCard({ bot }) {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
           <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
             <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>NÚMERO</div>
-            <div style={{ color: 'var(--text-primary)', fontSize: 14, fontWeight: 600 }}>{health.number || '—'}</div>
+            <div style={{ color: 'var(--text-primary)', fontSize: 15, fontWeight: 700, letterSpacing: 0.3 }}>{health.number || '—'}</div>
             <div style={{ color: '#94a3b8', fontSize: 12, marginTop: 2 }}>{health.verified_name}</div>
+            {health.number && (
+              <a href={`https://wa.me/${String(health.number).replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                style={{ display: 'inline-block', marginTop: 8, fontSize: 12, fontWeight: 700, color: '#25D366', textDecoration: 'none' }}>
+                💬 Abrir a conversa no WhatsApp →
+              </a>
+            )}
           </div>
           <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--bg-secondary, rgba(255,255,255,0.03))', border: '1px solid var(--border-soft)' }}>
             <div style={{ color: '#64748b', fontSize: 11, fontWeight: 700, marginBottom: 4 }}>QUALIDADE (META)</div>
