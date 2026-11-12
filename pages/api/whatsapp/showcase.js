@@ -53,6 +53,7 @@ export default async function handler(req, res) {
 
   let catalog = null
   let tenantsInCatalog = null
+  let catalogReview = null
   let catalogVisible = null
   let profile = null
   let profileIssues = []
@@ -64,6 +65,25 @@ export default async function handler(req, res) {
       if (catalog?.id) {
         const tenants = await catalogTenantIds(catalog.id, token)
         tenantsInCatalog = tenants.size
+        // Situação de cada produto na revisão da Meta: é ela que decide quando
+        // o item (e portanto a vitrine) passa a aparecer pro cliente final.
+        let after = null
+        const review = { approved: 0, pending: 0, rejected: 0, other: 0 }
+        for (let page = 0; page < 10; page++) {
+          const q = `fields=retailer_id,review_status,visibility&limit=200${after ? `&after=${after}` : ''}`
+          const pr = await fetch(`${GRAPH}/${catalog.id}/products?${q}&access_token=${token}`)
+          const pd = await pr.json()
+          for (const item of pd?.data || []) {
+            const st = String(item?.review_status || '').toUpperCase()
+            if (st === 'APPROVED') review.approved++
+            else if (st === 'REJECTED' || st === 'OUTDATED') review.rejected++
+            else if (!st || st === 'PENDING') review.pending++
+            else review.other++
+          }
+          after = pd?.paging?.next ? pd?.paging?.cursors?.after : null
+          if (!after) break
+        }
+        catalogReview = review
       }
       if (bot?.phone_number_id) {
         const r = await fetch(`${GRAPH}/${bot.phone_number_id}/whatsapp_commerce_settings?fields=is_catalog_visible,is_cart_enabled&access_token=${token}`)
@@ -92,6 +112,7 @@ export default async function handler(req, res) {
     bot: bot ? { id: bot.id, name: bot.name, phone_number_id: bot.phone_number_id } : null,
     catalog: catalog?.id ? { id: catalog.id, source: catalog.source } : null,
     catalog_visible_on_profile: catalogVisible,
+    catalog_review: catalogReview,
     tenants_in_catalog: tenantsInCatalog,
     shared_catalog: tenantsInCatalog !== null ? tenantsInCatalog > 1 : null,
     products: counts,

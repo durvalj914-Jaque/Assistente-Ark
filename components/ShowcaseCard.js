@@ -108,6 +108,17 @@ export default function ShowcaseCard({ tenantId }) {
                       ? `${products.local_only} ainda só no painel`
                       : 'Produtos ativos do painel aparecem no WhatsApp'}
                 </div>
+                {data.catalog_review && (
+                  <div style={{ color: data.catalog_review.pending ? '#f59e0b' : data.catalog_review.rejected ? '#ef4444' : '#10b981', fontSize: 11, marginTop: 4, fontWeight: 600 }}>
+                    {data.catalog_review.pending
+                      ? `⏳ ${data.catalog_review.pending} em análise pela Meta`
+                      : data.catalog_review.rejected
+                        ? `❌ ${data.catalog_review.rejected} recusado(s) pela Meta`
+                        : data.catalog_review.approved
+                          ? '✅ Aprovado pela Meta'
+                          : '—'}
+                  </div>
+                )}
               </div>
 
               <div style={tile}>
